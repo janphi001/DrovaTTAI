@@ -10,12 +10,9 @@ _LOW_AROUSAL = {"sad", "tender", "contemplative", "mundane"}
 
 
 def render_kitten(text: str, tag: EmotionTag) -> str:
-    s = text
-    n = len(text)
-    placed = sorted(((max(0, min(ev.pos, n)), i, ev) for i, ev in enumerate(tag.events)), reverse=True)
-    for p, _, ev in placed:
-        s = f"{s[:p]} <{ev.tag}> {s[p:]}"
-    s = re.sub(r"\s+", " ", s).strip()
+    # Laut-Tags (<sigh>, <laugh> ...) werden bewusst nicht gerendert: Kitten spricht sie auf Deutsch laut aus
+    # (Hörtest 2026-10-10). Emotion und Betonung wirken, wenn auch nur schwach.
+    s = re.sub(r"\s+", " ", text).strip()
     for word in tag.emphasis:
         s = re.sub(rf"(?<![\w(<>])({re.escape(word)})(?![\w)<>])", r"(((\1)))", s, count=1)
     if tag.emotion != "neutral" and tag.intensity >= KITTEN_MIN_INTENSITY:

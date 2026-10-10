@@ -41,7 +41,7 @@ def test_run_writes_final_files_and_renders_per_engine(tmp_path):
     assert all(r.ok for r in results)
     assert (tmp_path / "kitten" / "german" / "short_00.wav").exists()
     assert not list(tmp_path.rglob("*.part.wav"))
-    assert client.requests[1].text == "<sigh> Na gut & so."
+    assert client.requests[1].text == "Na gut & so."  # Laut-Tags werden für Kitten nicht gerendert
 
 
 def test_resume_skips_finished_and_ignores_partial(tmp_path):
