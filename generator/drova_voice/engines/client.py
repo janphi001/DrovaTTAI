@@ -18,6 +18,14 @@ class EngineError(RuntimeError):
     pass
 
 
+def _json_dict(text: str) -> dict | None:
+    try:
+        obj = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    return obj if isinstance(obj, dict) else None
+
+
 class EngineClient:
     def __init__(self, cmd: Sequence[str], cwd: str | Path | None = None):
         env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
@@ -41,18 +49,17 @@ class EngineClient:
             if not line:
                 raise EngineError(f"Worker beendet (Exit-Code {self._proc.poll()})")
             line = line.strip()
-            if not line.startswith("{") and _READY_MARKER in line:
-                # Fremdtext ohne Zeilenende direkt vor der Ready-Zeile: Präfix als Lärm behandeln, ab der Ready-Zeile parsen.
+            obj = _json_dict(line)
+            if obj is None and _READY_MARKER in line:
+                # Fremdtext (auch einer, der mit "{" beginnt) direkt vor der Ready-Zeile: nur den Präfix als Lärm
+                # weiterleiten, ab der Ready-Zeile parsen.
                 cut = line.index(_READY_MARKER)
-                print(f"[worker stdout] {line[:cut]}", file=sys.stderr)
+                if cut:
+                    print(f"[worker stdout] {line[:cut]}", file=sys.stderr)
                 line = line[cut:]
-            if line.startswith("{"):
-                try:
-                    obj = json.loads(line)
-                except json.JSONDecodeError:
-                    obj = None
-                if isinstance(obj, dict) and ("ready" in obj or "ok" in obj):
-                    return obj
+                obj = _json_dict(line)
+            if obj is not None and ("ready" in obj or "ok" in obj):
+                return obj
             if line:  # Leerzeilen sind kein Lärm
                 print(f"[worker stdout] {line}", file=sys.stderr)
         raise EngineError("Worker liefert kein gültiges Protokoll")

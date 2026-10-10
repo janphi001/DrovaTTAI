@@ -360,3 +360,30 @@ def test_stale_output_that_cannot_be_removed_is_reported_without_synth(tmp_path,
     assert not resp.ok and resp.id == "a2"
     assert "konnte nicht entfernt werden" in resp.error
     assert out.is_dir()
+
+
+# --- Lärm, der selbst mit "{" beginnt, vor der Ready-Zeile auf derselben Zeile ---
+
+PREFIXED_READY_STUB = '''
+import json, os, sys
+ready = json.dumps({"ready": True, "engine": "braced", "model": "stub-braced"})
+os.write(1, ("{noise " + ready + "\\n").encode("utf-8"))
+for line in sys.stdin:
+    req = json.loads(line)
+    with open(req["out_path"], "wb") as f:
+        f.write(b"RIFF")
+    os.write(1, (json.dumps({"id": req["id"], "ok": True, "out_path": req["out_path"],
+                             "sample_rate": 22050, "duration": 0.1}) + "\\n").encode("utf-8"))
+'''
+
+
+def test_ready_line_after_brace_noise_on_same_line_completes_handshake(tmp_path, guarded, capsys):
+    client = guarded(lambda: EngineClient(_stub(tmp_path, PREFIXED_READY_STUB)))
+    try:
+        assert (client.engine, client.model) == ("braced", "stub-braced")
+        resp = guarded(lambda: client.synth(SynthRequest(id="c1", text="Brauner Krug", out_path=str(tmp_path / "c1.wav"))))
+    finally:
+        client.close()
+    assert resp.ok and resp.id == "c1"
+    err = capsys.readouterr().err
+    assert err.count("{noise") == 1  # der Präfix wird genau einmal weitergeleitet
