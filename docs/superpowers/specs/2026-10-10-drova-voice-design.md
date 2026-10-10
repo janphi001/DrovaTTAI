@@ -1,6 +1,6 @@
 # DrovaVoice – KI-Vertonung für Drova: Forsaken Kin (Design)
 
-Stand: 2026-10-10 · Status: Entwurf zur Freigabe
+Stand: 2026-10-10 · Status: Entwurf zur Freigabe; §15 enthält die Änderungen nach dem Hörtest (M2)
 
 ## 1. Ziel
 
@@ -215,3 +215,14 @@ Engine-neutrales Format pro Zeilen-ID in `emotions.jsonl`:
 - Verteilung von Audio
 - Echtzeit-Gespräche per LLM
 - Andere Sprachen als Deutsch in Version 1
+
+## 15. Änderungen nach dem Hörtest (M2, 2026-10-10)
+
+Quelle: `docs/decisions/2026-10-tts-engine.md`. Wo dieser Abschnitt der übrigen Spec widerspricht, gilt dieser Abschnitt.
+
+- **Engine:** Fish Audio (Cloud, API `https://api.fish.audio/v1/tts`, Modell `s2.1-pro-free` bzw. `s2.1-pro`) mit den **offiziellen deutschen Fish-Stimmen** (Lena, Leon, Melanie, Lukas (Österreich), Emma, Elin (Schweiz), Jonas, Valentina (Österreich)). Die Aussagen "lokal erzeugt" (§1) und die Kandidatenliste (§6) gelten damit nicht mehr. Kitten TTS 2 bleibt als lokale Rückfallebene (Worker vorhanden, Klon über Referenz-WAV plus `ref.txt`).
+- **Folgen der Cloud:** Jeder Sprechtext geht an Fish; die Terms erlauben Fish, Inhalte zur Verbesserung der Modelle zu nutzen. Kostenlose Nutzung gilt nur für persönliche, nicht-kommerzielle Nutzung. Ratenlimits und Preise sind ungeklärt und werden vor dem Vollauf mit einer Stichprobe gemessen. Der API-Key liegt nur in der Umgebungsvariable `FISH_API_KEY`, nie im Repo.
+- **Stimmen-Pool (§6):** Der Pool besteht zunächst aus den offiziellen Fish-Stimmen (Fish-Modell-ID statt `ref.wav`). Die Zuordnung Stimme -> Figur steht in `casting/casting.yaml`.
+- **Emotionen (§7):** Für Fish werden Emotionen als Klammer-Anweisung am Satzanfang geschrieben (`[angry]`, `[sad]`, `[very excited]`), Laute als `[sighing]`, `[laughing]`, `[break]`. Fish-Cues sind englisch, freie Beschreibungen sind erlaubt. Für Kitten gilt: nur Emotions-Prefix und Betonung, keine Laut-Tags (werden vorgelesen).
+- **Engine-Worker (§6):** Der Worker `fish` spricht HTTP statt eines lokalen Modells, nutzt aber dasselbe JSON-Lines-Protokoll. Der Cache-Schlüssel enthält den Modellnamen als Header-Wert.
+- **Plan-1-Ergebnisse, die Plan 2 voraussetzt:** `drova_voice` (`loc`, `speech_text`, `emotions`, `render`, `bakeoff`, `engines`) und `DrovaVoice.Core` (`LineIds`) sind fertig und getestet; die Mod lädt in MelonLoader 0.7.3 mit Drova Modding API 0.5.4 und gibt `Core ok: 950774fdbc26dddf.ogg` aus (M0).
