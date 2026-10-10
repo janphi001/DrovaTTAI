@@ -85,6 +85,40 @@ def test_key_on_own_line_with_brace_on_next_line():
     ]
 
 
+def test_mid_line_braces_in_body_are_text():
+    res = parse_loc("Tst_1 { Anfang Lambda\nWort Xi {ruhig} Omikron\nEnde Sigma }\n")
+    assert res.errors == ()
+    assert [(e.key, e.text, e.line) for e in res.entries] == [
+        ("Tst_1", "Anfang Lambda\nWort Xi {ruhig} Omikron\nEnde Sigma", 1),
+    ]
+
+
+def test_mid_line_brace_on_closing_line_is_text():
+    res = parse_loc("Tst_1 { Anfang Lambda\nWort Xi {ruhig} }\n")
+    assert res.errors == ()
+    assert [(e.key, e.text) for e in res.entries] == [("Tst_1", "Anfang Lambda\nWort Xi {ruhig}")]
+
+
+def test_key_only_layout_mid_line_brace_in_body_is_text():
+    res = parse_loc("Kopf Titel Pi\n{\n\tWort Xi {ruhig} Omikron\n\tZeile Rho.\n}\n")
+    assert res.errors == ()
+    assert [(e.key, e.text, e.line) for e in res.entries] == [
+        ("Kopf Titel Pi", "Wort Xi {ruhig} Omikron\nZeile Rho.", 1),
+    ]
+
+
+def test_unterminated_entry_before_key_only_header_is_reported():
+    res = parse_loc("Tst_1 { Anfang Alpha\n\nKopf Titel Tau\n{\nBeta Gamma. }\n")
+    assert res.errors == (1,)
+    assert [(e.key, e.text, e.line) for e in res.entries] == [("Kopf Titel Tau", "Beta Gamma.", 3)]
+
+
+def test_unterminated_key_only_entry_does_not_swallow_next_entry():
+    res = parse_loc("Kopf Titel Mu\n{\nAnfang Nu\n\nTst_2 { Ende Xi. }\n")
+    assert res.errors == (1,)
+    assert [(e.key, e.text, e.line) for e in res.entries] == [("Tst_2", "Ende Xi.", 5)]
+
+
 def test_loc_rel_path(tmp_path):
     lang_dir = tmp_path / "de"
     f = lang_dir / "Testdir" / "NPC_Testfigur_de.loc"

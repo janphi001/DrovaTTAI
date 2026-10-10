@@ -6,7 +6,7 @@ from pathlib import Path
 
 _START_RE = re.compile(r"^(.+?)\s*\{\s?(.*)$")
 _BRACE_LINE_RE = re.compile(r"^\s*\{\s*$")
-_HEADER_LIKE_RE = re.compile(r"^[^{}]+\{")
+_HEADER_RE = re.compile(r"^\S[^{}]*\s\{(\s|$|\})")
 
 
 @dataclass(frozen=True)
@@ -20,6 +20,15 @@ class LocEntry:
 class LocParseResult:
     entries: tuple[LocEntry, ...]
     errors: tuple[int, ...]
+
+
+def _starts_entry(lines: list[str], idx: int) -> bool:
+    """True if lines[idx] looks like a new entry header rather than body text."""
+    line = lines[idx].strip()
+    if _HEADER_RE.match(line):
+        return True
+    # Key-only layout: a text line directly followed by a lone "{" line.
+    return bool(line) and idx + 1 < len(lines) and bool(_BRACE_LINE_RE.match(lines[idx + 1]))
 
 
 def parse_loc(content: str) -> LocParseResult:
@@ -51,14 +60,10 @@ def parse_loc(content: str) -> LocParseResult:
             continue
         buffer = [rest]
         j = i + consumed
-        while (
-            j < len(lines)
-            and not _HEADER_LIKE_RE.match(lines[j].strip())
-            and not lines[j].rstrip().endswith("}")
-        ):
+        while j < len(lines) and not _starts_entry(lines, j) and not lines[j].rstrip().endswith("}"):
             buffer.append(lines[j])
             j += 1
-        if j >= len(lines) or _HEADER_LIKE_RE.match(lines[j].strip()):
+        if j >= len(lines) or _starts_entry(lines, j):
             # Unterminated entry: report its start and resume at the next header.
             errors.append(start)
             i = j
