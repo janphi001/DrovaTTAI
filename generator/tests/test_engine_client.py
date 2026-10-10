@@ -387,3 +387,44 @@ def test_ready_line_after_brace_noise_on_same_line_completes_handshake(tmp_path,
     assert resp.ok and resp.id == "c1"
     err = capsys.readouterr().err
     assert err.count("{noise") == 1  # der Präfix wird genau einmal weitergeleitet
+
+
+# --- Opus-Review Task 12: Ladefehler sichtbar machen, leeres Audio nicht als Erfolg melden ---
+
+LOAD_FAILS = '''
+def load():
+    raise RuntimeError("CPML nicht bestätigt")
+
+def synth(_state, req):
+    return 22050, 0.1
+
+serve("broken", "stub-broken", load, synth)
+'''
+
+SYNTH_WRITES_HEADER_ONLY = '''
+def load():
+    return None
+
+def synth(_state, req):
+    with open(req["out_path"], "wb") as f:
+        f.write(b"RIFF" + bytes(40))
+    return 22050, 0.0
+
+serve("hollow", "stub-header-only", load, synth)
+'''
+
+
+def test_load_failure_reaches_the_client_with_its_reason(tmp_path, guarded):
+    with pytest.raises(EngineError, match="RuntimeError: CPML nicht bestätigt"):
+        guarded(lambda: EngineClient(_stub(tmp_path, _serve_header() + LOAD_FAILS)))
+
+
+def test_zero_duration_audio_is_not_reported_as_success(tmp_path, guarded):
+    client = guarded(lambda: EngineClient(_stub(tmp_path, _serve_header() + SYNTH_WRITES_HEADER_ONLY)))
+    out = str(tmp_path / "stumm.wav")
+    try:
+        resp = guarded(lambda: client.synth(SynthRequest(id="s1", text="Kalte Luft", out_path=out)))
+    finally:
+        client.close()
+    assert not resp.ok and resp.id == "s1"
+    assert resp.error == f"Leeres Audio (Dauer 0): {out}"

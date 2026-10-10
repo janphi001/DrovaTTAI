@@ -36,7 +36,13 @@ def serve(engine: str, model: str, load: Callable[[], Any], synth: Callable[[Any
         proto.write(json.dumps(obj, ensure_ascii=False) + "\n")
         proto.flush()
 
-    state = load()
+    try:
+        state = load()
+    except Exception as e:  # noqa: BLE001 – der Grund soll beim Client ankommen, nicht nur im stderr-Rauschen
+        traceback.print_exc()
+        proto.write("\n")
+        send({"ready": False, "engine": engine, "model": model, "error": f"{type(e).__name__}: {e}"})
+        sys.exit(1)
     proto.write("\n")  # schließt eine angefangene Fremdzeile ab, damit die Ready-Zeile eine eigene Zeile bleibt
     send({"ready": True, "engine": engine, "model": model})
     for line in sys.stdin:
@@ -60,6 +66,9 @@ def serve(engine: str, model: str, load: Callable[[], Any], synth: Callable[[Any
             sample_rate, duration = synth(state, req)
             if not (os.path.isfile(out_path) and os.path.getsize(out_path) > 0):
                 send({"id": req.get("id"), "ok": False, "error": f"Keine Audiodatei geschrieben: {out_path}"})
+                continue
+            if not duration > 0:
+                send({"id": req.get("id"), "ok": False, "error": f"Leeres Audio (Dauer 0): {out_path}"})
                 continue
             send({"id": req.get("id"), "ok": True, "out_path": out_path,
                   "sample_rate": sample_rate, "duration": duration})
