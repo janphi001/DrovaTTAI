@@ -80,6 +80,8 @@ def synth(_state, req):
     os.write(1, b"native noise during synth\\n")
     os.write(1, b"{broken json\\n")
     os.write(1, b'{"progress": 0.5}\\n')
+    with open(req["out_path"], "wb") as f:
+        f.write(b"RIFF")
     return 22050, 0.1
 
 serve("noisy", "stub-1", load, synth)
@@ -347,3 +349,57 @@ def test_close_kills_worker_that_ignores_end_of_input(tmp_path, workers, monkeyp
     client.close()
     assert client._proc.poll() is not None
     assert client._proc.stdin.closed and client._proc.stdout.closed
+
+
+# --- G3: ok nur mit geschriebener, nicht leerer Audiodatei ---
+
+SYNTH_WRITES_NOTHING = '''
+def load():
+    return None
+
+def synth(_state, req):
+    return 22050, 0.1
+
+serve("silent", "stub-silent", load, synth)
+'''
+
+SYNTH_WRITES_EMPTY_FILE = '''
+def load():
+    return None
+
+def synth(_state, req):
+    open(req["out_path"], "wb").close()
+    return 22050, 0.1
+
+serve("hollow", "stub-hollow", load, synth)
+'''
+
+
+@pytest.mark.parametrize("body", [SYNTH_WRITES_NOTHING, SYNTH_WRITES_EMPTY_FILE], ids=["keine-datei", "leere-datei"])
+def test_ok_requires_a_non_empty_audio_file(tmp_path, workers, body):
+    client = _guarded(lambda: EngineClient(_stub(tmp_path, _serve_header() + body)), workers)
+    out = str(tmp_path / "leer.wav")
+    try:
+        resp = _guarded(lambda: client.synth(SynthRequest(id="s1", text="Kalte Luft", out_path=out)), workers)
+    finally:
+        client.close()
+    assert not resp.ok and resp.id == "s1"
+    assert resp.error == f"Keine Audiodatei geschrieben: {out}"
+
+
+# --- G4: Anfragen, die kein JSON-Objekt sind, beenden die Schleife nicht ---
+
+def test_non_object_requests_are_rejected_and_loop_continues(tmp_path, workers):
+    lines = "\n".join([
+        "[1, 2]",
+        "5",
+        '"x"',
+        SynthRequest(id="n1", text="Leiser Regen", out_path=str(tmp_path / "n1.wav")).to_json(),
+    ]) + "\n"
+    proc = _guarded(lambda: subprocess.run(
+        FAKE, input=lines, capture_output=True, text=True, encoding="utf-8", env=UTF8_ENV,
+    ), workers)
+    assert proc.returncode == 0
+    replies = [json.loads(line) for line in proc.stdout.splitlines() if line.strip()][1:]  # erste Zeile: Ready
+    assert replies[:3] == [{"id": None, "ok": False, "error": "Anfrage ist kein JSON-Objekt"}] * 3
+    assert replies[3]["id"] == "n1" and replies[3]["ok"] is True

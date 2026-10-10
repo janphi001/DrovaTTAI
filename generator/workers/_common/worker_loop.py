@@ -37,9 +37,16 @@ def serve(engine: str, model: str, load: Callable[[], Any], synth: Callable[[Any
         except json.JSONDecodeError as e:
             send({"id": None, "ok": False, "error": f"Ungültiges JSON: {e}"})
             continue
+        if not isinstance(req, dict):
+            send({"id": None, "ok": False, "error": "Anfrage ist kein JSON-Objekt"})
+            continue
         try:
             sample_rate, duration = synth(state, req)
-            send({"id": req.get("id"), "ok": True, "out_path": req["out_path"],
+            out_path = req["out_path"]
+            if not (os.path.isfile(out_path) and os.path.getsize(out_path) > 0):
+                send({"id": req.get("id"), "ok": False, "error": f"Keine Audiodatei geschrieben: {out_path}"})
+                continue
+            send({"id": req.get("id"), "ok": True, "out_path": out_path,
                   "sample_rate": sample_rate, "duration": duration})
         except Exception as e:  # noqa: BLE001 – jeder Fehler wird gemeldet, der Worker lebt weiter
             traceback.print_exc()
