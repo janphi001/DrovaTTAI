@@ -56,7 +56,14 @@ def _parse(argv: list[str] | None) -> argparse.Namespace:
 
 
 def _run(args: argparse.Namespace) -> int:
-    cfg = load_config(args.config)
+    try:
+        cfg = load_config(args.config)
+    except FileNotFoundError:
+        print(f"FEHLER: Konfigurationsdatei nicht gefunden: {args.config}", file=sys.stderr)
+        return 2
+    except ValueError as e:
+        print(f"FEHLER: {e}", file=sys.stderr)
+        return 2
     bake_data = cfg.data_dir / "bakeoff"
     bake_out = cfg.out_dir / "bakeoff"
     samples_path = bake_data / "samples.jsonl"

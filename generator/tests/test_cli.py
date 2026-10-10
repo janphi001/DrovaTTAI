@@ -1,7 +1,9 @@
-import shutil
 import io
+import shutil
 import sys
 from pathlib import Path
+
+import pytest
 
 from drova_voice.cli import main
 from drova_voice.engines.protocol import SynthResponse
@@ -148,3 +150,28 @@ def test_select_without_dialog_dir_returns_2(tmp_path, capsys):
     assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 2
     err = capsys.readouterr().err
     assert "Dialog-Ordner fehlt" in err and "Dialog" in err
+
+
+@pytest.mark.parametrize("argv", [
+    ["bakeoff", "select"],
+    ["bakeoff", "run"],
+    ["bakeoff", "sheet"],
+    ["bakeoff", "refs", "--speaker", "Viktor Eka"],
+    ["smoke", "fake"],
+])
+def test_broken_config_is_a_german_error_with_exit_2(tmp_path, capsys, argv):
+    _, cfg, _ = _setup(tmp_path)
+    cfg.write_text('game_dir: ""\n', encoding="utf-8")
+    assert main(["--config", str(cfg), *argv]) == 2
+    err = capsys.readouterr().err
+    assert "FEHLER:" in err and "game_dir" in err
+    assert "Traceback" not in err
+
+
+@pytest.mark.parametrize("argv", [["bakeoff", "select"], ["smoke", "fake"]])
+def test_missing_config_file_is_a_german_error_with_exit_2(tmp_path, capsys, argv):
+    missing = tmp_path / "gibt_es_nicht.yaml"
+    assert main(["--config", str(missing), *argv]) == 2
+    err = capsys.readouterr().err
+    assert "FEHLER:" in err and "nicht gefunden" in err and "gibt_es_nicht.yaml" in err
+    assert "Traceback" not in err
