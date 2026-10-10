@@ -47,3 +47,11 @@ def test_backslash_path_in_double_quotes_gives_german_hint(tmp_path):
     cfg_file.write_text(r'game_dir: "C:\Drova\Spiel"' + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="einfachen Anführungszeichen"):
         load_config(cfg_file)
+
+
+@pytest.mark.parametrize("value", ["5", "[a, b]", "true", "0"])
+def test_repo_root_must_be_a_string(tmp_path, value):
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(f'game_dir: "C:/Game"\nrepo_root: {value}\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="repo_root"):
+        load_config(cfg_file)
