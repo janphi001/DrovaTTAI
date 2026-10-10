@@ -28,6 +28,22 @@ def test_kitten_emphasis_first_occurrence_whole_word():
     assert render_kitten("Niemand.", EmotionTag(emphasis=["nie"])) == "Niemand."
 
 
+def test_kitten_emphasis_skips_inserted_event_tag():
+    tag = EmotionTag(events=[Event("um", 0)], emphasis=["um"])
+    assert render_kitten("Das ist um was", tag) == "<um> Das ist (((um))) was"
+
+
+@pytest.mark.parametrize("word", ["laugh", "sigh", "pause"])
+def test_kitten_emphasis_never_inside_event_tag(word):
+    tag = EmotionTag(events=[Event(word, 0)], emphasis=[word])
+    assert render_kitten(f"Das ist {word} was", tag) == f"<{word}> Das ist (((" + word + "))) was"
+
+
+def test_kitten_event_positions_clamped_to_original_text():
+    tag = EmotionTag(events=[Event("sigh", 10), Event("laugh", 20)])
+    assert render_kitten("Hallo", tag) == "Hallo <sigh> <laugh>"
+
+
 @pytest.mark.parametrize("tag, expected", [
     (EmotionTag(), {"exaggeration": 0.5, "cfg_weight": 0.5}),
     (EmotionTag("angry", 1.0), {"exaggeration": 0.9, "cfg_weight": 0.3}),

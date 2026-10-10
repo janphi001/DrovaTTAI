@@ -11,12 +11,13 @@ _LOW_AROUSAL = {"sad", "tender", "contemplative", "mundane"}
 
 def render_kitten(text: str, tag: EmotionTag) -> str:
     s = text
-    for ev in sorted(tag.events, key=lambda e: e.pos, reverse=True):
-        p = max(0, min(ev.pos, len(s)))
+    n = len(text)
+    placed = sorted(((max(0, min(ev.pos, n)), i, ev) for i, ev in enumerate(tag.events)), reverse=True)
+    for p, _, ev in placed:
         s = f"{s[:p]} <{ev.tag}> {s[p:]}"
     s = re.sub(r"\s+", " ", s).strip()
     for word in tag.emphasis:
-        s = re.sub(rf"(?<![\w(])({re.escape(word)})(?![\w)])", r"(((\1)))", s, count=1)
+        s = re.sub(rf"(?<![\w(<>])({re.escape(word)})(?![\w)<>])", r"(((\1)))", s, count=1)
     if tag.emotion != "neutral" and tag.intensity >= KITTEN_MIN_INTENSITY:
         s = f"[{tag.emotion}] {s}"
     return s
