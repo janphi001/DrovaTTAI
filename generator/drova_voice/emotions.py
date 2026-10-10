@@ -111,7 +111,6 @@ def from_stage_directions(stage: Sequence[StageDirection]) -> EmotionTag:
                 tag.events.append(Event(eff.event, sd.pos))
             if eff.note and eff.note not in tag.notes:
                 tag.notes.append(eff.note)
-            break
     if matched:
         tag.source = "stage"
     return tag
