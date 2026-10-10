@@ -18,6 +18,9 @@ def _require_clean(value: str, name: str) -> None:
 
 
 def statement_id(tree: str, loca_path: str, loca_key: str) -> str:
+    for value, name in ((tree, "tree"), (loca_path, "loca_path"), (loca_key, "loca_key")):
+        if not isinstance(value, str):
+            raise ValueError(f"{name} muss ein Text (str) sein: {value!r}")
     path = normalize_loca_path(loca_path)
     for value, name in ((tree, "tree"), (path, "loca_path"), (loca_key, "loca_key")):
         _require_clean(value, name)
@@ -25,6 +28,9 @@ def statement_id(tree: str, loca_path: str, loca_key: str) -> str:
 
 
 def choice_id(tree: str, loca_path: str, loca_key: str, choice_index: int) -> str:
+    # bool ist eine Unterklasse von int, wird hier aber als Fehler behandelt (True würde sonst als 1 landen).
+    if isinstance(choice_index, bool) or not isinstance(choice_index, int):
+        raise ValueError(f"choice_index muss eine ganze Zahl sein: {choice_index!r}")
     if choice_index < 0:
         raise ValueError(f"choice_index muss >= 0 sein: {choice_index}")
     return f"{statement_id(tree, loca_path, loca_key)}{SEP}c{choice_index}"

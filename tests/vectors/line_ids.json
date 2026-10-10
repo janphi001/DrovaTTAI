@@ -6,5 +6,9 @@
   {"kind": "statement", "tree": "DT_WorldDialogue_Template", "locaPath": "/WorldDialogueCombat", "locaKey": "Plh_3", "choiceIndex": null, "variant": "f2",
    "expectedId": "DT_WorldDialogue_Template|WorldDialogueCombat|Plh_3#f2", "expectedFile": "f15de7a5cb1284dd.ogg"},
   {"kind": "statement", "tree": "DT_Bär", "locaPath": "Dialog/Ümlaut", "locaKey": "Plh_1", "choiceIndex": null, "variant": "neutral",
-   "expectedId": "DT_Bär|Dialog/Ümlaut|Plh_1#neutral", "expectedFile": "98b91eed1e4804d3.ogg"}
+   "expectedId": "DT_Bär|Dialog/Ümlaut|Plh_1#neutral", "expectedFile": "98b91eed1e4804d3.ogg"},
+  {"kind": "statement", "tree": "DT_Ba\u0308r", "locaPath": "Dialog/NPC_Test", "locaKey": "Plh_2", "choiceIndex": null, "variant": null,
+   "expectedId": "DT_Ba\u0308r|Dialog/NPC_Test|Plh_2", "expectedFile": "8d0b026eeaae15f6.ogg"},
+  {"kind": "choice", "tree": "DT_Main_NPC_Test", "locaPath": "Dialog/NPC_Test", "locaKey": "Plh_7", "choiceIndex": 1, "variant": "m1",
+   "expectedId": "DT_Main_NPC_Test|Dialog/NPC_Test|Plh_7|c1#m1", "expectedFile": "0f066b04ea15567c.ogg"}
 ]

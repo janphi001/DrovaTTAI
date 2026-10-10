@@ -57,3 +57,23 @@ def test_rejects_bad_variant():
 def test_empty_variant_is_noop():
     assert with_variant("DT_X|A|Plh_1", None) == "DT_X|A|Plh_1"
     assert with_variant("DT_X|A|Plh_1", "") == "DT_X|A|Plh_1"
+
+
+@pytest.mark.parametrize("bad", [True, False, "1", 1.0, None])
+def test_choice_index_must_be_plain_int(bad):
+    with pytest.raises(ValueError, match="choice_index"):
+        choice_id("DT_X", "Dialog/A", "Plh_1", bad)
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        (None, "Dialog/A", "Plh_1"),
+        ("DT_X", None, "Plh_1"),
+        ("DT_X", "Dialog/A", None),
+        (1, "Dialog/A", "Plh_1"),
+    ],
+)
+def test_statement_id_rejects_non_str_with_value_error(args):
+    with pytest.raises(ValueError, match="Text"):
+        statement_id(*args)
