@@ -1,0 +1,10 @@
+# Stimmen für den Hörtest. reference: Pfad relativ zur Repo-Wurzel (voices/ ist gitignored).
+- {engine: kitten, voice: German}
+- {engine: chatterbox}                      # Standardstimme mit language_id=de
+- {engine: xtts, voice: "Ana Florence"}
+- {engine: xtts, voice: "Viktor Eka"}
+- {engine: xtts, voice: "Damien Black"}
+# Nach `drova-voice bakeoff refs --speaker "Viktor Eka" --speaker "Ana Florence"`:
+# - {engine: kitten, reference: voices/bakeoff/xtts-viktor-eka.wav}
+# - {engine: chatterbox, reference: voices/bakeoff/xtts-viktor-eka.wav}
+# - {engine: chatterbox, reference: voices/bakeoff/xtts-ana-florence.wav}
