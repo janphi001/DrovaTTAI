@@ -1,9 +1,16 @@
 # Spielabgeleitete Daten und erzeugtes Audio – niemals committen
-data/
-cache/
-out/
-voices/
+/data/
+/cache/
+/out/
+/voices/
 generator/config.yaml
+*.wav
+*.ogg
+*.mp3
+*.flac
+
+# Lokale Planungs- und Review-Dateien
+/.superpowers/
 
 # Python
 .venv/
