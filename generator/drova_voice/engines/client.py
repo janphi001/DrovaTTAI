@@ -11,6 +11,7 @@ from drova_voice.engines.protocol import SynthRequest, SynthResponse
 
 _MAX_NOISE_LINES = 1000
 _READY_MARKER = '{"ready"'
+_CLOSE_TIMEOUT_S = 30
 
 
 class EngineError(RuntimeError):
@@ -68,12 +69,18 @@ class EngineClient:
         return resp
 
     def close(self) -> None:
-        if self._proc.poll() is None:
-            try:
-                self._proc.stdin.close()
-                self._proc.wait(timeout=30)
-            except (OSError, subprocess.TimeoutExpired):
-                self._proc.kill()
+        # Immer: Eingabe schließen, auf Ende warten, notfalls töten, dann Ausgabe schließen (auch bei beendetem Worker).
+        try:
+            self._proc.stdin.close()
+        except OSError:
+            pass
+        try:
+            self._proc.wait(timeout=_CLOSE_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            self._proc.kill()
+            self._proc.wait()
+        finally:
+            self._proc.stdout.close()
 
     def __enter__(self) -> "EngineClient":
         return self

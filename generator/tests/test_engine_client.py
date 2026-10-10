@@ -315,3 +315,35 @@ def test_ready_line_glued_to_foreign_text_is_found_without_serve(tmp_path, worke
         client.close()
     assert resp.ok and resp.id == "g1"
     assert "loading..." in capsys.readouterr().err
+
+
+# --- G2: close() schließt Pipes immer, auch bei bereits beendetem oder hängendem Worker ---
+
+def test_close_releases_pipes_of_crashed_worker(tmp_path, workers):
+    client = _guarded(lambda: EngineClient(_stub(tmp_path, DIES_AFTER_READY)), workers)
+    client._proc.wait(timeout=GUARD_TIMEOUT)  # Worker ist schon beendet
+    client.close()
+    assert client._proc.stdin.closed and client._proc.stdout.closed
+
+
+def test_close_is_idempotent_and_releases_pipes_of_live_worker(workers):
+    client = _guarded(lambda: EngineClient(FAKE), workers)
+    client.close()
+    client.close()
+    assert client._proc.stdin.closed and client._proc.stdout.closed
+    assert client._proc.returncode == 0
+
+
+STUCK_AFTER_READY = '''
+import json, os, time
+os.write(1, (json.dumps({"ready": True, "engine": "stuck", "model": "stub-stuck"}) + "\\n").encode("utf-8"))
+time.sleep(600)  # ignoriert das Dateiende auf stdin
+'''
+
+
+def test_close_kills_worker_that_ignores_end_of_input(tmp_path, workers, monkeypatch):
+    monkeypatch.setattr(client_mod, "_CLOSE_TIMEOUT_S", 1)
+    client = _guarded(lambda: EngineClient(_stub(tmp_path, STUCK_AFTER_READY)), workers)
+    client.close()
+    assert client._proc.poll() is not None
+    assert client._proc.stdin.closed and client._proc.stdout.closed
