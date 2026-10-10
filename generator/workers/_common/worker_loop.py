@@ -1,0 +1,42 @@
+"""Gemeinsame Schleife für Engine-Worker (JSON-Lines über stdin/stdout).
+
+Nur stdlib: wird von Workern in fremden venvs importiert.
+"""
+from __future__ import annotations
+
+import json
+import sys
+import traceback
+from typing import Any, Callable
+
+
+def serve(engine: str, model: str, load: Callable[[], Any], synth: Callable[[Any, dict], tuple[int, float]]) -> None:
+    proto = sys.stdout
+    sys.stdout = sys.stderr  # Ausgaben von Bibliotheken dürfen das Protokoll nicht stören
+    if hasattr(sys.stdin, "reconfigure"):
+        sys.stdin.reconfigure(encoding="utf-8")
+    if hasattr(proto, "reconfigure"):
+        proto.reconfigure(encoding="utf-8")
+
+    def send(obj: dict) -> None:
+        proto.write(json.dumps(obj, ensure_ascii=False) + "\n")
+        proto.flush()
+
+    state = load()
+    send({"ready": True, "engine": engine, "model": model})
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            req = json.loads(line)
+        except json.JSONDecodeError as e:
+            send({"id": None, "ok": False, "error": f"Ungültiges JSON: {e}"})
+            continue
+        try:
+            sample_rate, duration = synth(state, req)
+            send({"id": req.get("id"), "ok": True, "out_path": req["out_path"],
+                  "sample_rate": sample_rate, "duration": duration})
+        except Exception as e:  # noqa: BLE001 – jeder Fehler wird gemeldet, der Worker lebt weiter
+            traceback.print_exc()
+            send({"id": req.get("id"), "ok": False, "error": f"{type(e).__name__}: {e}"})
