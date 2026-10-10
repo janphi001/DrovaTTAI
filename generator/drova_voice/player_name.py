@@ -9,13 +9,18 @@ DEFAULT_NAME = "Arden"
 GREETINGS = ("Hallo", "Hey", "Hi", "Na", "Ah", "Oh", "Danke", "Willkommen", "Moin", "Tag", "Servus", "Grüß dich")
 
 _N = re.escape(NAME_TOKEN)
+# Artikel und Possessivdeterminierer, die einen Appositiv einleiten ("NAME, der Vogt, ...").
+_DETERMINERS = (
+    r"(?:der|die|das|den|dem|des|ein|eine|einen|einem|einer)\b"
+    r"|(?:mein|dein|sein|ihr|unser|euer)\w*"
+)
 _RULES: list[tuple[re.Pattern, object]] = [
     # "Danke, NAME." / "Wir gehen zum Wald, NAME ..."
     (re.compile(rf",\s*{_N}(?=\s*(?:\.\.\.|…|[.!?]|$))"), ""),
-    # "NAME, komm her." am Satzanfang
-    (re.compile(rf"(?:^|(?<=[.!?…]\s)){_N}\s*,\s*(\w)"), lambda m: m.group(1).upper()),
+    # "NAME, komm her." am Satzanfang – nicht bei Appositiven ("NAME, der Vogt, ...")
+    (re.compile(rf"(?:^|(?<=[.!?…]\s)){_N}\s*,\s*(?!(?i:{_DETERMINERS}))(\w)"), lambda m: m.group(1).upper()),
     # "Lanzo! NAME!" – Name als eigener Ausruf nach Satzende
-    (re.compile(rf"(?<=[.!?…]\s){_N}\s*[.!?](?![.…])\s*"), ""),
+    (re.compile(rf"(?<=[.!?…]\s){_N}\s*[.!?](?![.!?…])\s*"), ""),
     # "Hallo NAME!" / "Hallo NAME, ..."
     (re.compile(rf"\b({'|'.join(map(re.escape, GREETINGS))})\s+{_N}(?=\s*[,.!?…])"), r"\1"),
 ]

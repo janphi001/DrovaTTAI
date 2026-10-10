@@ -11,6 +11,7 @@ N = NAME_TOKEN
     (f"Hallo {N}, der Wald riecht nach Regen.", "Hallo, der Wald riecht nach Regen."),
     (f"Nun zu dir, {N} ... Pass auf die Brücke auf.", "Nun zu dir ... Pass auf die Brücke auf."),
     (f"Tarro! {N}!", "Tarro!"),
+    (f"Tarro! {N}. Komm.", "Tarro! Komm."),
     (f"{N}, komm mal her.", "Komm mal her."),
 ])
 def test_vocative_is_removed(raw, neutral):
@@ -24,6 +25,10 @@ def test_vocative_is_removed(raw, neutral):
     f"Vorsicht, Pamph. {N} schafft das bestimmt.",
     f"Nett, dass du kommst {N} ... Der Tee ist noch warm.",
     f"Pass auf. {N} ... Der Tee ist noch warm.",
+    f"{N}, der Vogt, wartet am Brunnen.",
+    f"{N}, mein Freund, wartet am Brunnen.",
+    f"Tarro?! {N}?!",
+    f"Tarro! {N}!!",
     f"{N}!",
 ])
 def test_name_inside_sentence_needs_review(raw):
