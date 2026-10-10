@@ -1,9 +1,10 @@
+import sys
 from pathlib import Path
 
 import pytest
 
 from drova_voice.bakeoff import BakeoffResult, Sample, VoiceSpec, load_voice_specs, run_bakeoff, write_sheet
-from drova_voice.engines.client import EngineError
+from drova_voice.engines.client import EngineClient, EngineError
 from drova_voice.engines.protocol import SynthResponse
 
 SAMPLES = [
@@ -179,3 +180,36 @@ def test_sheet_falls_back_to_file_uri_for_wav_outside_out_dir(tmp_path):
     results = [BakeoffResult("fake", "default", "short_00", True, str(outside), 1.0, 0.5, None)]
     page = write_sheet(SAMPLES[:1], results, tmp_path / "out").read_text(encoding="utf-8")
     assert outside.resolve().as_uri() in page
+
+
+SILENT_WORKER = '''
+import sys
+sys.path.insert(0, COMMON)
+from worker_loop import serve
+
+def load():
+    return None
+
+def synth(_state, req):
+    return 22050, 0.1  # schreibt absichtlich nichts
+
+serve("fake", "stub-silent", load, synth)
+'''
+
+
+def test_stale_part_file_from_killed_run_is_not_promoted(tmp_path, guarded):
+    common = Path(__file__).resolve().parents[1] / "workers" / "_common"
+    stub = tmp_path / "silent_worker.py"
+    stub.write_text(SILENT_WORKER.replace("COMMON", repr(str(common))), encoding="utf-8")
+    part = tmp_path / "fake" / "default" / "short_00.part.wav"
+    part.parent.mkdir(parents=True)
+    part.write_bytes(b"alter Rest")
+
+    results = guarded(lambda: run_bakeoff(
+        SAMPLES[:1], [VoiceSpec("fake")], lambda e: EngineClient([sys.executable, str(stub)]), tmp_path,
+    ))
+    assert len(results) == 1 and not results[0].ok
+    assert results[0].error == f"Keine Audiodatei geschrieben: {part}"
+    assert not (tmp_path / "fake" / "default" / "short_00.wav").exists()
+    assert not (tmp_path / "fake" / "default" / "short_00.txt").exists()
+    assert not part.exists()

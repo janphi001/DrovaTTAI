@@ -331,3 +331,32 @@ def test_non_object_requests_are_rejected_and_loop_continues(tmp_path, guarded):
     replies = [json.loads(line) for line in proc.stdout.splitlines() if line.strip()][1:]  # erste Zeile: Ready
     assert replies[:3] == [{"id": None, "ok": False, "error": "Anfrage ist kein JSON-Objekt"}] * 3
     assert replies[3]["id"] == "n1" and replies[3]["ok"] is True
+
+
+# --- Veraltete Ausgabedatei (z. B. aus einem abgebrochenen Lauf) darf kein ok vortäuschen ---
+
+def test_stale_output_file_is_removed_before_synth(tmp_path, guarded):
+    out = tmp_path / "alt.part.wav"
+    out.write_bytes(b"alte Bytes")
+    client = guarded(lambda: EngineClient(_stub(tmp_path, _serve_header() + SYNTH_WRITES_NOTHING)))
+    try:
+        resp = guarded(lambda: client.synth(SynthRequest(id="a1", text="Alter Rest", out_path=str(out))))
+    finally:
+        client.close()
+    assert not resp.ok and resp.id == "a1"
+    assert resp.error == f"Keine Audiodatei geschrieben: {out}"
+    assert not out.exists()
+
+
+def test_stale_output_that_cannot_be_removed_is_reported_without_synth(tmp_path, guarded):
+    out = tmp_path / "gesperrt.part.wav"
+    out.mkdir()  # ein Verzeichnis lässt sich nicht als Datei entfernen
+    (out / "inhalt.txt").write_bytes(b"x")
+    client = guarded(lambda: EngineClient(_stub(tmp_path, _serve_header() + SYNTH_WRITES_NOTHING)))
+    try:
+        resp = guarded(lambda: client.synth(SynthRequest(id="a2", text="Gesperrt", out_path=str(out))))
+    finally:
+        client.close()
+    assert not resp.ok and resp.id == "a2"
+    assert "konnte nicht entfernt werden" in resp.error
+    assert out.is_dir()

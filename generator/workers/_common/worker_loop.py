@@ -11,6 +11,17 @@ import traceback
 from typing import Any, Callable
 
 
+def _clear_output(path: str) -> str | None:
+    """Entfernt eine alte Ausgabedatei, damit nur prüft, was dieser Aufruf schreibt. Gibt bei Fehler eine Meldung zurück."""
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        return None
+    except OSError as e:
+        return f"Alte Ausgabedatei konnte nicht entfernt werden: {path} ({e})"
+    return None
+
+
 def serve(engine: str, model: str, load: Callable[[], Any], synth: Callable[[Any, dict], tuple[int, float]]) -> None:
     # Protokoll-Kanal auf eine eigene Kopie von fd 1 legen, danach fd 1 auf stderr umleiten:
     # Ausgaben von Bibliotheken – auch native (C-Ebene) – dürfen das Protokoll nicht stören.
@@ -41,8 +52,12 @@ def serve(engine: str, model: str, load: Callable[[], Any], synth: Callable[[Any
             send({"id": None, "ok": False, "error": "Anfrage ist kein JSON-Objekt"})
             continue
         try:
-            sample_rate, duration = synth(state, req)
             out_path = req["out_path"]
+            problem = _clear_output(out_path)
+            if problem:
+                send({"id": req.get("id"), "ok": False, "error": problem})
+                continue
+            sample_rate, duration = synth(state, req)
             if not (os.path.isfile(out_path) and os.path.getsize(out_path) > 0):
                 send({"id": req.get("id"), "ok": False, "error": f"Keine Audiodatei geschrieben: {out_path}"})
                 continue
