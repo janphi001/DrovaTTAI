@@ -1,0 +1,19 @@
+# Spielabgeleitete Daten und erzeugtes Audio – niemals committen
+data/
+cache/
+out/
+voices/
+generator/config.yaml
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
