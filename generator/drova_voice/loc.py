@@ -34,7 +34,7 @@ def _starts_entry(lines: list[str], idx: int) -> bool:
 def parse_loc(content: str) -> LocParseResult:
     entries: list[LocEntry] = []
     errors: list[int] = []
-    lines = content.lstrip("﻿").splitlines()
+    lines = content.lstrip("\ufeff").splitlines()
     i = 0
     while i < len(lines):
         line = lines[i]

@@ -5,7 +5,7 @@ from drova_voice.jsonl import read_jsonl, write_jsonl
 
 def test_roundtrip_keeps_unicode_line_separators_inside_rows(tmp_path):
     rows = [
-        {"a": "x y", "b": "x y", "c": "x\u0085y"},
+        {"a": "x\u2028y", "b": "x\u2029y", "c": "x\u0085y"},
         {"text": "Grüße, Ärger & Öl ß"},
     ]
     path = tmp_path / "rows.jsonl"

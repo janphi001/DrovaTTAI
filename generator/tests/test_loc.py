@@ -14,7 +14,7 @@ def test_single_line_entries_with_blank_lines():
 
 def test_crlf_and_bom(tmp_path):
     f = tmp_path / "NPC_X_de.loc"
-    f.write_bytes("﻿Tst_1 { Äußerst Kappa Lambda. }\r\n\r\nTst_2 { Noch Iota? }\r\n".encode("utf-8"))
+    f.write_bytes("\ufeffTst_1 { Äußerst Kappa Lambda. }\r\n\r\nTst_2 { Noch Iota? }\r\n".encode("utf-8"))
     res = read_loc_file(f)
     assert [(e.key, e.text) for e in res.entries] == [
         ("Tst_1", "Äußerst Kappa Lambda."),
@@ -120,7 +120,7 @@ def test_unterminated_key_only_entry_does_not_swallow_next_entry():
 
 
 def test_parse_loc_crlf_multiline_with_leading_bom():
-    content = "﻿Brief_1 { Liebe Mu,\r\nich komme bald Sigma.\r\nDein Rho }\r\n\r\nTst_2 { Kurz Tau. }\r\n"
+    content = "\ufeffBrief_1 { Liebe Mu,\r\nich komme bald Sigma.\r\nDein Rho }\r\n\r\nTst_2 { Kurz Tau. }\r\n"
     res = parse_loc(content)
     assert res.errors == ()
     assert [(e.key, e.text, e.line) for e in res.entries] == [
