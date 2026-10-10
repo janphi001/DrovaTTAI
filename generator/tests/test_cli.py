@@ -10,7 +10,7 @@ from drova_voice.engines.protocol import SynthResponse
 from drova_voice.jsonl import read_jsonl
 
 
-def test_bakeoff_select_and_run_with_fake_engine(tmp_path):
+def test_bakeoff_select_and_run_with_fake_engine(tmp_path, guarded):
     repo = tmp_path / "repo"
     gen = repo / "generator"
     gen.mkdir(parents=True)
@@ -27,7 +27,7 @@ def test_bakeoff_select_and_run_with_fake_engine(tmp_path):
     samples = read_jsonl(repo / "data" / "bakeoff" / "samples.jsonl")
     assert [s["bucket"] for s in samples] == ["question"]
 
-    assert main(["--config", str(cfg), "bakeoff", "run", "--voices", str(voices)]) == 0
+    assert guarded(lambda: main(["--config", str(cfg), "bakeoff", "run", "--voices", str(voices)])) == 0
     assert (repo / "out" / "bakeoff" / "fake" / "default" / "question_00.wav").exists()
     assert (repo / "out" / "bakeoff" / "index.html").exists()
 
