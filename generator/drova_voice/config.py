@@ -36,12 +36,28 @@ class Config:
 
 
 def load_config(path: Path) -> Config:
-    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    try:
+        raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    except yaml.scanner.ScannerError as e:
+        # Typisch: Windows-Pfad mit Backslash in doppelten Anführungszeichen, z. B. "C:\Games" (\G ist ungültig).
+        raise ValueError(
+            f"{path}: YAML-Fehler: {e}. Hinweis: Windows-Pfade mit '/' oder in einfachen "
+            "Anführungszeichen schreiben, z. B. 'C:/Games/...'"
+        ) from e
+    except yaml.YAMLError as e:
+        raise ValueError(f"{path}: YAML-Fehler: {e}") from e
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"{path}: Konfiguration muss aus 'Schlüssel: Wert'-Zeilen bestehen")
     if "game_dir" not in raw:
         raise ValueError(f"{path}: 'game_dir' fehlt")
+    game_dir = raw["game_dir"]
+    if not isinstance(game_dir, str) or not game_dir.strip():
+        raise ValueError(f"{path}: 'game_dir' muss ein nicht-leerer Text sein")
     repo_root = Path(raw["repo_root"]) if raw.get("repo_root") else Path(path).resolve().parent.parent
     return Config(
-        game_dir=Path(raw["game_dir"]),
+        game_dir=Path(game_dir),
         language=str(raw.get("language", "de")),
         repo_root=repo_root.resolve(),
     )

@@ -1,3 +1,5 @@
+import pytest
+
 from drova_voice.bakeoff import Sample, classify, select_samples
 from drova_voice.jsonl import read_jsonl, write_jsonl
 from drova_voice.player_name import NAME_TOKEN
@@ -93,3 +95,17 @@ def test_jsonl_roundtrip(tmp_path):
     path = tmp_path / "out" / "samples.jsonl"
     write_jsonl(path, (s.to_dict() for s in samples))
     assert [Sample.from_dict(d) for d in read_jsonl(path)] == samples
+
+
+def test_missing_dialog_dir_raises_german_file_not_found(tmp_path):
+    with pytest.raises(FileNotFoundError, match="Dialog-Ordner fehlt") as exc:
+        select_samples(tmp_path / "leer", per_bucket=1)
+    assert str(tmp_path / "leer" / "Dialog") in str(exc.value)
+
+
+def test_empty_selection_raises_value_error(tmp_path):
+    d = tmp_path / "de" / "Dialog"
+    d.mkdir(parents=True)
+    (d / "NPC_Leer_de.loc").write_text("Plh_1 { *grinst* }\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="Keine Zeilen gefunden"):
+        select_samples(tmp_path / "de", per_bucket=1)

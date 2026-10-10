@@ -1,3 +1,5 @@
 # Kopieren nach generator/config.yaml und anpassen.
+# Windows-Pfade mit "/" schreiben oder in einfachen Anführungszeichen ('C:\Games\...'),
+# denn in doppelten Anführungszeichen ist "\G" ein ungültiges YAML-Escape.
 game_dir: "D:/Games/Steam/steamapps/common/Drova - Forsaken Kin"
 language: de

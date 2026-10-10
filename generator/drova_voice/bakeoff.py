@@ -79,10 +79,13 @@ def _prepare(raw: str) -> SpeechText:
 
 
 def select_samples(loc_dir: Path, per_bucket: int = 4, seed: int = 42) -> list[Sample]:
+    dialog = Path(loc_dir) / "Dialog"
+    if not dialog.is_dir():
+        raise FileNotFoundError(f"Dialog-Ordner fehlt: {dialog}")
     # Nicht sprechbare Zeilen (z. B. nur "*grinst*") gar nicht erst in den Pool,
     # sonst könnte ein Bucket je nach Zufall leer bleiben.
     pool: dict[str, list[tuple[str, str, str, SpeechText]]] = {b: [] for b in BUCKETS}
-    for f in sorted((Path(loc_dir) / "Dialog").glob("NPC_*.loc")):
+    for f in sorted(dialog.glob("NPC_*.loc")):
         for e in read_loc_file(f).entries:
             if not e.text.strip():
                 continue
@@ -112,6 +115,8 @@ def select_samples(loc_dir: Path, per_bucket: int = 4, seed: int = 42) -> list[S
         for source, key, raw, st in rng.sample(candidates, min(per_bucket, len(candidates))):
             tag = from_stage_directions(st.stage)
             samples.append(Sample(f"{bucket}_{len(samples):02d}", source, key, raw, st.text, tag.to_dict(), bucket))
+    if not samples:
+        raise ValueError(f"Keine Zeilen gefunden in {dialog}: Stichprobe ist leer")
     return samples
 
 

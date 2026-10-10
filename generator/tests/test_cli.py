@@ -1,3 +1,4 @@
+import shutil
 import io
 import sys
 from pathlib import Path
@@ -127,3 +128,23 @@ def test_console_with_cp1252_and_unencodable_path_does_not_crash(tmp_path, monke
     console.flush()
     text = buf.getvalue().decode("cp1252")
     assert "Zeilen ->" in text and "→" not in text
+
+
+def test_select_with_empty_dialog_returns_2_and_keeps_old_samples(tmp_path, capsys):
+    repo, cfg, voices = _setup(tmp_path)
+    assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 0
+    samples_path = repo / "data" / "bakeoff" / "samples.jsonl"
+    before = samples_path.read_bytes()
+    dialog = tmp_path / "game" / "Drova_Data" / "StreamingAssets" / "Localization" / "de" / "Dialog"
+    (dialog / "NPC_A_de.loc").write_text("Plh_1 { *grinst* }\n", encoding="utf-8")
+    assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 2
+    assert "Keine Zeilen gefunden" in capsys.readouterr().err
+    assert samples_path.read_bytes() == before
+
+
+def test_select_without_dialog_dir_returns_2(tmp_path, capsys):
+    _, cfg, _ = _setup(tmp_path)
+    shutil.rmtree(tmp_path / "game" / "Drova_Data" / "StreamingAssets" / "Localization" / "de" / "Dialog")
+    assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 2
+    err = capsys.readouterr().err
+    assert "Dialog-Ordner fehlt" in err and "Dialog" in err

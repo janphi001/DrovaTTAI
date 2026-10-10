@@ -72,7 +72,11 @@ def _run(args: argparse.Namespace) -> int:
         return 0 if resp.ok else 1
 
     if args.bcmd == "select":
-        samples = select_samples(cfg.loc_dir, per_bucket=args.per_bucket)
+        try:
+            samples = select_samples(cfg.loc_dir, per_bucket=args.per_bucket)
+        except (FileNotFoundError, ValueError) as e:  # alte samples.jsonl bleibt dabei unangetastet
+            print(f"FEHLER: {e}", file=sys.stderr)
+            return 2
         write_jsonl(samples_path, (s.to_dict() for s in samples))
         print(f"{len(samples)} Zeilen -> {samples_path}")
         return 0

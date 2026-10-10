@@ -25,3 +25,25 @@ def test_missing_game_dir_raises(tmp_path):
     cfg_file.write_text("language: de\n", encoding="utf-8")
     with pytest.raises(ValueError, match="game_dir"):
         load_config(cfg_file)
+
+
+@pytest.mark.parametrize("value", ['""', "123", "[a, b]", "null"])
+def test_game_dir_must_be_non_empty_string(tmp_path, value):
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(f"game_dir: {value}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="game_dir"):
+        load_config(cfg_file)
+
+
+def test_yaml_root_must_be_mapping(tmp_path):
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text("- eins\n- zwei\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="Konfiguration"):
+        load_config(cfg_file)
+
+
+def test_backslash_path_in_double_quotes_gives_german_hint(tmp_path):
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(r'game_dir: "C:\Drova\Spiel"' + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="einfachen Anführungszeichen"):
+        load_config(cfg_file)
