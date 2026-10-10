@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <DrovaGameDir Condition="'$(DrovaGameDir)' == '' and '$(DROVA_GAME_DIR)' != ''">$(DROVA_GAME_DIR)</DrovaGameDir>
+    <DrovaGameDir Condition="'$(DrovaGameDir)' == ''">D:\Games\Steam\steamapps\common\Drova - Forsaken Kin</DrovaGameDir>
+  </PropertyGroup>
+</Project>
