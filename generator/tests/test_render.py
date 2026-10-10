@@ -61,3 +61,10 @@ def test_render_request_dispatch():
     assert render_request("fake", "Raus!", tag) == ("Raus!", {})
     with pytest.raises(ValueError):
         render_request("unknown", "Raus!", tag)
+
+
+@pytest.mark.parametrize("engine", ["kitten", "chatterbox", "xtts", "fake"])
+@pytest.mark.parametrize("text", ["", "   ", "...", "?!"])
+def test_render_request_rejects_text_without_alphanumeric_characters(engine, text):
+    with pytest.raises(ValueError, match="sprechbar"):
+        render_request(engine, text, EmotionTag())

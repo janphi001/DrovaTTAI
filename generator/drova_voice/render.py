@@ -34,6 +34,9 @@ def chatterbox_params(tag: EmotionTag) -> dict[str, float]:
 
 
 def render_request(engine: str, text: str, tag: EmotionTag) -> tuple[str, dict]:
+    # Letzte Schutzschicht: ein Text ohne Buchstaben oder Ziffern erzeugt nur Stille oder Müll in der Engine.
+    if not any(ch.isalnum() for ch in text):
+        raise ValueError("Text ist nicht sprechbar: er enthält keine Buchstaben oder Ziffern")
     if engine == "kitten":
         return render_kitten(text, tag), {}
     if engine == "chatterbox":
