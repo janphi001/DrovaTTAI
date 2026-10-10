@@ -11,6 +11,8 @@ def normalize_loca_path(path: str) -> str:
 
 
 def _require_clean(value: str, name: str) -> None:
+    if not value:
+        raise ValueError(f"{name} darf nicht leer sein")
     if SEP in value or VARIANT_SEP in value:
         raise ValueError(f"{name} darf weder '{SEP}' noch '{VARIANT_SEP}' enthalten: {value!r}")
 

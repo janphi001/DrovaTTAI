@@ -28,6 +28,22 @@ def test_rejects_separator_in_parts():
         statement_id("DT|X", "Dialog/A", "Plh_1")
 
 
+@pytest.mark.parametrize(
+    "tree, loca_path, loca_key",
+    [
+        ("", "Dialog/A", "Plh_1"),
+        ("DT_X", "/", "Plh_1"),
+        ("DT_X", "", "Plh_1"),
+        ("DT_X", "Dialog/A", ""),
+    ],
+)
+def test_rejects_empty_parts(tree, loca_path, loca_key):
+    with pytest.raises(ValueError):
+        statement_id(tree, loca_path, loca_key)
+    with pytest.raises(ValueError):
+        choice_id(tree, loca_path, loca_key, 0)
+
+
 def test_rejects_negative_choice_index():
     with pytest.raises(ValueError):
         choice_id("DT_X", "Dialog/A", "Plh_1", -1)
