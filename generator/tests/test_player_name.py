@@ -13,6 +13,7 @@ N = NAME_TOKEN
     (f"Tarro! {N}!", "Tarro!"),
     (f"Tarro! {N}. Komm.", "Tarro! Komm."),
     (f"{N}, komm mal her.", "Komm mal her."),
+    (f"{N}, seid still.", "Seid still."),
 ])
 def test_vocative_is_removed(raw, neutral):
     v = make_name_variants(raw)
@@ -27,6 +28,10 @@ def test_vocative_is_removed(raw, neutral):
     f"Pass auf. {N} ... Der Tee ist noch warm.",
     f"{N}, der Vogt, wartet am Brunnen.",
     f"{N}, mein Freund, wartet am Brunnen.",
+    f"{N}, eure Freunde, warten.",
+    f"{N}, eurer Vogt, wartet.",
+    f"{N}, kein Narr, wartet.",
+    f"{N}, eines Tages, warten.",
     f"Tarro?! {N}?!",
     f"Tarro! {N}!!",
     f"{N}!",
