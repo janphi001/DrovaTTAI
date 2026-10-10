@@ -73,3 +73,7 @@ def test_stage_direction_of_exactly_300_chars_is_removed():
     st = build_speech_text(f"*{long_dir}* Ende.")
     assert st.text == "Ende."
     assert st.stage == (StageDirection(long_dir, 0),)
+
+
+def test_lexicon_replacement_keeps_backslash_literal():
+    assert apply_lexicon("Das Zorvana ist hier", {"Zorvana": "Zor\\vana"}) == "Das Zor\\vana ist hier"

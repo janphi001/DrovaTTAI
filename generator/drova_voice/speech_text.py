@@ -59,7 +59,8 @@ def _numbers_to_words(text: str) -> str:
 
 def apply_lexicon(text: str, lexicon: Mapping[str, str]) -> str:
     for word, spoken in lexicon.items():
-        text = re.sub(rf"\b{re.escape(word)}\b", spoken, text)
+        # Lambda statt Ersatztext: re wertet Backslashes im Ersatz sonst als Escapes aus.
+        text = re.sub(rf"\b{re.escape(word)}\b", lambda m: spoken, text)
     return text
 
 
