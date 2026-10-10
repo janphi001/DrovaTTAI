@@ -24,3 +24,13 @@ bin/
 obj/
 *.user
 .vs/
+
+# Modellgewichte und Spiel-Assemblies nie committen
+*.pt
+*.pth
+*.safetensors
+*.onnx
+*.npz
+*.ckpt
+Il2CppAssemblies/
+*.log

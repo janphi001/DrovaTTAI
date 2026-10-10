@@ -8,4 +8,8 @@ Getestet mit: Drova: Forsaken Kin (Steam, Stand 2026-10), Unity 2022.3.45f1, Mel
 4. Mod bauen: `dotnet build mod/DrovaVoice/DrovaVoice.csproj -c Release` (kopiert nach `Mods/` und `UserLibs/`).
    Anderer Spielpfad: Umgebungsvariable `DROVA_GAME_DIR` setzen.
 
-Rückbau: `version.dll`, `MelonLoader/`, `Mods/`, `UserLibs/`, `Plugins/` (falls angelegt) aus dem Spielordner löschen.
+Rückbau: `version.dll`, `MelonLoader/`, `Mods/`, `UserLibs/`, `Plugins/` (falls angelegt) und `UserData/` aus dem Spielordner löschen.
+Die Modding API legt zusätzlich Lokalisierungsdateien an, die ebenfalls zu entfernen sind:
+`Drova_Data/StreamingAssets/Localization/{de,en,fr}/ModdingUI_*.loc` sowie `{de,en}/Modding_API/`.
+Empfehlung: vor der Installation eine Kopie des ganzen Spielordners anlegen (z. B. `robocopy <Spielordner> <Backup> /E`);
+ein Abgleich mit `robocopy <Backup> <Spielordner> /MIR /L` zeigt als Trockenlauf, was zurückgebaut würde.
