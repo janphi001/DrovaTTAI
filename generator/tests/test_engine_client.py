@@ -2,7 +2,6 @@ import json
 import os
 import subprocess
 import sys
-import threading
 import wave
 from pathlib import Path
 
@@ -17,28 +16,28 @@ COMMON = WORKERS / "_common"
 FAKE = [sys.executable, str(WORKERS / "fake" / "worker.py")]
 
 
-def test_handshake_and_synth(tmp_path):
+def test_handshake_and_synth(tmp_path, guarded):
     out = tmp_path / "a.wav"
-    with EngineClient(FAKE) as client:
+    with guarded(lambda: EngineClient(FAKE)) as client:
         assert (client.engine, client.model) == ("fake", "sine-1")
-        resp = client.synth(SynthRequest(id="1", text="Grüß dich, Wanderer.", out_path=str(out)))
+        resp = guarded(lambda: client.synth(SynthRequest(id="1", text="Grüß dich, Wanderer.", out_path=str(out))))
     assert resp.ok and resp.id == "1"
     assert resp.duration == pytest.approx(1.0, abs=0.01)
     with wave.open(str(out)) as w:
         assert w.getframerate() == 22050
 
 
-def test_failure_is_reported_and_worker_survives(tmp_path):
-    with EngineClient(FAKE) as client:
-        bad = client.synth(SynthRequest(id="x", text="FAIL", out_path=str(tmp_path / "x.wav")))
-        good = client.synth(SynthRequest(id="y", text="Hallo", out_path=str(tmp_path / "y.wav")))
+def test_failure_is_reported_and_worker_survives(tmp_path, guarded):
+    with guarded(lambda: EngineClient(FAKE)) as client:
+        bad = guarded(lambda: client.synth(SynthRequest(id="x", text="FAIL", out_path=str(tmp_path / "x.wav"))))
+        good = guarded(lambda: client.synth(SynthRequest(id="y", text="Hallo", out_path=str(tmp_path / "y.wav"))))
     assert not bad.ok and "absichtlicher Fehler" in bad.error
     assert good.ok
 
 
-def test_dead_worker_raises():
+def test_dead_worker_raises(guarded):
     with pytest.raises(EngineError):
-        EngineClient([sys.executable, "-c", "import sys; sys.exit(3)"])
+        guarded(lambda: EngineClient([sys.executable, "-c", "import sys; sys.exit(3)"]))
 
 
 def test_worker_command_for_stdlib_worker_uses_current_python():
@@ -99,34 +98,34 @@ def _assert_protocol_only(stdout: str) -> None:
         assert isinstance(obj, dict) and ("ready" in obj or "ok" in obj), line
 
 
-def test_native_stdout_noise_does_not_break_handshake_or_synth(tmp_path):
-    with EngineClient(_stub(tmp_path, _serve_header() + NATIVE_NOISY_BODY)) as client:
+def test_native_stdout_noise_does_not_break_handshake_or_synth(tmp_path, guarded):
+    with guarded(lambda: EngineClient(_stub(tmp_path, _serve_header() + NATIVE_NOISY_BODY))) as client:
         assert (client.engine, client.model) == ("noisy", "stub-1")
         for i, text in enumerate(["Silberne Fuchsbrücke", "Leiser Wind", "Dritter Satz"]):
             out = str(tmp_path / f"n{i}.wav")
-            resp = client.synth(SynthRequest(id=f"n{i}", text=text, out_path=out))
+            resp = guarded(lambda: client.synth(SynthRequest(id=f"n{i}", text=text, out_path=out)))
             assert resp.ok and resp.id == f"n{i}"
             assert resp.out_path == out and resp.sample_rate == 22050
             assert resp.duration == pytest.approx(0.1)
 
 
-def test_worker_stdout_carries_only_protocol_lines_with_native_noise(tmp_path):
+def test_worker_stdout_carries_only_protocol_lines_with_native_noise(tmp_path, guarded):
     req = SynthRequest(id="r1", text="Stiller Teich", out_path=str(tmp_path / "r1.wav"))
-    proc = subprocess.run(
+    proc = guarded(lambda: subprocess.run(
         _stub(tmp_path, _serve_header() + NATIVE_NOISY_BODY),
         input=req.to_json() + "\n", capture_output=True, text=True, encoding="utf-8", timeout=30,
         env=UTF8_ENV,
-    )
+    ))
     assert proc.returncode == 0
     _assert_protocol_only(proc.stdout)
 
 
-def test_fake_worker_stdout_carries_only_protocol_lines(tmp_path):
+def test_fake_worker_stdout_carries_only_protocol_lines(tmp_path, guarded):
     req = SynthRequest(id="p1", text="Stille Fuchsbrücke", out_path=str(tmp_path / "p1.wav"))
-    proc = subprocess.run(
+    proc = guarded(lambda: subprocess.run(
         FAKE, input=req.to_json() + "\n", capture_output=True, text=True, encoding="utf-8", timeout=30,
         env=UTF8_ENV,
-    )
+    ))
     assert proc.returncode == 0
     _assert_protocol_only(proc.stdout)
     assert "fake: lade Modell" in proc.stderr  # der Lärm ist da, landet aber auf stderr
@@ -149,17 +148,17 @@ for line in sys.stdin:
 '''
 
 
-def test_client_skips_json_without_protocol_keys(tmp_path):
-    with EngineClient(_stub(tmp_path, RAW_STUB)) as client:
+def test_client_skips_json_without_protocol_keys(tmp_path, guarded):
+    with guarded(lambda: EngineClient(_stub(tmp_path, RAW_STUB))) as client:
         assert (client.engine, client.model) == ("raw", "stub-raw")
-        resp = client.synth(SynthRequest(id="k1", text="Kiesweg am Bach", out_path=str(tmp_path / "k1.wav")))
+        resp = guarded(lambda: client.synth(SynthRequest(id="k1", text="Kiesweg am Bach", out_path=str(tmp_path / "k1.wav"))))
     assert resp.ok and resp.id == "k1"
 
 
-def test_client_tolerates_undecodable_stdout_bytes(tmp_path):
+def test_client_tolerates_undecodable_stdout_bytes(tmp_path, guarded):
     body = 'import os\nos.write(1, b"\\xff\\xfe noise\\n")\n' + RAW_STUB
-    with EngineClient(_stub(tmp_path, body)) as client:
-        resp = client.synth(SynthRequest(id="b1", text="Roter Mohn", out_path=str(tmp_path / "b1.wav")))
+    with guarded(lambda: EngineClient(_stub(tmp_path, body))) as client:
+        resp = guarded(lambda: client.synth(SynthRequest(id="b1", text="Roter Mohn", out_path=str(tmp_path / "b1.wav"))))
     assert resp.ok and resp.id == "b1"
 
 
@@ -169,19 +168,18 @@ os.write(1, (json.dumps({"ready": True, "engine": "dying", "model": "stub-dead"}
 '''
 
 
-def test_synth_after_worker_died_raises_engine_error(tmp_path):
-    client = EngineClient(_stub(tmp_path, DIES_AFTER_READY))
+def test_synth_after_worker_died_raises_engine_error(tmp_path, guarded):
+    client = guarded(lambda: EngineClient(_stub(tmp_path, DIES_AFTER_READY)))
     try:
         client._proc.wait(timeout=30)  # Worker ist beendet, bevor die Anfrage kommt
         with pytest.raises(EngineError):
-            client.synth(SynthRequest(id="d1", text="Kurzer Satz", out_path=str(tmp_path / "d1.wav")))
+            guarded(lambda: client.synth(SynthRequest(id="d1", text="Kurzer Satz", out_path=str(tmp_path / "d1.wav"))))
     finally:
         client.close()
 
 
 FLOOD_STUB = '''
 import sys
-import threading
 for i in range(LIMIT):
     sys.stdout.write("flood " + str(i) + "\\n")
 sys.stdout.flush()
@@ -190,81 +188,11 @@ for _ in sys.stdin:
 '''
 
 
-def test_failed_handshake_kills_worker(tmp_path, monkeypatch):
-    started = []
-    real_popen = subprocess.Popen
-
-    def capturing_popen(*args, **kwargs):
-        proc = real_popen(*args, **kwargs)
-        started.append(proc)
-        return proc
-
-    monkeypatch.setattr(client_mod.subprocess, "Popen", capturing_popen)
+def test_failed_handshake_kills_worker(tmp_path, workers, guarded):
     body = FLOOD_STUB.replace("LIMIT", str(client_mod._MAX_NOISE_LINES + 1))
-    try:
-        with pytest.raises(EngineError, match="kein gültiges Protokoll"):
-            EngineClient(_stub(tmp_path, body))
-        assert started and started[0].poll() is not None
-    finally:
-        for proc in started:
-            if proc.poll() is None:
-                proc.kill()
-
-
-# --- Hängen-Schutz für Tests mit Subprozessen: Aufrufe laufen in einem Daemon-Thread, Worker werden am Ende gereinigt ---
-
-GUARD_TIMEOUT = 20
-
-
-def _reap(proc) -> None:
-    if proc.poll() is None:
-        proc.kill()
-    proc.wait()
-    for pipe in (proc.stdin, proc.stdout, proc.stderr):
-        try:
-            if pipe is not None:
-                pipe.close()
-        except OSError:
-            pass
-
-
-@pytest.fixture
-def workers(monkeypatch):
-    """Sammelt alle von einem Test gestarteten Worker; Teardown tötet und schließt Reste."""
-    started = []
-    real_popen = subprocess.Popen
-
-    def capturing_popen(*args, **kwargs):
-        proc = real_popen(*args, **kwargs)
-        started.append(proc)
-        return proc
-
-    monkeypatch.setattr(client_mod.subprocess, "Popen", capturing_popen)
-    yield started
-    for proc in started:
-        _reap(proc)
-
-
-def _guarded(fn, started):
-    """Führt fn in einem Daemon-Thread aus. Kommt keine Antwort innerhalb GUARD_TIMEOUT, werden die Worker getötet und der Test scheitert."""
-    outcome = {}
-
-    def target():
-        try:
-            outcome["value"] = fn()
-        except BaseException as e:  # noqa: BLE001 – wird unten im Testthread erneut geworfen
-            outcome["error"] = e
-
-    thread = threading.Thread(target=target, daemon=True)
-    thread.start()
-    thread.join(GUARD_TIMEOUT)
-    if thread.is_alive():
-        for proc in started:
-            proc.kill()
-        pytest.fail(f"Worker antwortet nicht innerhalb von {GUARD_TIMEOUT} s")
-    if "error" in outcome:
-        raise outcome["error"]
-    return outcome.get("value")
+    with pytest.raises(EngineError, match="kein gültiges Protokoll"):
+        guarded(lambda: EngineClient(_stub(tmp_path, body)))
+    assert workers and workers[0].poll() is not None
 
 
 # --- W3: Fremdtext ohne Zeilenende direkt vor der Ready-Zeile darf den Handshake nicht blockieren ---
@@ -294,25 +222,25 @@ for line in sys.stdin:
 '''
 
 
-def test_noise_without_newline_before_serve_does_not_block_handshake(tmp_path, workers, capsys):
+def test_noise_without_newline_before_serve_does_not_block_handshake(tmp_path, guarded, capsys):
     cmd = _stub(tmp_path, _serve_header() + 'os.write(1, b"loading...")\n' + SERVE_BODY_WITHOUT_EOL)
-    client = _guarded(lambda: EngineClient(cmd), workers)
+    client = guarded(lambda: EngineClient(cmd))
     try:
         assert (client.engine, client.model) == ("eolless", "stub-eol")
         out = str(tmp_path / "e1.wav")
-        resp = _guarded(lambda: client.synth(SynthRequest(id="e1", text="Stiller Bach", out_path=out)), workers)
+        resp = guarded(lambda: client.synth(SynthRequest(id="e1", text="Stiller Bach", out_path=out)))
     finally:
         client.close()
     assert resp.ok and resp.id == "e1"
     assert "loading..." in capsys.readouterr().err
 
 
-def test_ready_line_glued_to_foreign_text_is_found_without_serve(tmp_path, workers, capsys):
+def test_ready_line_glued_to_foreign_text_is_found_without_serve(tmp_path, guarded, capsys):
     cmd = _stub(tmp_path, RAW_GLUED_READY_STUB)
-    client = _guarded(lambda: EngineClient(cmd), workers)
+    client = guarded(lambda: EngineClient(cmd))
     try:
         assert (client.engine, client.model) == ("glued", "stub-glued")
-        resp = _guarded(lambda: client.synth(SynthRequest(id="g1", text="Kalter Wind", out_path=str(tmp_path / "g1.wav"))), workers)
+        resp = guarded(lambda: client.synth(SynthRequest(id="g1", text="Kalter Wind", out_path=str(tmp_path / "g1.wav"))))
     finally:
         client.close()
     assert resp.ok and resp.id == "g1"
@@ -321,15 +249,15 @@ def test_ready_line_glued_to_foreign_text_is_found_without_serve(tmp_path, worke
 
 # --- G2: close() schließt Pipes immer, auch bei bereits beendetem oder hängendem Worker ---
 
-def test_close_releases_pipes_of_crashed_worker(tmp_path, workers):
-    client = _guarded(lambda: EngineClient(_stub(tmp_path, DIES_AFTER_READY)), workers)
-    client._proc.wait(timeout=GUARD_TIMEOUT)  # Worker ist schon beendet
+def test_close_releases_pipes_of_crashed_worker(tmp_path, guarded):
+    client = guarded(lambda: EngineClient(_stub(tmp_path, DIES_AFTER_READY)))
+    client._proc.wait(timeout=30)  # Worker ist schon beendet
     client.close()
     assert client._proc.stdin.closed and client._proc.stdout.closed
 
 
-def test_close_is_idempotent_and_releases_pipes_of_live_worker(workers):
-    client = _guarded(lambda: EngineClient(FAKE), workers)
+def test_close_is_idempotent_and_releases_pipes_of_live_worker(guarded):
+    client = guarded(lambda: EngineClient(FAKE))
     client.close()
     client.close()
     assert client._proc.stdin.closed and client._proc.stdout.closed
@@ -343,9 +271,9 @@ time.sleep(600)  # ignoriert das Dateiende auf stdin
 '''
 
 
-def test_close_kills_worker_that_ignores_end_of_input(tmp_path, workers, monkeypatch):
+def test_close_kills_worker_that_ignores_end_of_input(tmp_path, guarded, monkeypatch):
     monkeypatch.setattr(client_mod, "_CLOSE_TIMEOUT_S", 1)
-    client = _guarded(lambda: EngineClient(_stub(tmp_path, STUCK_AFTER_READY)), workers)
+    client = guarded(lambda: EngineClient(_stub(tmp_path, STUCK_AFTER_READY)))
     client.close()
     assert client._proc.poll() is not None
     assert client._proc.stdin.closed and client._proc.stdout.closed
@@ -376,11 +304,11 @@ serve("hollow", "stub-hollow", load, synth)
 
 
 @pytest.mark.parametrize("body", [SYNTH_WRITES_NOTHING, SYNTH_WRITES_EMPTY_FILE], ids=["keine-datei", "leere-datei"])
-def test_ok_requires_a_non_empty_audio_file(tmp_path, workers, body):
-    client = _guarded(lambda: EngineClient(_stub(tmp_path, _serve_header() + body)), workers)
+def test_ok_requires_a_non_empty_audio_file(tmp_path, guarded, body):
+    client = guarded(lambda: EngineClient(_stub(tmp_path, _serve_header() + body)))
     out = str(tmp_path / "leer.wav")
     try:
-        resp = _guarded(lambda: client.synth(SynthRequest(id="s1", text="Kalte Luft", out_path=out)), workers)
+        resp = guarded(lambda: client.synth(SynthRequest(id="s1", text="Kalte Luft", out_path=out)))
     finally:
         client.close()
     assert not resp.ok and resp.id == "s1"
@@ -389,16 +317,16 @@ def test_ok_requires_a_non_empty_audio_file(tmp_path, workers, body):
 
 # --- G4: Anfragen, die kein JSON-Objekt sind, beenden die Schleife nicht ---
 
-def test_non_object_requests_are_rejected_and_loop_continues(tmp_path, workers):
+def test_non_object_requests_are_rejected_and_loop_continues(tmp_path, guarded):
     lines = "\n".join([
         "[1, 2]",
         "5",
         '"x"',
         SynthRequest(id="n1", text="Leiser Regen", out_path=str(tmp_path / "n1.wav")).to_json(),
     ]) + "\n"
-    proc = _guarded(lambda: subprocess.run(
+    proc = guarded(lambda: subprocess.run(
         FAKE, input=lines, capture_output=True, text=True, encoding="utf-8", env=UTF8_ENV,
-    ), workers)
+    ))
     assert proc.returncode == 0
     replies = [json.loads(line) for line in proc.stdout.splitlines() if line.strip()][1:]  # erste Zeile: Ready
     assert replies[:3] == [{"id": None, "ok": False, "error": "Anfrage ist kein JSON-Objekt"}] * 3
