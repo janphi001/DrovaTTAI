@@ -6,7 +6,7 @@ from typing import Mapping
 
 from num2words import num2words
 
-STAGE_RE = re.compile(r"\*([^*\n]{1,80})\*")
+STAGE_RE = re.compile(r"\*([^*\n]{1,300})\*")
 GVAR_RE = re.compile(r"\$GVAR:([^$]+)\$")
 _BR_RE = re.compile(r"\s*<br\s*/?>\s*", re.IGNORECASE)
 _TAG_RE = re.compile(r"<[^>]+>")
