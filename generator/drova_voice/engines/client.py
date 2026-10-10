@@ -10,6 +10,7 @@ from typing import Sequence
 from drova_voice.engines.protocol import SynthRequest, SynthResponse
 
 _MAX_NOISE_LINES = 1000
+_READY_MARKER = '{"ready"'
 
 
 class EngineError(RuntimeError):
@@ -39,6 +40,11 @@ class EngineClient:
             if not line:
                 raise EngineError(f"Worker beendet (Exit-Code {self._proc.poll()})")
             line = line.strip()
+            if not line.startswith("{") and _READY_MARKER in line:
+                # Fremdtext ohne Zeilenende direkt vor der Ready-Zeile: Präfix als Lärm behandeln, ab der Ready-Zeile parsen.
+                cut = line.index(_READY_MARKER)
+                print(f"[worker stdout] {line[:cut]}", file=sys.stderr)
+                line = line[cut:]
             if line.startswith("{"):
                 try:
                     obj = json.loads(line)
@@ -46,7 +52,8 @@ class EngineClient:
                     obj = None
                 if isinstance(obj, dict) and ("ready" in obj or "ok" in obj):
                     return obj
-            print(f"[worker stdout] {line}", file=sys.stderr)
+            if line:  # Leerzeilen sind kein Lärm
+                print(f"[worker stdout] {line}", file=sys.stderr)
         raise EngineError("Worker liefert kein gültiges Protokoll")
 
     def synth(self, req: SynthRequest) -> SynthResponse:

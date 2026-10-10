@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import wave
 from pathlib import Path
 
@@ -178,6 +179,7 @@ def test_synth_after_worker_died_raises_engine_error(tmp_path):
 
 FLOOD_STUB = '''
 import sys
+import threading
 for i in range(LIMIT):
     sys.stdout.write("flood " + str(i) + "\\n")
 sys.stdout.flush()
@@ -205,3 +207,111 @@ def test_failed_handshake_kills_worker(tmp_path, monkeypatch):
         for proc in started:
             if proc.poll() is None:
                 proc.kill()
+
+
+# --- Hängen-Schutz für Tests mit Subprozessen: Aufrufe laufen in einem Daemon-Thread, Worker werden am Ende gereinigt ---
+
+GUARD_TIMEOUT = 20
+
+
+def _reap(proc) -> None:
+    if proc.poll() is None:
+        proc.kill()
+    proc.wait()
+    for pipe in (proc.stdin, proc.stdout, proc.stderr):
+        try:
+            if pipe is not None:
+                pipe.close()
+        except OSError:
+            pass
+
+
+@pytest.fixture
+def workers(monkeypatch):
+    """Sammelt alle von einem Test gestarteten Worker; Teardown tötet und schließt Reste."""
+    started = []
+    real_popen = subprocess.Popen
+
+    def capturing_popen(*args, **kwargs):
+        proc = real_popen(*args, **kwargs)
+        started.append(proc)
+        return proc
+
+    monkeypatch.setattr(client_mod.subprocess, "Popen", capturing_popen)
+    yield started
+    for proc in started:
+        _reap(proc)
+
+
+def _guarded(fn, started):
+    """Führt fn in einem Daemon-Thread aus. Kommt keine Antwort innerhalb GUARD_TIMEOUT, werden die Worker getötet und der Test scheitert."""
+    outcome = {}
+
+    def target():
+        try:
+            outcome["value"] = fn()
+        except BaseException as e:  # noqa: BLE001 – wird unten im Testthread erneut geworfen
+            outcome["error"] = e
+
+    thread = threading.Thread(target=target, daemon=True)
+    thread.start()
+    thread.join(GUARD_TIMEOUT)
+    if thread.is_alive():
+        for proc in started:
+            proc.kill()
+        pytest.fail(f"Worker antwortet nicht innerhalb von {GUARD_TIMEOUT} s")
+    if "error" in outcome:
+        raise outcome["error"]
+    return outcome.get("value")
+
+
+# --- W3: Fremdtext ohne Zeilenende direkt vor der Ready-Zeile darf den Handshake nicht blockieren ---
+
+SERVE_BODY_WITHOUT_EOL = '''
+def load():
+    return None
+
+def synth(_state, req):
+    with open(req["out_path"], "wb") as f:
+        f.write(b"RIFF")
+    return 22050, 0.1
+
+serve("eolless", "stub-eol", load, synth)
+'''
+
+RAW_GLUED_READY_STUB = '''
+import json, os, sys
+
+os.write(1, b"loading..." + json.dumps({"ready": True, "engine": "glued", "model": "stub-glued"}).encode("utf-8") + b"\\n")
+for line in sys.stdin:
+    req = json.loads(line)
+    with open(req["out_path"], "wb") as f:
+        f.write(b"RIFF")
+    os.write(1, (json.dumps({"id": req["id"], "ok": True, "out_path": req["out_path"],
+                             "sample_rate": 22050, "duration": 0.1}) + "\\n").encode("utf-8"))
+'''
+
+
+def test_noise_without_newline_before_serve_does_not_block_handshake(tmp_path, workers, capsys):
+    cmd = _stub(tmp_path, _serve_header() + 'os.write(1, b"loading...")\n' + SERVE_BODY_WITHOUT_EOL)
+    client = _guarded(lambda: EngineClient(cmd), workers)
+    try:
+        assert (client.engine, client.model) == ("eolless", "stub-eol")
+        out = str(tmp_path / "e1.wav")
+        resp = _guarded(lambda: client.synth(SynthRequest(id="e1", text="Stiller Bach", out_path=out)), workers)
+    finally:
+        client.close()
+    assert resp.ok and resp.id == "e1"
+    assert "loading..." in capsys.readouterr().err
+
+
+def test_ready_line_glued_to_foreign_text_is_found_without_serve(tmp_path, workers, capsys):
+    cmd = _stub(tmp_path, RAW_GLUED_READY_STUB)
+    client = _guarded(lambda: EngineClient(cmd), workers)
+    try:
+        assert (client.engine, client.model) == ("glued", "stub-glued")
+        resp = _guarded(lambda: client.synth(SynthRequest(id="g1", text="Kalter Wind", out_path=str(tmp_path / "g1.wav"))), workers)
+    finally:
+        client.close()
+    assert resp.ok and resp.id == "g1"
+    assert "loading..." in capsys.readouterr().err

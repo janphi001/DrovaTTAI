@@ -26,6 +26,7 @@ def serve(engine: str, model: str, load: Callable[[], Any], synth: Callable[[Any
         proto.flush()
 
     state = load()
+    proto.write("\n")  # schließt eine angefangene Fremdzeile ab, damit die Ready-Zeile eine eigene Zeile bleibt
     send({"ready": True, "engine": engine, "model": model})
     for line in sys.stdin:
         line = line.strip()
