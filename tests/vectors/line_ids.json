@@ -1,0 +1,10 @@
+[
+  {"kind": "statement", "tree": "DT_Main_NPC_Adela", "locaPath": "Dialog/NPC_Adela", "locaKey": "Plh_5", "choiceIndex": null, "variant": null,
+   "expectedId": "DT_Main_NPC_Adela|Dialog/NPC_Adela|Plh_5", "expectedFile": "950774fdbc26dddf.ogg"},
+  {"kind": "choice", "tree": "DT_Main_NPC_Adela", "locaPath": "Dialog\\NPC_Adela/", "locaKey": "Plh_19", "choiceIndex": 2, "variant": null,
+   "expectedId": "DT_Main_NPC_Adela|Dialog/NPC_Adela|Plh_19|c2", "expectedFile": "7702474c8a24ee3e.ogg"},
+  {"kind": "statement", "tree": "DT_WorldDialogue_Template", "locaPath": "/WorldDialogueCombat", "locaKey": "Plh_3", "choiceIndex": null, "variant": "f2",
+   "expectedId": "DT_WorldDialogue_Template|WorldDialogueCombat|Plh_3#f2", "expectedFile": "f15de7a5cb1284dd.ogg"},
+  {"kind": "statement", "tree": "DT_Bär", "locaPath": "Dialog/Ümlaut", "locaKey": "Plh_1", "choiceIndex": null, "variant": "neutral",
+   "expectedId": "DT_Bär|Dialog/Ümlaut|Plh_1#neutral", "expectedFile": "98b91eed1e4804d3.ogg"}
+]
