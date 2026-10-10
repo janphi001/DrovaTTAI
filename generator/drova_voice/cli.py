@@ -8,7 +8,7 @@ from drova_voice.bakeoff import (REF_TEXT, BakeoffResult, Sample, VoiceSpec, loa
                                  run_bakeoff, select_samples, write_sheet)
 from drova_voice.config import DEFAULT_CONFIG_PATH, load_config
 from drova_voice.emotions import EmotionTag
-from drova_voice.engines.client import EngineClient, worker_command
+from drova_voice.engines.client import EngineClient, EngineError, worker_command
 from drova_voice.engines.protocol import SynthRequest
 from drova_voice.jsonl import read_jsonl, write_jsonl
 from drova_voice.render import render_request
@@ -37,7 +37,7 @@ def _merge_results(path: Path, new: list[BakeoffResult]) -> list[BakeoffResult]:
     return results
 
 
-def main(argv: list[str] | None = None) -> int:
+def _parse(argv: list[str] | None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="drova-voice")
     p.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -52,8 +52,10 @@ def main(argv: list[str] | None = None) -> int:
     refs.add_argument("--speaker", action="append", required=True)
     smoke = sub.add_parser("smoke", help="Engine mit einem Testsatz prüfen")
     smoke.add_argument("engine")
-    args = p.parse_args(argv)
+    return p.parse_args(argv)
 
+
+def _run(args: argparse.Namespace) -> int:
     cfg = load_config(args.config)
     bake_data = cfg.data_dir / "bakeoff"
     bake_out = cfg.out_dir / "bakeoff"
@@ -63,19 +65,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "smoke":
         out = cfg.out_dir / "smoke" / f"{args.engine}.wav"
         out.parent.mkdir(parents=True, exist_ok=True)
-        text, params = render_request(args.engine, "Hallo, ich bin ein Test der Sprachausgabe.", EmotionTag())
-        with _client(args.engine) as client:
+        with _client(args.engine) as client:  # zuerst: unbekannte Engine -> EngineError
+            text, params = render_request(args.engine, "Hallo, ich bin ein Test der Sprachausgabe.", EmotionTag())
             resp = client.synth(SynthRequest(id="smoke", text=text, out_path=str(out), params=params))
-        print(f"{args.engine}: {'OK' if resp.ok else 'FEHLER'} {resp.duration or ''} {resp.error or ''} → {out}")
+        print(f"{args.engine}: {'OK' if resp.ok else 'FEHLER'} {resp.duration or ''} {resp.error or ''} -> {out}")
         return 0 if resp.ok else 1
 
     if args.bcmd == "select":
         samples = select_samples(cfg.loc_dir, per_bucket=args.per_bucket)
         write_jsonl(samples_path, (s.to_dict() for s in samples))
-        print(f"{len(samples)} Zeilen → {samples_path}")
+        print(f"{len(samples)} Zeilen -> {samples_path}")
         return 0
-
-    samples = [Sample.from_dict(d) for d in read_jsonl(samples_path)]
 
     if args.bcmd == "refs":
         target = cfg.voices_dir / "bakeoff"
@@ -84,15 +84,29 @@ def main(argv: list[str] | None = None) -> int:
             for speaker in args.speaker:
                 slug = VoiceSpec("xtts", voice=speaker).slug
                 out = target / f"xtts-{slug}.wav"
-                resp = client.synth(SynthRequest(id=slug, text=REF_TEXT, out_path=str(out), voice=speaker))
-                print(f"{speaker}: {'OK' if resp.ok else resp.error} → {out}")
+                part = out.with_name(f"xtts-{slug}.part.wav")
+                resp = client.synth(SynthRequest(id=slug, text=REF_TEXT, out_path=str(part), voice=speaker))
+                if resp.ok:
+                    part.replace(out)
+                else:
+                    part.unlink(missing_ok=True)
+                print(f"{speaker}: {'OK' if resp.ok else resp.error} -> {out}")
         return 0
+
+    samples = [Sample.from_dict(d) for d in read_jsonl(samples_path)]
 
     if args.bcmd == "run":
         voices = load_voice_specs(args.voices, cfg.repo_root)
         if args.engine:
             voices = [v for v in voices if v.engine in args.engine]
-        new = run_bakeoff(samples, voices, _client, bake_out)
+            if not voices:
+                print(f"FEHLER: keine Stimme für Engine(s) {', '.join(args.engine)} in {args.voices}", file=sys.stderr)
+                return 2
+
+        def persist(r: BakeoffResult) -> None:
+            _merge_results(results_path, [r])  # sofort sichern, damit ein Abbruch nichts verliert
+
+        new = run_bakeoff(samples, voices, _client, bake_out, on_result=persist)
         results = _merge_results(results_path, new)
         failed = [r for r in new if not r.ok]
         for r in failed:
@@ -103,6 +117,19 @@ def main(argv: list[str] | None = None) -> int:
     page = write_sheet(samples, results, bake_out)
     print(f"Hörseite: {page}")
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    # Windows-Konsolen (cp1252) dürfen beim Ausgeben von Pfaden nicht abstürzen.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
+    args = _parse(argv)
+    try:
+        return _run(args)
+    except EngineError as e:
+        print(f"FEHLER: {e}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

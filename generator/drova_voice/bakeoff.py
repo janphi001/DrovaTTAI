@@ -11,6 +11,7 @@ from typing import Callable, ContextManager, Sequence
 import yaml
 
 from drova_voice.emotions import EmotionTag, from_stage_directions
+from drova_voice.engines.client import EngineError
 from drova_voice.engines.protocol import SynthRequest
 from drova_voice.loc import read_loc_file
 from drova_voice.render import render_request
@@ -122,6 +123,22 @@ class BakeoffResult:
         return cls(**d)
 
 
+def _label(spec: VoiceSpec) -> str:
+    return spec.voice or spec.reference or "default"
+
+
+def _check_unique_slugs(voices: Sequence[VoiceSpec]) -> None:
+    seen: dict[tuple[str, str], str] = {}
+    for v in voices:
+        key = (v.engine, v.slug)
+        if key in seen:
+            raise ValueError(
+                f"Engine '{v.engine}': Stimmen '{seen[key]}' und '{_label(v)}' "
+                f"ergeben beide den Ordnernamen '{v.slug}'"
+            )
+        seen[key] = _label(v)
+
+
 def load_voice_specs(path: Path, repo_root: Path) -> list[VoiceSpec]:
     specs = []
     for item in yaml.safe_load(Path(path).read_text(encoding="utf-8")) or []:
@@ -129,7 +146,35 @@ def load_voice_specs(path: Path, repo_root: Path) -> list[VoiceSpec]:
         if ref and not Path(ref).is_absolute():
             ref = str((Path(repo_root) / ref).resolve())
         specs.append(VoiceSpec(item["engine"], item.get("voice"), ref))
+    _check_unique_slugs(specs)
     return specs
+
+
+def _sidecar(wav: Path) -> Path:
+    """Textdatei neben dem Wav: der gesendete Text, damit Änderungen am Text erkannt werden."""
+    return wav.with_suffix(".txt")
+
+
+def _is_finished(wav: Path, text: str) -> bool:
+    side = _sidecar(wav)
+    return wav.exists() and side.exists() and side.read_bytes() == text.encode("utf-8")
+
+
+def _synth_one(client, engine: str, v: VoiceSpec, s: Sample, wav: Path, text: str, params: dict) -> BakeoffResult:
+    part = wav.with_name(f"{s.sample_id}.part.wav")
+    wav.parent.mkdir(parents=True, exist_ok=True)
+    started = time.perf_counter()
+    resp = client.synth(SynthRequest(
+        id=f"{engine}/{v.slug}/{s.sample_id}", text=text, out_path=str(part),
+        voice=v.voice, reference=v.reference, params=params,
+    ))
+    seconds = time.perf_counter() - started
+    if resp.ok:
+        part.replace(wav)
+        _sidecar(wav).write_bytes(text.encode("utf-8"))
+        return BakeoffResult(engine, v.slug, s.sample_id, True, str(wav), resp.duration, seconds, None)
+    part.unlink(missing_ok=True)
+    return BakeoffResult(engine, v.slug, s.sample_id, False, None, None, seconds, resp.error)
 
 
 def run_bakeoff(
@@ -137,37 +182,41 @@ def run_bakeoff(
     voices: Sequence[VoiceSpec],
     client_factory: Callable[[str], ContextManager],
     out_dir: Path,
+    on_result: Callable[[BakeoffResult], None] | None = None,
 ) -> list[BakeoffResult]:
+    _check_unique_slugs(voices)
     results: list[BakeoffResult] = []
+
+    def emit(r: BakeoffResult) -> None:
+        results.append(r)
+        if on_result is not None:
+            on_result(r)
+
     for engine in dict.fromkeys(v.engine for v in voices):
         engine_voices = [v for v in voices if v.engine == engine]
-        todo = [(v, s) for v in engine_voices for s in samples
-                if not (Path(out_dir) / engine / v.slug / f"{s.sample_id}.wav").exists()]
+        jobs = []
         for v in engine_voices:
             for s in samples:
                 wav = Path(out_dir) / engine / v.slug / f"{s.sample_id}.wav"
-                if wav.exists():
-                    results.append(BakeoffResult(engine, v.slug, s.sample_id, True, str(wav), None, 0.0, None))
-        if not todo:
-            continue
-        with client_factory(engine) as client:
-            for v, s in todo:
-                wav = Path(out_dir) / engine / v.slug / f"{s.sample_id}.wav"
-                part = wav.with_name(f"{s.sample_id}.part.wav")
-                wav.parent.mkdir(parents=True, exist_ok=True)
                 text, params = render_request(engine, s.text, EmotionTag.from_dict(s.emotion))
-                started = time.perf_counter()
-                resp = client.synth(SynthRequest(
-                    id=f"{engine}/{v.slug}/{s.sample_id}", text=text, out_path=str(part),
-                    voice=v.voice, reference=v.reference, params=params,
-                ))
-                seconds = time.perf_counter() - started
-                if resp.ok:
-                    part.replace(wav)
-                    results.append(BakeoffResult(engine, v.slug, s.sample_id, True, str(wav), resp.duration, seconds, None))
+                if _is_finished(wav, text):
+                    emit(BakeoffResult(engine, v.slug, s.sample_id, True, str(wav), None, 0.0, None))
                 else:
-                    part.unlink(missing_ok=True)
-                    results.append(BakeoffResult(engine, v.slug, s.sample_id, False, None, None, seconds, resp.error))
+                    jobs.append((v, s, wav, text, params))
+        if not jobs:
+            continue
+        current = None
+        t0 = time.perf_counter()
+        try:
+            with client_factory(engine) as client:
+                for job in jobs:
+                    current = job
+                    t0 = time.perf_counter()
+                    emit(_synth_one(client, engine, *job))
+        except EngineError as e:
+            # Engine gilt als ausgefallen: aktuelles Element (oder das erste) melden, Rest dieser Engine überspringen.
+            v, s = (current or jobs[0])[:2]
+            emit(BakeoffResult(engine, v.slug, s.sample_id, False, None, None, time.perf_counter() - t0, str(e)))
     return results
 
 
@@ -183,7 +232,11 @@ def write_sheet(samples: Sequence[Sample], results: Sequence[BakeoffResult], out
         for e, v in columns:
             r = by_key.get((e, v, s.sample_id))
             if r and r.ok and r.wav:
-                src = Path(r.wav).resolve().relative_to(out_dir.resolve()).as_posix()
+                wav_path = Path(r.wav).resolve()
+                try:
+                    src = wav_path.relative_to(out_dir.resolve()).as_posix()
+                except ValueError:  # liegt außerhalb der Hörseite: absolute file://-URI
+                    src = wav_path.as_uri()
                 cells.append(f'<td><audio controls preload="none" src="{esc(src)}"></audio></td>')
             else:
                 cells.append(f"<td>– {esc(r.error) if r and r.error else ''}</td>")

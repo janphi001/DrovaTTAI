@@ -1,6 +1,9 @@
 from pathlib import Path
 
-from drova_voice.bakeoff import BakeoffResult, Sample, VoiceSpec, run_bakeoff, write_sheet
+import pytest
+
+from drova_voice.bakeoff import BakeoffResult, Sample, VoiceSpec, load_voice_specs, run_bakeoff, write_sheet
+from drova_voice.engines.client import EngineError
 from drova_voice.engines.protocol import SynthResponse
 
 SAMPLES = [
@@ -71,3 +74,108 @@ def test_sheet_escapes_text_and_links_audio(tmp_path):
     assert "Na gut &amp; so." in html
     assert "kaputt" in html
     assert "0.50" in html  # Echtzeitfaktor 0.5 s / 1.0 s
+
+
+NEUTRAL = {"emotion": "neutral", "intensity": 0.0, "events": [], "emphasis": [], "notes": [], "source": "default"}
+
+
+class TextClient(FakeClient):
+    """Schreibt den gesendeten Text als Dateiinhalt, damit der Test den Inhalt prüfen kann."""
+
+    def synth(self, req):
+        self.requests.append(req)
+        Path(req.out_path).write_bytes(req.text.encode("utf-8"))
+        return SynthResponse(id=req.id, ok=True, out_path=req.out_path, sample_rate=22050, duration=1.0)
+
+
+def test_changed_text_resynthesizes_and_same_text_skips(tmp_path):
+    a = Sample("short_00", "NPC_A_de", "Plh_1", "raw", "Text A.", NEUTRAL, "short")
+    b = Sample("short_00", "NPC_A_de", "Plh_1", "raw", "Text B.", NEUTRAL, "short")
+    first = TextClient()
+    run_bakeoff([a], [VoiceSpec("fake")], lambda e: first, tmp_path)
+    assert [r.text for r in first.requests] == ["Text A."]
+
+    second = TextClient()
+    run_bakeoff([b], [VoiceSpec("fake")], lambda e: second, tmp_path)
+    assert [r.text for r in second.requests] == ["Text B."]
+    wav = tmp_path / "fake" / "default" / "short_00.wav"
+    assert wav.read_bytes() == b"Text B."
+    assert wav.with_suffix(".txt").read_bytes() == b"Text B."
+
+    third = TextClient()
+    run_bakeoff([b], [VoiceSpec("fake")], lambda e: third, tmp_path)
+    assert third.requests == []
+
+
+def test_duplicate_slug_for_same_engine_is_rejected(tmp_path):
+    p = tmp_path / "voices.yaml"
+    p.write_text('- {engine: xtts, voice: "Ana Florence"}\n- {engine: xtts, voice: "ana-florence"}\n', encoding="utf-8")
+    with pytest.raises(ValueError) as exc:
+        load_voice_specs(p, tmp_path)
+    assert "xtts" in str(exc.value) and "ana-florence" in str(exc.value)
+
+
+def test_same_slug_for_different_engines_is_allowed(tmp_path):
+    p = tmp_path / "voices.yaml"
+    p.write_text('- {engine: kitten, voice: German}\n- {engine: xtts, voice: German}\n', encoding="utf-8")
+    assert len(load_voice_specs(p, tmp_path)) == 2
+
+
+def test_on_result_gets_every_result_in_order(tmp_path):
+    got = []
+    results = run_bakeoff(SAMPLES, [VoiceSpec("fake")], lambda e: FakeClient(), tmp_path, on_result=got.append)
+    assert got == results
+    assert [r.sample_id for r in got] == ["short_00", "stage_01"]
+    again = []
+    results2 = run_bakeoff(SAMPLES, [VoiceSpec("fake")], lambda e: FakeClient(), tmp_path, on_result=again.append)
+    assert again == results2 and all(r.ok and r.seconds == 0.0 for r in again)
+
+
+def test_keyboard_interrupt_keeps_already_reported_results(tmp_path):
+    class InterruptOnSecond(FakeClient):
+        def synth(self, req):
+            if self.requests:
+                raise KeyboardInterrupt
+            return super().synth(req)
+
+    got = []
+    with pytest.raises(KeyboardInterrupt):
+        run_bakeoff(SAMPLES, [VoiceSpec("fake")], lambda e: InterruptOnSecond(), tmp_path, on_result=got.append)
+    assert [r.sample_id for r in got] == ["short_00"]
+    assert (tmp_path / "fake" / "default" / "short_00.wav").exists()
+    assert not (tmp_path / "fake" / "default" / "stage_01.wav").exists()
+
+
+def test_engine_that_fails_to_start_is_recorded_and_others_continue(tmp_path):
+    def factory(engine):
+        if engine == "xtts":
+            raise EngineError("Worker nicht bereit")
+        return FakeClient()
+
+    results = run_bakeoff(SAMPLES, [VoiceSpec("xtts"), VoiceSpec("fake")], factory, tmp_path)
+    broken = [r for r in results if r.engine == "xtts"]
+    assert len(broken) == 1
+    assert not broken[0].ok and broken[0].sample_id == "short_00"
+    assert "Worker nicht bereit" in broken[0].error
+    fake = [r for r in results if r.engine == "fake"]
+    assert len(fake) == 2 and all(r.ok for r in fake)
+
+
+def test_engine_error_during_synth_skips_rest_of_that_engine(tmp_path):
+    class Dying(FakeClient):
+        def synth(self, req):
+            raise EngineError("Worker beendet")
+
+    results = run_bakeoff(SAMPLES, [VoiceSpec("kitten"), VoiceSpec("fake")], lambda e: Dying() if e == "kitten" else FakeClient(), tmp_path)
+    dying = [r for r in results if r.engine == "kitten"]
+    assert [r.sample_id for r in dying] == ["short_00"] and not dying[0].ok
+    assert [r.sample_id for r in results if r.engine == "fake"] == ["short_00", "stage_01"]
+
+
+def test_sheet_falls_back_to_file_uri_for_wav_outside_out_dir(tmp_path):
+    outside = tmp_path / "elsewhere" / "short_00.wav"
+    outside.parent.mkdir()
+    outside.write_bytes(b"RIFF")
+    results = [BakeoffResult("fake", "default", "short_00", True, str(outside), 1.0, 0.5, None)]
+    page = write_sheet(SAMPLES[:1], results, tmp_path / "out").read_text(encoding="utf-8")
+    assert outside.resolve().as_uri() in page

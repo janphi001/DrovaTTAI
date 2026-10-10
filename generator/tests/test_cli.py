@@ -1,4 +1,9 @@
+import io
+import sys
+from pathlib import Path
+
 from drova_voice.cli import main
+from drova_voice.engines.protocol import SynthResponse
 from drova_voice.jsonl import read_jsonl
 
 
@@ -22,3 +27,103 @@ def test_bakeoff_select_and_run_with_fake_engine(tmp_path):
     assert main(["--config", str(cfg), "bakeoff", "run", "--voices", str(voices)]) == 0
     assert (repo / "out" / "bakeoff" / "fake" / "default" / "question_00.wav").exists()
     assert (repo / "out" / "bakeoff" / "index.html").exists()
+
+
+LOC_TWO_QUESTIONS = "Plh_1 { Wohin führt dieser Weg eigentlich? }\nPlh_2 { Wann kommt der Regen wohl an? }\n"
+
+
+def _setup(tmp_path, repo_name="repo", loc=LOC_TWO_QUESTIONS):
+    repo = tmp_path / repo_name
+    gen = repo / "generator"
+    gen.mkdir(parents=True)
+    game = tmp_path / "game"
+    dialog = game / "Drova_Data" / "StreamingAssets" / "Localization" / "de" / "Dialog"
+    dialog.mkdir(parents=True)
+    (dialog / "NPC_A_de.loc").write_text(loc, encoding="utf-8")
+    cfg = gen / "config.yaml"
+    cfg.write_text(f'game_dir: "{game.as_posix()}"\n', encoding="utf-8")
+    voices = gen / "voices.yaml"
+    voices.write_text("- {engine: fake}\n", encoding="utf-8")
+    return repo, cfg, voices
+
+
+class StubClient:
+    """Liefert erfolgreiche Antworten; bei interrupt_on_second wird beim zweiten Aufruf abgebrochen."""
+
+    def __init__(self, interrupt_on_second=False, ok=True):
+        self.calls = 0
+        self.interrupt_on_second = interrupt_on_second
+        self.ok = ok
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return None
+
+    def synth(self, req):
+        self.calls += 1
+        if self.interrupt_on_second and self.calls == 2:
+            raise KeyboardInterrupt
+        Path(req.out_path).write_bytes(b"RIFF")
+        if not self.ok:
+            return SynthResponse(id=req.id, ok=False, error="kaputt")
+        return SynthResponse(id=req.id, ok=True, out_path=req.out_path, sample_rate=22050, duration=1.0)
+
+
+def test_interrupted_run_keeps_finished_results_on_disk(tmp_path, monkeypatch):
+    repo, cfg, voices = _setup(tmp_path)
+    assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 0
+    monkeypatch.setattr("drova_voice.cli._client", lambda engine: StubClient(interrupt_on_second=True))
+    try:
+        main(["--config", str(cfg), "bakeoff", "run", "--voices", str(voices)])
+    except KeyboardInterrupt:
+        pass
+    else:
+        raise AssertionError("KeyboardInterrupt hätte durchgereicht werden müssen")
+    persisted = read_jsonl(repo / "out" / "bakeoff" / "results.jsonl")
+    assert [(r["sample_id"], r["ok"]) for r in persisted] == [("question_00", True)]
+
+
+def test_run_with_unmatched_engine_returns_2(tmp_path, capsys):
+    repo, cfg, voices = _setup(tmp_path)
+    assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 0
+    assert main(["--config", str(cfg), "bakeoff", "run", "--voices", str(voices), "--engine", "nope"]) == 2
+    assert "nope" in capsys.readouterr().err
+
+
+def test_refs_works_without_samples_and_leaves_no_part_file(tmp_path, monkeypatch, capsys):
+    repo, cfg, voices = _setup(tmp_path)  # kein select: samples.jsonl fehlt
+    monkeypatch.setattr("drova_voice.cli._client", lambda engine: StubClient())
+    assert main(["--config", str(cfg), "bakeoff", "refs", "--speaker", "Viktor Eka"]) == 0
+    target = repo / "voices" / "bakeoff"
+    assert (target / "xtts-viktor-eka.wav").exists()
+    assert not list(target.glob("*.part.wav"))
+    assert "->" in capsys.readouterr().out
+
+
+def test_failed_refs_leaves_neither_final_nor_part_file(tmp_path, monkeypatch, capsys):
+    repo, cfg, voices = _setup(tmp_path)
+    monkeypatch.setattr("drova_voice.cli._client", lambda engine: StubClient(ok=False))
+    assert main(["--config", str(cfg), "bakeoff", "refs", "--speaker", "Viktor Eka"]) == 0
+    target = repo / "voices" / "bakeoff"
+    assert not (target / "xtts-viktor-eka.wav").exists()
+    assert not list(target.glob("*.wav"))
+    assert "kaputt" in capsys.readouterr().out
+
+
+def test_unknown_engine_is_a_german_error_with_exit_1(tmp_path, capsys):
+    _, cfg, _ = _setup(tmp_path)
+    assert main(["--config", str(cfg), "smoke", "nope"]) == 1
+    assert "Unbekannte Engine" in capsys.readouterr().err
+
+
+def test_console_with_cp1252_and_unencodable_path_does_not_crash(tmp_path, monkeypatch):
+    _, cfg, _ = _setup(tmp_path, repo_name="Ωrepo")  # Ω ist nicht in cp1252
+    buf = io.BytesIO()
+    console = io.TextIOWrapper(buf, encoding="cp1252", write_through=True)
+    monkeypatch.setattr(sys, "stdout", console)
+    assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 0
+    console.flush()
+    text = buf.getvalue().decode("cp1252")
+    assert "Zeilen ->" in text and "→" not in text
