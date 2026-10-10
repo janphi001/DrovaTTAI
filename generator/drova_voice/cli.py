@@ -10,7 +10,7 @@ from drova_voice.config import DEFAULT_CONFIG_PATH, load_config
 from drova_voice.emotions import EmotionTag
 from drova_voice.engines.client import EngineClient, EngineError, cache_env, worker_command
 from drova_voice.engines.protocol import SynthRequest
-from drova_voice.jsonl import read_jsonl, write_jsonl
+from drova_voice.jsonl import read_jsonl, replace_with_retry, write_jsonl
 from drova_voice.render import render_request
 
 WORKERS_DIR = Path(__file__).resolve().parents[1] / "workers"
@@ -97,6 +97,7 @@ def _run(args: argparse.Namespace) -> int:
     if args.bcmd == "refs":
         target = cfg.voices_dir / "bakeoff"
         target.mkdir(parents=True, exist_ok=True)
+        failed_refs = 0
         with _client("xtts") as client:
             for speaker in args.speaker:
                 slug = VoiceSpec("xtts", voice=speaker).slug
@@ -106,11 +107,12 @@ def _run(args: argparse.Namespace) -> int:
                 if resp.ok:
                     # Kitten braucht den gesprochenen Text zum Klonen (sonst lädt es Whisper, nur Englisch).
                     out.with_suffix(".txt").write_text(REF_TEXT, encoding="utf-8")
-                    part.replace(out)
+                    replace_with_retry(part, out)
                 else:
                     part.unlink(missing_ok=True)
+                    failed_refs += 1
                 print(f"{speaker}: {'OK' if resp.ok else resp.error} -> {out}")
-        return 0
+        return 1 if failed_refs else 0
 
     samples = [Sample.from_dict(d) for d in read_jsonl(samples_path)]
 
@@ -122,8 +124,22 @@ def _run(args: argparse.Namespace) -> int:
                 print(f"FEHLER: keine Stimme für Engine(s) {', '.join(args.engine)} in {args.voices}", file=sys.stderr)
                 return 2
 
+        missing = []
+        for v in voices:
+            if v.reference and not Path(v.reference).is_file():
+                missing.append(f"Referenz fehlt: {v.reference} (erzeugen mit `drova-voice bakeoff refs --speaker ...`)")
+            elif v.reference and v.engine == "kitten" and not Path(v.reference).with_suffix(".txt").is_file():
+                missing.append(f"Referenztext fehlt: {Path(v.reference).with_suffix('.txt')} (Kitten braucht den gesprochenen Text zum Klonen)")
+        if missing:
+            for line in missing:
+                print(f"FEHLER: {line}", file=sys.stderr)
+            return 2
+
         def persist(r: BakeoffResult) -> None:
-            _merge_results(results_path, [r])  # sofort sichern, damit ein Abbruch nichts verliert
+            try:
+                _merge_results(results_path, [r])  # sofort sichern, damit ein Abbruch nichts verliert
+            except OSError as e:  # z. B. Datei kurz gesperrt: der Endabgleich holt es nach
+                print(f"WARNUNG: Zwischenstand nicht gesichert: {e}", file=sys.stderr)
 
         new = run_bakeoff(samples, voices, _client, bake_out, on_result=persist)
         results = _merge_results(results_path, new)

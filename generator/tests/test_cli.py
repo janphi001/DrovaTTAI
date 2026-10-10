@@ -108,7 +108,7 @@ def test_refs_works_without_samples_and_leaves_no_part_file(tmp_path, monkeypatc
 def test_failed_refs_leaves_neither_final_nor_part_file(tmp_path, monkeypatch, capsys):
     repo, cfg, voices = _setup(tmp_path)
     monkeypatch.setattr("drova_voice.cli._client", lambda engine: StubClient(ok=False))
-    assert main(["--config", str(cfg), "bakeoff", "refs", "--speaker", "Viktor Eka"]) == 0
+    assert main(["--config", str(cfg), "bakeoff", "refs", "--speaker", "Viktor Eka"]) == 1
     target = repo / "voices" / "bakeoff"
     assert not (target / "xtts-viktor-eka.wav").exists()
     assert not list(target.glob("*.wav"))
@@ -198,5 +198,25 @@ def test_refs_writes_the_spoken_text_next_to_each_reference(tmp_path, monkeypatc
 def test_failed_refs_leaves_no_text_file(tmp_path, monkeypatch):
     repo, cfg, voices = _setup(tmp_path)
     monkeypatch.setattr("drova_voice.cli._client", lambda engine: StubClient(ok=False))
-    assert main(["--config", str(cfg), "bakeoff", "refs", "--speaker", "Viktor Eka"]) == 0
+    assert main(["--config", str(cfg), "bakeoff", "refs", "--speaker", "Viktor Eka"]) == 1
     assert not list((repo / "voices" / "bakeoff").glob("*.txt"))
+
+
+def test_run_refuses_a_missing_reference_with_a_clear_message(tmp_path, capsys):
+    repo, cfg, voices = _setup(tmp_path)
+    voices.write_text("- {engine: kitten, reference: voices/bakeoff/xtts-fehlt.wav}\n", encoding="utf-8")
+    assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 0
+    assert main(["--config", str(cfg), "bakeoff", "run", "--voices", str(voices)]) == 2
+    err = capsys.readouterr().err
+    assert "xtts-fehlt.wav" in err and "refs" in err
+
+
+def test_run_refuses_a_kitten_reference_without_transcript(tmp_path, capsys):
+    repo, cfg, voices = _setup(tmp_path)
+    ref = repo / "voices" / "bakeoff" / "ohne-text.wav"
+    ref.parent.mkdir(parents=True)
+    ref.write_bytes(b"RIFF")
+    voices.write_text("- {engine: kitten, reference: voices/bakeoff/ohne-text.wav}\n", encoding="utf-8")
+    assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 0
+    assert main(["--config", str(cfg), "bakeoff", "run", "--voices", str(voices)]) == 2
+    assert "ohne-text.txt" in capsys.readouterr().err

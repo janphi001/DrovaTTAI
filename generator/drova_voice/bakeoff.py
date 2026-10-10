@@ -14,6 +14,7 @@ from drova_voice.emotions import EmotionTag, Event, from_stage_directions
 from drova_voice.engines.client import EngineError
 from drova_voice.engines.protocol import SynthRequest
 from drova_voice.loc import read_loc_file
+from drova_voice.jsonl import replace_with_retry
 from drova_voice.render import render_request
 from drova_voice.player_name import NAME_TOKEN, make_name_variants
 from drova_voice.speech_text import GVAR_RE, STAGE_RE, SpeechText, build_speech_text
@@ -206,7 +207,7 @@ def _synth_one(client, engine: str, v: VoiceSpec, s: Sample, wav: Path, text: st
     ))
     seconds = time.perf_counter() - started
     if resp.ok:
-        part.replace(wav)
+        replace_with_retry(part, wav)
         _sidecar(wav).write_bytes(text.encode("utf-8"))
         return BakeoffResult(engine, v.slug, s.sample_id, True, str(wav), resp.duration, seconds, None)
     part.unlink(missing_ok=True)
@@ -256,8 +257,20 @@ def run_bakeoff(
     return results
 
 
+def _matches_line(engine: str, s: Sample, wav: Path) -> bool:
+    """Gehoert die Datei zum aktuellen Text der Zeile? (Sidecar-Vergleich wie beim Wiederaufnehmen.)"""
+    try:
+        text, _ = render_request(engine, s.text, EmotionTag.from_dict(s.emotion))
+    except ValueError:
+        return False
+    return _is_finished(wav, text)
+
+
 def write_sheet(samples: Sequence[Sample], results: Sequence[BakeoffResult], out_dir: Path) -> Path:
     out_dir = Path(out_dir)
+    by_id = {s.sample_id: s for s in samples}
+    current_ids = set(by_id)
+    results = [r for r in results if r.sample_id in current_ids]  # Ergebnisse frueherer Stichproben ausblenden
     by_key = {(r.engine, r.voice_slug, r.sample_id): r for r in results}
     columns = sorted({(r.engine, r.voice_slug) for r in results})
     esc = html.escape
@@ -267,7 +280,9 @@ def write_sheet(samples: Sequence[Sample], results: Sequence[BakeoffResult], out
         cells = []
         for e, v in columns:
             r = by_key.get((e, v, s.sample_id))
-            if r and r.ok and r.wav:
+            if r and r.ok and r.wav and not _matches_line(e, s, Path(r.wav)):
+                cells.append("<td>– veraltet (Text der Zeile hat sich geändert, bitte neu erzeugen)</td>")
+            elif r and r.ok and r.wav:
                 wav_path = Path(r.wav).resolve()
                 try:
                     src = wav_path.relative_to(out_dir.resolve()).as_posix()
@@ -281,7 +296,8 @@ def write_sheet(samples: Sequence[Sample], results: Sequence[BakeoffResult], out
         rows.append(f"<tr><td><b>{esc(s.bucket)}</b><br>{esc(s.text)}<br><small>{esc(emo)} {esc(events)} · {esc(s.source)}/{esc(s.key)}</small></td>{''.join(cells)}</tr>")
     summary = []
     for e, v in columns:
-        timed = [r for r in results if (r.engine, r.voice_slug) == (e, v) and r.ok and r.duration]
+        timed = [r for r in results if (r.engine, r.voice_slug) == (e, v) and r.ok and r.duration
+                 and _matches_line(e, by_id[r.sample_id], Path(r.wav))]
         dur = sum(r.duration for r in timed)
         sec = sum(r.seconds for r in timed)
         rtf = f"{sec / dur:.2f}" if dur else "–"

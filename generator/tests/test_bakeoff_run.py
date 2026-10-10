@@ -66,8 +66,9 @@ def test_failed_synth_leaves_no_file(tmp_path):
 
 
 def test_sheet_escapes_text_and_links_audio(tmp_path):
+    wav0 = _finished_wav(tmp_path, "fake", "default", SAMPLES[0])
     results = [
-        BakeoffResult("fake", "default", "short_00", True, str(tmp_path / "fake" / "default" / "short_00.wav"), 1.0, 0.5, None),
+        BakeoffResult("fake", "default", "short_00", True, str(wav0), 1.0, 0.5, None),
         BakeoffResult("fake", "default", "stage_01", False, None, None, 0.1, "kaputt"),
     ]
     html = write_sheet(SAMPLES, results, tmp_path).read_text(encoding="utf-8")
@@ -78,6 +79,17 @@ def test_sheet_escapes_text_and_links_audio(tmp_path):
 
 
 NEUTRAL = {"emotion": "neutral", "intensity": 0.0, "events": [], "emphasis": [], "notes": [], "source": "default"}
+
+
+def _finished_wav(root, engine, slug, sample):
+    """Eine fertige Datei wie run_bakeoff sie hinterlaesst: wav plus Sidecar mit dem gerenderten Text."""
+    from drova_voice.emotions import EmotionTag
+    from drova_voice.render import render_request
+    wav = Path(root) / engine / slug / f"{sample.sample_id}.wav"
+    wav.parent.mkdir(parents=True, exist_ok=True)
+    wav.write_bytes(b"RIFF")
+    wav.with_suffix(".txt").write_bytes(render_request(engine, sample.text, EmotionTag.from_dict(sample.emotion))[0].encode("utf-8"))
+    return wav
 
 
 class TextClient(FakeClient):
@@ -174,9 +186,7 @@ def test_engine_error_during_synth_skips_rest_of_that_engine(tmp_path):
 
 
 def test_sheet_falls_back_to_file_uri_for_wav_outside_out_dir(tmp_path):
-    outside = tmp_path / "elsewhere" / "short_00.wav"
-    outside.parent.mkdir()
-    outside.write_bytes(b"RIFF")
+    outside = _finished_wav(tmp_path / "elsewhere", "fake", "default", SAMPLES[0])
     results = [BakeoffResult("fake", "default", "short_00", True, str(outside), 1.0, 0.5, None)]
     page = write_sheet(SAMPLES[:1], results, tmp_path / "out").read_text(encoding="utf-8")
     assert outside.resolve().as_uri() in page
@@ -213,3 +223,38 @@ def test_stale_part_file_from_killed_run_is_not_promoted(tmp_path, guarded):
     assert not (tmp_path / "fake" / "default" / "short_00.wav").exists()
     assert not (tmp_path / "fake" / "default" / "short_00.txt").exists()
     assert not part.exists()
+
+
+def test_sheet_hides_audio_whose_text_no_longer_matches_the_line(tmp_path):
+    wav = _finished_wav(tmp_path, "fake", "default", SAMPLES[0])
+    wav.with_suffix(".txt").write_bytes(b"ein ganz anderer Text")  # Stichprobe wurde neu gezogen
+    results = [BakeoffResult("fake", "default", "short_00", True, str(wav), 1.0, 0.5, None)]
+    page = write_sheet(SAMPLES[:1], results, tmp_path).read_text(encoding="utf-8")
+    assert "<audio" not in page and "veraltet" in page
+
+
+def test_sheet_summary_only_counts_current_samples(tmp_path):
+    wav = _finished_wav(tmp_path, "fake", "default", SAMPLES[0])
+    results = [
+        BakeoffResult("fake", "default", "short_00", True, str(wav), 1.0, 0.5, None),
+        BakeoffResult("fake", "default", "alt_99", True, str(wav), 100.0, 100.0, None),  # gehoert zu einer frueheren Stichprobe
+    ]
+    page = write_sheet(SAMPLES[:1], results, tmp_path).read_text(encoding="utf-8")
+    assert "0.50" in page and "100.0 s" not in page
+
+
+def test_finished_wav_is_put_in_place_even_if_another_program_briefly_holds_the_old_one(tmp_path, monkeypatch):
+    import os
+    import drova_voice.jsonl as jsonl_mod
+    real, failures = os.replace, []
+
+    def flaky(src, dst):
+        if len(failures) < 2:
+            failures.append(1)
+            raise PermissionError(5, "Zugriff verweigert")
+        real(src, dst)
+
+    monkeypatch.setattr(jsonl_mod.os, "replace", flaky)
+    monkeypatch.setattr(jsonl_mod.time, "sleep", lambda _s: None)
+    results = run_bakeoff(SAMPLES[:1], [VoiceSpec("fake")], lambda e: FakeClient(), tmp_path)
+    assert results[0].ok and (tmp_path / "fake" / "default" / "short_00.wav").exists() and len(failures) == 2

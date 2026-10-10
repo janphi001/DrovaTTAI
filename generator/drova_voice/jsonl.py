@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Iterable
 
 
-def _replace_with_retry(tmp: Path, path: Path, attempts: int = 40, delay: float = 0.25) -> None:
+def replace_with_retry(tmp: Path, path: Path, attempts: int = 40, delay: float = 0.25) -> None:
     # Windows: os.replace scheitert mit PermissionError, solange ein anderes Programm (Editor, Virenscanner,
     # ein Fortschritts-Check) die Zieldatei offen hat. Kurz warten und erneut versuchen.
     for attempt in range(attempts):
@@ -29,7 +29,7 @@ def write_jsonl(path: Path, rows: Iterable[dict]) -> None:
         with open(tmp, "w", encoding="utf-8", newline="\n") as f:
             for row in rows:
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
-        _replace_with_retry(tmp, path)
+        replace_with_retry(tmp, path)
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise
