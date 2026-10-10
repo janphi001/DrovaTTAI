@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 _START_RE = re.compile(r"^(.+?)\s*\{\s?(.*)$")
-_BRACE_LINE_RE = re.compile(r"^\s*\{")
+_BRACE_LINE_RE = re.compile(r"^\s*\{\s*$")
+_HEADER_LIKE_RE = re.compile(r"^[^{}]+\{")
 
 
 @dataclass(frozen=True)
@@ -50,14 +51,20 @@ def parse_loc(content: str) -> LocParseResult:
             continue
         buffer = [rest]
         j = i + consumed
-        while j < len(lines) and not lines[j].rstrip().endswith("}"):
+        while (
+            j < len(lines)
+            and not _HEADER_LIKE_RE.match(lines[j].strip())
+            and not lines[j].rstrip().endswith("}")
+        ):
             buffer.append(lines[j])
             j += 1
-        if j >= len(lines):
+        if j >= len(lines) or _HEADER_LIKE_RE.match(lines[j].strip()):
+            # Unterminated entry: report its start and resume at the next header.
             errors.append(start)
-            break
+            i = j
+            continue
         buffer.append(lines[j].rstrip()[:-1])
-        entries.append(LocEntry(key, "\n".join(buffer).strip(), start))
+        entries.append(LocEntry(key, "\n".join(part.strip() for part in buffer).strip(), start))
         i = j + 1
     return LocParseResult(tuple(entries), tuple(errors))
 
