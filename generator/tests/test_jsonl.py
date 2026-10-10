@@ -37,3 +37,36 @@ def test_failed_write_keeps_old_file_and_leaves_no_tmp(tmp_path):
         write_jsonl(path, broken_rows())
     assert path.read_text(encoding="utf-8") == '{"alt": true}\n'
     assert not path.with_name(path.name + ".tmp").exists()
+
+
+def test_write_retries_when_another_program_briefly_holds_the_target_open(tmp_path, monkeypatch):
+    import os
+    import drova_voice.jsonl as jsonl_mod
+    real_replace, failures = os.replace, []
+
+    def flaky_replace(src, dst):
+        if len(failures) < 2:
+            failures.append(1)
+            raise PermissionError(5, "Zugriff verweigert")
+        real_replace(src, dst)
+
+    monkeypatch.setattr(jsonl_mod.os, "replace", flaky_replace)
+    monkeypatch.setattr(jsonl_mod.time, "sleep", lambda _s: None)
+    path = tmp_path / "r.jsonl"
+    write_jsonl(path, [{"a": 1}])
+    assert len(failures) == 2 and read_jsonl(path) == [{"a": 1}]
+
+
+def test_write_gives_up_after_the_retries_and_keeps_the_old_file(tmp_path, monkeypatch):
+    import drova_voice.jsonl as jsonl_mod
+    path = tmp_path / "r.jsonl"
+    write_jsonl(path, [{"alt": True}])
+
+    def locked(src, dst):
+        raise PermissionError(5, "Zugriff verweigert")
+
+    monkeypatch.setattr(jsonl_mod.os, "replace", locked)
+    monkeypatch.setattr(jsonl_mod.time, "sleep", lambda _s: None)
+    with pytest.raises(PermissionError):
+        write_jsonl(path, [{"neu": True}])
+    assert read_jsonl(path) == [{"alt": True}] and not list(tmp_path.glob("*.tmp"))
