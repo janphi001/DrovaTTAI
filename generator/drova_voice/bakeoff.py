@@ -10,7 +10,7 @@ from typing import Callable, ContextManager, Sequence
 
 import yaml
 
-from drova_voice.emotions import EmotionTag, from_stage_directions
+from drova_voice.emotions import EmotionTag, Event, from_stage_directions
 from drova_voice.engines.client import EngineError
 from drova_voice.engines.protocol import SynthRequest
 from drova_voice.loc import read_loc_file
@@ -18,8 +18,21 @@ from drova_voice.render import render_request
 from drova_voice.player_name import NAME_TOKEN, make_name_variants
 from drova_voice.speech_text import GVAR_RE, STAGE_RE, SpeechText, build_speech_text
 
-BUCKETS = ("short", "long", "stage", "player_name", "gvar", "question", "exclaim", "normal")
+BUCKETS = ("short", "long", "stage", "emotion", "player_name", "gvar", "question", "exclaim", "normal")
 BAKEOFF_GVAR_FALLBACK = "zehn"
+
+# Feste synthetische Tags für den Bucket "emotion" (neutrale Zeilen, die Emotion bekommen), reihum vergeben.
+_EMOTION_PRESETS: tuple[tuple[str, float, tuple[str, ...]], ...] = (
+    ("angry", 0.8, ()),
+    ("sad", 0.7, ()),
+    ("joyful", 0.6, ("laugh",)),
+    ("stern", 0.5, ("sigh",)),
+)
+
+
+def _emotion_preset(n: int) -> EmotionTag:
+    name, intensity, events = _EMOTION_PRESETS[n % len(_EMOTION_PRESETS)]
+    return EmotionTag(name, intensity, [Event(tag, 0) for tag in events], source="manual")
 
 
 @dataclass(frozen=True)
@@ -74,11 +87,27 @@ def select_samples(loc_dir: Path, per_bucket: int = 4, seed: int = 42) -> list[S
             if not e.text.strip():
                 continue
             st = _prepare(e.text)
-            if st.is_speakable:
-                pool[classify(e.text)].append((f.stem, e.key, e.text, st))
+            if not st.is_speakable:
+                continue
+            kind = classify(e.text)
+            # "stage" nur, wenn mindestens eine Regieanweisungs-Regel greift; sonst hätte die Zeile keine Emotion.
+            if kind == "stage" and from_stage_directions(st.stage).source != "stage":
+                continue
+            pool[kind].append((f.stem, e.key, e.text, st))
     rng = random.Random(seed)
     samples: list[Sample] = []
     for bucket in BUCKETS:
+        if bucket == "emotion":
+            # Zuerst aus den neutralen Zeilen ziehen, damit "normal" den Rest bekommt (keine Doppelten).
+            normal = pool["normal"]
+            picked = rng.sample(range(len(normal)), min(per_bucket, len(normal)))
+            taken = set(picked)
+            pool["normal"] = [row for i, row in enumerate(normal) if i not in taken]
+            for n, i in enumerate(picked):
+                source, key, raw, st = normal[i]
+                tag = _emotion_preset(n)
+                samples.append(Sample(f"{bucket}_{len(samples):02d}", source, key, raw, st.text, tag.to_dict(), bucket))
+            continue
         candidates = pool[bucket]
         for source, key, raw, st in rng.sample(candidates, min(per_bucket, len(candidates))):
             tag = from_stage_directions(st.stage)
