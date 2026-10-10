@@ -1,3 +1,4 @@
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -5,6 +6,8 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DrovaVoice.Core", "DrovaVoice.Core\DrovaVoice.Core.csproj", "{7D3883CF-8B0B-48B7-A920-41E433F71ED7}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DrovaVoice.Core.Tests", "DrovaVoice.Core.Tests\DrovaVoice.Core.Tests.csproj", "{886DE58E-7333-481C-BC83-6995091DAF6D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DrovaVoice", "DrovaVoice\DrovaVoice.csproj", "{6D90DAE8-2F38-4632-BA48-CCE3B98B935A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -40,6 +43,18 @@ Global
 		{886DE58E-7333-481C-BC83-6995091DAF6D}.Release|x64.Build.0 = Release|Any CPU
 		{886DE58E-7333-481C-BC83-6995091DAF6D}.Release|x86.ActiveCfg = Release|Any CPU
 		{886DE58E-7333-481C-BC83-6995091DAF6D}.Release|x86.Build.0 = Release|Any CPU
+		{6D90DAE8-2F38-4632-BA48-CCE3B98B935A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6D90DAE8-2F38-4632-BA48-CCE3B98B935A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6D90DAE8-2F38-4632-BA48-CCE3B98B935A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6D90DAE8-2F38-4632-BA48-CCE3B98B935A}.Debug|x64.Build.0 = Debug|Any CPU
+		{6D90DAE8-2F38-4632-BA48-CCE3B98B935A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6D90DAE8-2F38-4632-BA48-CCE3B98B935A}.Debug|x86.Build.0 = Debug|Any CPU
+		{6D90DAE8-2F38-4632-BA48-CCE3B98B935A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6D90DAE8-2F38-4632-BA48-CCE3B98B935A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6D90DAE8-2F38-4632-BA48-CCE3B98B935A}.Release|x64.ActiveCfg = Release|Any CPU
+		{6D90DAE8-2F38-4632-BA48-CCE3B98B935A}.Release|x64.Build.0 = Release|Any CPU
+		{6D90DAE8-2F38-4632-BA48-CCE3B98B935A}.Release|x86.ActiveCfg = Release|Any CPU
+		{6D90DAE8-2F38-4632-BA48-CCE3B98B935A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

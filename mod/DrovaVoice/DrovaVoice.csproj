@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>DrovaVoice</AssemblyName>
+    <RootNamespace>DrovaVoice</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DrovaVoice.Core\DrovaVoice.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="MelonLoader">
+      <HintPath>$(DrovaGameDir)\MelonLoader\net6\MelonLoader.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Il2CppInterop.Runtime">
+      <HintPath>$(DrovaGameDir)\MelonLoader\net6\Il2CppInterop.Runtime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Drova_Modding_API">
+      <HintPath>$(DrovaGameDir)\Mods\Drova_Modding_API.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <Target Name="DeployToGame" AfterTargets="Build" Condition="Exists('$(DrovaGameDir)\Mods')">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(DrovaGameDir)\Mods" />
+    <Copy SourceFiles="$(TargetDir)DrovaVoice.Core.dll" DestinationFolder="$(DrovaGameDir)\UserLibs" />
+  </Target>
+</Project>
