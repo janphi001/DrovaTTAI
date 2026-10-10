@@ -428,3 +428,39 @@ def test_zero_duration_audio_is_not_reported_as_success(tmp_path, guarded):
         client.close()
     assert not resp.ok and resp.id == "s1"
     assert resp.error == f"Leeres Audio (Dauer 0): {out}"
+
+
+# --- Opus-Review Task 12: Modell-Caches gehören aufs Projektlaufwerk, nicht nach C: ---
+
+def test_cache_env_points_model_caches_into_the_project_cache(tmp_path):
+    env = client_mod.cache_env(tmp_path / "cache", base={})
+    assert env == {"HF_HOME": str(tmp_path / "cache" / "hf"), "TTS_HOME": str(tmp_path / "cache" / "tts"),
+                   "PKUSEG_HOME": str(tmp_path / "cache" / "pkuseg")}
+
+
+def test_cache_env_does_not_override_values_the_user_already_set(tmp_path):
+    env = client_mod.cache_env(tmp_path / "cache", base={"HF_HOME": "E:/mein-hf"})
+    assert "HF_HOME" not in env and "TTS_HOME" in env
+
+
+ECHO_ENV = '''
+def load():
+    return None
+
+def synth(_state, req):
+    with open(req["out_path"], "wb") as f:
+        f.write(os.environ.get("HF_HOME", "ungesetzt").encode() + bytes(60))
+    return 22050, 0.1
+
+serve("env", "stub-env", load, synth)
+'''
+
+
+def test_client_passes_extra_env_to_the_worker(tmp_path, guarded):
+    client = guarded(lambda: EngineClient(_stub(tmp_path, _serve_header() + ECHO_ENV), env={"HF_HOME": "D:/cache/hf"}))
+    out = tmp_path / "e.wav"
+    try:
+        resp = guarded(lambda: client.synth(SynthRequest(id="e1", text="Kalte Luft", out_path=str(out))))
+    finally:
+        client.close()
+    assert resp.ok and out.read_bytes().startswith(b"D:/cache/hf")

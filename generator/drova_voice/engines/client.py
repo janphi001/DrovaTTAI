@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from drova_voice.engines.protocol import SynthRequest, SynthResponse
 
@@ -18,6 +18,13 @@ class EngineError(RuntimeError):
     pass
 
 
+def cache_env(cache_dir: Path, base: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Modell-Caches der Engines ins Projekt legen (sonst landen GB auf C:). Vom Nutzer gesetzte Werte bleiben."""
+    base = os.environ if base is None else base
+    wanted = {"HF_HOME": "hf", "TTS_HOME": "tts", "PKUSEG_HOME": "pkuseg"}
+    return {name: str(Path(cache_dir) / sub) for name, sub in wanted.items() if name not in base}
+
+
 def _json_dict(text: str) -> dict | None:
     try:
         obj = json.loads(text)
@@ -27,8 +34,8 @@ def _json_dict(text: str) -> dict | None:
 
 
 class EngineClient:
-    def __init__(self, cmd: Sequence[str], cwd: str | Path | None = None):
-        env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
+    def __init__(self, cmd: Sequence[str], cwd: str | Path | None = None, env: Mapping[str, str] | None = None):
+        env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1", **(env or {}))
         self._proc = subprocess.Popen(
             list(cmd), stdin=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, env=env,
             text=True, encoding="utf-8", errors="replace", bufsize=1,

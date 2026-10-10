@@ -8,7 +8,7 @@ from drova_voice.bakeoff import (REF_TEXT, BakeoffResult, Sample, VoiceSpec, loa
                                  run_bakeoff, select_samples, write_sheet)
 from drova_voice.config import DEFAULT_CONFIG_PATH, load_config
 from drova_voice.emotions import EmotionTag
-from drova_voice.engines.client import EngineClient, EngineError, worker_command
+from drova_voice.engines.client import EngineClient, EngineError, cache_env, worker_command
 from drova_voice.engines.protocol import SynthRequest
 from drova_voice.jsonl import read_jsonl, write_jsonl
 from drova_voice.render import render_request
@@ -17,8 +17,11 @@ WORKERS_DIR = Path(__file__).resolve().parents[1] / "workers"
 DEFAULT_VOICES = Path(__file__).resolve().parents[1] / "bakeoff_voices.yaml"
 
 
+CACHE_DIR = WORKERS_DIR.parents[1] / "cache"
+
+
 def _client(engine: str) -> EngineClient:
-    return EngineClient(worker_command(WORKERS_DIR, engine))
+    return EngineClient(worker_command(WORKERS_DIR, engine), env=cache_env(CACHE_DIR))
 
 
 def _merge_results(path: Path, new: list[BakeoffResult]) -> list[BakeoffResult]:
