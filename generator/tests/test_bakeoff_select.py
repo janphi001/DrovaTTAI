@@ -109,3 +109,17 @@ def test_empty_selection_raises_value_error(tmp_path):
     (d / "NPC_Leer_de.loc").write_text("Plh_1 { *grinst* }\n", encoding="utf-8")
     with pytest.raises(ValueError, match="Keine Zeilen gefunden"):
         select_samples(tmp_path / "de", per_bucket=1)
+
+
+def test_stage_bucket_drops_lines_whose_directions_only_add_notes(tmp_path):
+    d = tmp_path / "de" / "Dialog"
+    d.mkdir(parents=True)
+    (d / "NPC_Test_de.loc").write_text(
+        "Plh_1 { *flüstert* Hallo, du da drüben. }\n"
+        "Plh_2 { *hick* Noch ein Becher, bitte. }\n"
+        "Plh_3 { Der Weg ist lang. }\n",
+        encoding="utf-8",
+    )
+    samples = select_samples(tmp_path / "de", per_bucket=10)
+    assert [s for s in samples if s.bucket == "stage"] == []
+    assert {s.key for s in samples} == {"Plh_3"}

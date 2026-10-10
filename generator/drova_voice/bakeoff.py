@@ -93,9 +93,11 @@ def select_samples(loc_dir: Path, per_bucket: int = 4, seed: int = 42) -> list[S
             if not st.is_speakable:
                 continue
             kind = classify(e.text)
-            # "stage" nur, wenn mindestens eine Regieanweisungs-Regel greift; sonst hätte die Zeile keine Emotion.
-            if kind == "stage" and from_stage_directions(st.stage).source != "stage":
-                continue
+            # "stage" nur mit Wirkung: mindestens eine Emotion oder ein Laut. Reine Notizen (flüstert, hick) reichen nicht.
+            if kind == "stage":
+                stage_tag = from_stage_directions(st.stage)
+                if stage_tag.emotion == "neutral" and not stage_tag.events:
+                    continue
             pool[kind].append((f.stem, e.key, e.text, st))
     rng = random.Random(seed)
     samples: list[Sample] = []
