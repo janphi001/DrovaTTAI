@@ -119,6 +119,16 @@ def test_unterminated_key_only_entry_does_not_swallow_next_entry():
     assert [(e.key, e.text, e.line) for e in res.entries] == [("Tst_2", "Ende Xi.", 5)]
 
 
+def test_parse_loc_crlf_multiline_with_leading_bom():
+    content = "﻿Brief_1 { Liebe Mu,\r\nich komme bald Sigma.\r\nDein Rho }\r\n\r\nTst_2 { Kurz Tau. }\r\n"
+    res = parse_loc(content)
+    assert res.errors == ()
+    assert [(e.key, e.text, e.line) for e in res.entries] == [
+        ("Brief_1", "Liebe Mu,\nich komme bald Sigma.\nDein Rho", 1),
+        ("Tst_2", "Kurz Tau.", 5),
+    ]
+
+
 def test_loc_rel_path(tmp_path):
     lang_dir = tmp_path / "de"
     f = lang_dir / "Testdir" / "NPC_Testfigur_de.loc"
