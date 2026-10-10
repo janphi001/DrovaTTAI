@@ -63,7 +63,7 @@ class _FakeSoundfile(types.ModuleType):
         self.written.append((path, len(data), rate))
 
 
-def test_kitten_synth_uses_voice_without_reference_and_reference_with_it(monkeypatch):
+def test_kitten_synth_uses_voice_without_reference_and_reference_with_it(monkeypatch, tmp_path):
     fake_sf = _FakeSoundfile()
     monkeypatch.setitem(sys.modules, "soundfile", fake_sf)
     calls = []
@@ -79,6 +79,104 @@ def test_kitten_synth_uses_voice_without_reference_and_reference_with_it(monkeyp
     rate, seconds = module.synth(FakeModel(), {"text": "Hallo", "out_path": "a.wav", "voice": "Bruno"})
     assert (rate, seconds) == (24000, 1.0)
     assert calls[-1] == ("Hallo", {"normalize": False, "voice": "Bruno"})
-    module.synth(FakeModel(), {"text": "Hallo", "out_path": "b.wav", "reference": "ref.wav"})
-    assert calls[-1] == ("Hallo", {"normalize": False, "reference": "ref.wav"})
+    ref = tmp_path / "ref.wav"
+    ref.write_bytes(b"x")
+    ref.with_suffix(".txt").write_text("Ich bleibe.", encoding="utf-8")
+    module.synth(FakeModel(), {"text": "Hallo", "out_path": "b.wav", "reference": str(ref)})
+    assert calls[-1] == ("Hallo", {"normalize": False, "reference": str(ref), "reference_text": "Ich bleibe."})
     assert [w[0] for w in fake_sf.written] == ["a.wav", "b.wav"]
+
+
+def _kitten_with_fake_model(monkeypatch):
+    monkeypatch.setitem(sys.modules, "soundfile", _FakeSoundfile())
+    calls = []
+
+    class FakeModel:
+        sample_rate = 24000
+
+        def generate(self, text, **kwargs):
+            calls.append(kwargs)
+            return [0.0] * 24000
+
+    return _load_module("kitten"), FakeModel(), calls
+
+
+def test_kitten_clone_passes_the_known_transcript_instead_of_letting_whisper_guess(monkeypatch, tmp_path):
+    module, model, calls = _kitten_with_fake_model(monkeypatch)
+    (tmp_path / "ref.wav").write_bytes(b"x")
+    (tmp_path / "ref.txt").write_text("Ich bleibe.", encoding="utf-8")
+    module.synth(model, {"text": "Hallo", "out_path": "a.wav", "reference": str(tmp_path / "ref.wav")})
+    assert calls[-1]["reference_text"] == "Ich bleibe."
+
+
+def test_kitten_clone_without_transcript_fails_instead_of_downloading_whisper(monkeypatch, tmp_path):
+    module, model, calls = _kitten_with_fake_model(monkeypatch)
+    (tmp_path / "ref.wav").write_bytes(b"x")
+    with pytest.raises(ValueError, match="Whisper"):
+        module.synth(model, {"text": "Hallo", "out_path": "a.wav", "reference": str(tmp_path / "ref.wav")})
+    assert not calls
+
+
+def test_kitten_passes_the_preset_from_params(monkeypatch):
+    module, model, calls = _kitten_with_fake_model(monkeypatch)
+    module.synth(model, {"text": "Hallo", "out_path": "a.wav", "voice": "Bruno", "params": {"preset": "expressive"}})
+    assert calls[-1]["preset"] == "expressive"
+    module.synth(model, {"text": "Hallo", "out_path": "b.wav", "voice": "Bruno"})
+    assert "preset" not in calls[-1]
+
+
+class _FakeWav:
+    shape = (1, 24000)
+
+    def squeeze(self, _dim):
+        return self
+
+    def cpu(self):
+        return self
+
+    def numpy(self):
+        return [0.0] * 24000
+
+
+class _FakeChatterbox:
+    sr = 24000
+
+    def __init__(self):
+        self.conds = "eingebaut"
+        self._builtin_conds = self.conds  # so setzt load() es
+        self._ref_conds = {}
+        self.prepared = []
+        self.seen = []
+
+    def prepare_conditionals(self, path, exaggeration=0.5):
+        self.prepared.append(path)
+        self.conds = f"conds:{path}"
+
+    def generate(self, text, language_id, audio_prompt_path=None, exaggeration=0.5, cfg_weight=0.5):
+        self.seen.append((self.conds, audio_prompt_path))
+        return _FakeWav()
+
+
+def test_chatterbox_reference_does_not_leak_into_the_next_default_voice_request(monkeypatch):
+    fake_sf = _FakeSoundfile()
+    monkeypatch.setitem(sys.modules, "soundfile", fake_sf)
+    module, model = _load_module("chatterbox"), _FakeChatterbox()
+    module.synth(model, {"text": "a", "out_path": "1.wav", "reference": "ref.wav"})
+    module.synth(model, {"text": "b", "out_path": "2.wav"})
+    assert model.seen == [("conds:ref.wav", None), ("eingebaut", None)]
+
+
+def test_chatterbox_embeds_each_reference_only_once(monkeypatch):
+    monkeypatch.setitem(sys.modules, "soundfile", _FakeSoundfile())
+    module, model = _load_module("chatterbox"), _FakeChatterbox()
+    for i in range(3):
+        module.synth(model, {"text": "a", "out_path": f"{i}.wav", "reference": "ref.wav"})
+    assert model.prepared == ["ref.wav"]
+
+
+def test_chatterbox_writes_through_soundfile_like_the_other_workers(monkeypatch):
+    fake_sf = _FakeSoundfile()
+    monkeypatch.setitem(sys.modules, "soundfile", fake_sf)
+    module, model = _load_module("chatterbox"), _FakeChatterbox()
+    assert module.synth(model, {"text": "a", "out_path": "x.wav"}) == (24000, 1.0)
+    assert fake_sf.written == [("x.wav", 24000, 24000)]

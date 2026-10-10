@@ -464,3 +464,54 @@ def test_client_passes_extra_env_to_the_worker(tmp_path, guarded):
     finally:
         client.close()
     assert resp.ok and out.read_bytes().startswith(b"D:/cache/hf")
+
+
+WARMUP_STUB = '''
+def load():
+    return []
+
+def synth(calls, req):
+    calls.append(req["text"])
+    with open(req["out_path"], "wb") as f:
+        f.write(b"RIFF" + bytes(60))
+    if req["text"] == "Kalte Luft":
+        with open(req["out_path"] + ".log", "w", encoding="utf-8") as g:
+            g.write("|".join(calls))
+    return 22050, 0.1
+
+serve("warm", "stub-warm", load, synth, warmup_text="Guten Tag.")
+'''
+
+WARMUP_FAILS = '''
+def load():
+    return None
+
+def synth(_state, req):
+    if req["text"] == "Guten Tag.":
+        raise RuntimeError("aufwärmen kaputt")
+    with open(req["out_path"], "wb") as f:
+        f.write(b"RIFF" + bytes(60))
+    return 22050, 0.1
+
+serve("warmfail", "stub-warmfail", load, synth, warmup_text="Guten Tag.")
+'''
+
+
+def test_worker_synthesizes_a_warmup_sentence_before_the_first_request(tmp_path, guarded):
+    client = guarded(lambda: EngineClient(_stub(tmp_path, _serve_header() + WARMUP_STUB)))
+    out = tmp_path / "w.wav"
+    try:
+        resp = guarded(lambda: client.synth(SynthRequest(id="w1", text="Kalte Luft", out_path=str(out))))
+    finally:
+        client.close()
+    assert resp.ok
+    assert Path(str(out) + ".log").read_text(encoding="utf-8") == "Guten Tag.|Kalte Luft"
+
+
+def test_failing_warmup_does_not_prevent_the_worker_from_becoming_ready(tmp_path, guarded):
+    client = guarded(lambda: EngineClient(_stub(tmp_path, _serve_header() + WARMUP_FAILS)))
+    try:
+        resp = guarded(lambda: client.synth(SynthRequest(id="w1", text="Kalte Luft", out_path=str(tmp_path / "w.wav"))))
+    finally:
+        client.close()
+    assert resp.ok

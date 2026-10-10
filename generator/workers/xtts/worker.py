@@ -35,4 +35,4 @@ def synth(tts, req: dict) -> tuple[int, float]:
 
 
 if __name__ == "__main__":
-    serve("xtts", MODEL, load, synth)
+    serve("xtts", MODEL, load, synth, warmup_text="Guten Tag, wie geht es dir?")

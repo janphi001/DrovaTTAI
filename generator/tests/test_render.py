@@ -55,7 +55,7 @@ def test_chatterbox_params(tag, expected):
 
 def test_render_request_dispatch():
     tag = EmotionTag("angry", 1.0, [Event("growl", 0)])
-    assert render_request("kitten", "Raus!", tag) == ("[angry] <growl> Raus!", {})
+    assert render_request("kitten", "Raus!", tag) == ("[angry] <growl> Raus!", {"preset": "expressive"})
     assert render_request("chatterbox", "Raus!", tag) == ("Raus!", {"exaggeration": 0.9, "cfg_weight": 0.3})
     assert render_request("xtts", "Raus!", tag) == ("Raus!", {})
     assert render_request("fake", "Raus!", tag) == ("Raus!", {})
@@ -68,3 +68,12 @@ def test_render_request_dispatch():
 def test_render_request_rejects_text_without_alphanumeric_characters(engine, text):
     with pytest.raises(ValueError, match="sprechbar"):
         render_request(engine, text, EmotionTag())
+
+
+def test_kitten_uses_the_expressive_preset_only_when_tags_are_rendered():
+    _, params = render_request("kitten", "Na gut.", EmotionTag("stern", 0.8))
+    assert params == {"preset": "expressive"}
+    _, params = render_request("kitten", "Na gut.", EmotionTag("neutral", 0.0, events=[Event("sigh", 3)]))
+    assert params == {"preset": "expressive"}
+    assert render_request("kitten", "Na gut.", EmotionTag())[1] == {}
+    assert render_request("kitten", "Schön.", EmotionTag("joyful", 0.2))[1] == {}

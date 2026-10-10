@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
 import traceback
 from typing import Any, Callable
 
@@ -22,7 +23,17 @@ def _clear_output(path: str) -> str | None:
     return None
 
 
-def serve(engine: str, model: str, load: Callable[[], Any], synth: Callable[[Any, dict], tuple[int, float]]) -> None:
+def _warm_up(state: Any, synth: Callable[[Any, dict], tuple[int, float]], text: str) -> None:
+    """Ein kurzer Satz vor der Ready-Zeile: CUDA-Kernel und Caches werden warm, bevor gemessen wird."""
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            synth(state, {"id": "warmup", "text": text, "out_path": os.path.join(tmp, "warmup.wav")})
+    except Exception:  # noqa: BLE001 – Aufwärmen ist nur eine Optimierung
+        traceback.print_exc()
+
+
+def serve(engine: str, model: str, load: Callable[[], Any], synth: Callable[[Any, dict], tuple[int, float]],
+          warmup_text: str | None = None) -> None:
     # Protokoll-Kanal auf eine eigene Kopie von fd 1 legen, danach fd 1 auf stderr umleiten:
     # Ausgaben von Bibliotheken – auch native (C-Ebene) – dürfen das Protokoll nicht stören.
     sys.stdout.flush()
@@ -43,6 +54,8 @@ def serve(engine: str, model: str, load: Callable[[], Any], synth: Callable[[Any
         proto.write("\n")
         send({"ready": False, "engine": engine, "model": model, "error": f"{type(e).__name__}: {e}"})
         sys.exit(1)
+    if warmup_text:
+        _warm_up(state, synth, warmup_text)
     proto.write("\n")  # schließt eine angefangene Fremdzeile ab, damit die Ready-Zeile eine eigene Zeile bleibt
     send({"ready": True, "engine": engine, "model": model})
     for line in sys.stdin:

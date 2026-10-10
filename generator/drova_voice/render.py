@@ -38,7 +38,9 @@ def render_request(engine: str, text: str, tag: EmotionTag) -> tuple[str, dict]:
     if not any(ch.isalnum() for ch in text):
         raise ValueError("Text ist nicht sprechbar: er enthält keine Buchstaben oder Ziffern")
     if engine == "kitten":
-        return render_kitten(text, tag), {}
+        rendered = render_kitten(text, tag)
+        # Tags (Emotion, Laute) wirken nur im Preset "expressive"; "stable" dämpft sie.
+        return rendered, ({"preset": "expressive"} if rendered != render_kitten(text, EmotionTag()) else {})
     if engine == "chatterbox":
         return text, chatterbox_params(tag)
     if engine in ("xtts", "fake"):

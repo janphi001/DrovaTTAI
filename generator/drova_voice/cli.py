@@ -104,6 +104,8 @@ def _run(args: argparse.Namespace) -> int:
                 part = out.with_name(f"xtts-{slug}.part.wav")
                 resp = client.synth(SynthRequest(id=slug, text=REF_TEXT, out_path=str(part), voice=speaker))
                 if resp.ok:
+                    # Kitten braucht den gesprochenen Text zum Klonen (sonst lädt es Whisper, nur Englisch).
+                    out.with_suffix(".txt").write_text(REF_TEXT, encoding="utf-8")
                     part.replace(out)
                 else:
                     part.unlink(missing_ok=True)

@@ -185,3 +185,18 @@ def test_config_path_that_cannot_be_read_returns_2(tmp_path, capsys, argv):
     err = capsys.readouterr().err
     assert "FEHLER:" in err and "nicht lesbar" in err
     assert "Traceback" not in err
+
+
+def test_refs_writes_the_spoken_text_next_to_each_reference(tmp_path, monkeypatch):
+    from drova_voice.bakeoff import REF_TEXT
+    repo, cfg, voices = _setup(tmp_path)
+    monkeypatch.setattr("drova_voice.cli._client", lambda engine: StubClient())
+    assert main(["--config", str(cfg), "bakeoff", "refs", "--speaker", "Viktor Eka"]) == 0
+    assert (repo / "voices" / "bakeoff" / "xtts-viktor-eka.txt").read_text(encoding="utf-8") == REF_TEXT
+
+
+def test_failed_refs_leaves_no_text_file(tmp_path, monkeypatch):
+    repo, cfg, voices = _setup(tmp_path)
+    monkeypatch.setattr("drova_voice.cli._client", lambda engine: StubClient(ok=False))
+    assert main(["--config", str(cfg), "bakeoff", "refs", "--speaker", "Viktor Eka"]) == 0
+    assert not list((repo / "voices" / "bakeoff").glob("*.txt"))
