@@ -5,18 +5,21 @@ Nur stdlib: wird von Workern in fremden venvs importiert.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import traceback
 from typing import Any, Callable
 
 
 def serve(engine: str, model: str, load: Callable[[], Any], synth: Callable[[Any, dict], tuple[int, float]]) -> None:
-    proto = sys.stdout
-    sys.stdout = sys.stderr  # Ausgaben von Bibliotheken dürfen das Protokoll nicht stören
+    # Protokoll-Kanal auf eine eigene Kopie von fd 1 legen, danach fd 1 auf stderr umleiten:
+    # Ausgaben von Bibliotheken – auch native (C-Ebene) – dürfen das Protokoll nicht stören.
+    sys.stdout.flush()
+    proto = os.fdopen(os.dup(1), "w", encoding="utf-8", newline="\n")
+    os.dup2(2, 1)
+    sys.stdout = sys.stderr
     if hasattr(sys.stdin, "reconfigure"):
         sys.stdin.reconfigure(encoding="utf-8")
-    if hasattr(proto, "reconfigure"):
-        proto.reconfigure(encoding="utf-8")
 
     def send(obj: dict) -> None:
         proto.write(json.dumps(obj, ensure_ascii=False) + "\n")

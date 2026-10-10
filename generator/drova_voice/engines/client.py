@@ -21,12 +21,15 @@ class EngineClient:
         env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
         self._proc = subprocess.Popen(
             list(cmd), stdin=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, env=env,
-            text=True, encoding="utf-8", bufsize=1,
+            text=True, encoding="utf-8", errors="replace", bufsize=1,
         )
-        hello = self._read()
-        if not hello.get("ready"):
-            self.close()
-            raise EngineError(f"Worker nicht bereit: {hello}")
+        try:
+            hello = self._read()
+            if not hello.get("ready"):
+                raise EngineError(f"Worker nicht bereit: {hello}")
+        except BaseException:
+            self.close()  # Worker nicht verwaist zurücklassen
+            raise
         self.engine = hello.get("engine")
         self.model = hello.get("model")
 
@@ -38,15 +41,20 @@ class EngineClient:
             line = line.strip()
             if line.startswith("{"):
                 try:
-                    return json.loads(line)
+                    obj = json.loads(line)
                 except json.JSONDecodeError:
-                    pass
+                    obj = None
+                if isinstance(obj, dict) and ("ready" in obj or "ok" in obj):
+                    return obj
             print(f"[worker stdout] {line}", file=sys.stderr)
         raise EngineError("Worker liefert kein gültiges Protokoll")
 
     def synth(self, req: SynthRequest) -> SynthResponse:
-        self._proc.stdin.write(req.to_json() + "\n")
-        self._proc.stdin.flush()
+        try:
+            self._proc.stdin.write(req.to_json() + "\n")
+            self._proc.stdin.flush()
+        except OSError as e:
+            raise EngineError(f"Worker nimmt keine Anfragen mehr an: {e}") from e
         resp = SynthResponse.from_dict(self._read())
         if resp.id != req.id:
             raise EngineError(f"Antwort-ID {resp.id!r} passt nicht zu Anfrage {req.id!r}")
