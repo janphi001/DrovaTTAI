@@ -61,6 +61,9 @@ def _run(args: argparse.Namespace) -> int:
     except FileNotFoundError:
         print(f"FEHLER: Konfigurationsdatei nicht gefunden: {args.config}", file=sys.stderr)
         return 2
+    except OSError as e:
+        print(f"FEHLER: Konfigurationsdatei nicht lesbar: {args.config} ({e.strerror or e})", file=sys.stderr)
+        return 2
     except ValueError as e:
         print(f"FEHLER: {e}", file=sys.stderr)
         return 2
