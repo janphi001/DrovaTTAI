@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using DrovaVoice.Core;
 using DrovaVoice.Export;
@@ -19,9 +20,11 @@ namespace DrovaVoice
         private bool _hotkeyBroken;
         private int _frame;
         private bool _exportTriggerStuck;
+        private bool _exportAllTriggerStuck;
 
         private string ModDir => Path.Combine(MelonEnvironment.ModsDirectory, "DrovaVoice");
         private string TriggerPath => Path.Combine(ModDir, "export.trigger");
+        private string TriggerAllPath => Path.Combine(ModDir, "export-all.trigger");
 
         public override void OnInitializeMelon()
         {
@@ -37,7 +40,9 @@ namespace DrovaVoice
             bool trigger = false;
             if (_frame % 60 == 0 && ConsumeTrigger(TriggerPath, ref _exportTriggerStuck)) trigger = true;
             if (!trigger && HotkeyPressed()) trigger = true;
-            if (trigger) RunExport();
+            bool all = _frame % 60 == 0 && ConsumeTrigger(TriggerAllPath, ref _exportAllTriggerStuck);
+            if (all) RunExport(useCatalog: true);
+            else if (trigger) RunExport(useCatalog: false);
         }
 
         /// <summary>True genau einmal pro Auslöser-Datei: Datei löschen und melden. Lässt sie sich nicht löschen, wird einmal gewarnt und nicht erneut ausgelöst, bis die Datei weg ist.</summary>
@@ -68,7 +73,7 @@ namespace DrovaVoice
             }
         }
 
-        private void RunExport()
+        private void RunExport(bool useCatalog)
         {
             if (_exporting) { LoggerInstance.Warning("Export läuft bereits, Auslöser ignoriert."); return; }
             _exporting = true;
@@ -76,7 +81,21 @@ namespace DrovaVoice
             {
                 string lang = _language!.Value;
                 var exporter = new DialogueExporter(lang, LoggerInstance);
-                var manifest = exporter.Export(TreeSource.LoadedTrees());
+                IEnumerable<Il2CppNodeCanvas.DialogueTrees.DialogueTree> trees;
+                if (useCatalog)
+                {
+                    string catalog = Path.Combine(MelonEnvironment.GameRootDirectory, "Drova_Data", "StreamingAssets", "aa", "catalog.json");
+                    if (!File.Exists(catalog))
+                    {
+                        LoggerInstance.Error($"Addressables-Katalog nicht gefunden: {catalog}");
+                        return;
+                    }
+                    var addresses = CatalogReader.TreeAddresses(File.ReadAllText(catalog));
+                    LoggerInstance.Msg($"Katalog: {addresses.Count} Baum-Adressen");
+                    trees = CatalogTreeLoader.Load(addresses, LoggerInstance);
+                }
+                else trees = TreeSource.LoadedTrees();
+                var manifest = exporter.Export(trees);
                 string path = Path.Combine(ModDir, "Export", lang, "manifest.json");
                 ManifestFile.Save(manifest, path);
                 LoggerInstance.Msg($"Manifest geschrieben: {path} ({manifest.Lines.Count} Zeilen)");
