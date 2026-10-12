@@ -41,3 +41,20 @@ voices:
   amira_german_b59d11: {id: "b59d1164746a48bf971f4a0fd2cbf814", label: "Amira - German", gender: f, region: de, age: mittel, source: bibliothek, tags: ["female", "middle-aged", "narration", "deep", "dark", "mysterious"]}
   almanca_yeni_22d4f9: {id: "22d4f9243101493a82ad8d27694a2038", label: "almanca yeni", gender: f, region: de, age: mittel, source: bibliothek, tags: ["female", "middle-aged", "narration", "calm", "measured", "professional"]}
   pia_87bebc: {id: "87bebc5ad62a4deaaf254befad582453", label: "Pia", gender: f, region: de, age: alt, source: bibliothek, tags: ["female", "old", "conversational", "low", "calm", "relaxed"]}
+  lebhafte_junge_frau_37bab8: {id: "37bab8e91a5a44fa853b41bc6a8730e8", label: "Lebhafte junge Frau", gender: f, region: de, age: jung, source: bibliothek, tags: ["female", "young", "conversational", "character-voice", "social-media", "medium"]}
+  m_dchen_6761f7: {id: "6761f7ebcbce46db89864f9ce0a2d242", label: "mädchen", gender: f, region: de, age: jung, source: bibliothek, tags: ["female", "young", "character-voice", "storytelling", "deep", "smooth"]}
+  kind_von_oben_578878: {id: "57887823e98a48e0a7c01819628ba59b", label: "Kind von oben", gender: f, region: de, age: jung, source: bibliothek, tags: ["female", "young", "social-media", "entertainment", "energetic", "cheerful"], note: "Kinderstimme (Annäherung), nur Kurzzeilen testen"}
+  warmer_junger_mann_179999: {id: "1799997c77204a1b8753511fdf47f485", label: "Warmer junger Mann", gender: m, region: de, age: jung, source: bibliothek, tags: ["male", "old", "conversational", "crisp", "narration", "deep"], note: "Tags der Bibliothek sagen alt; klingt laut Nutzer warm/jung (tiefe Lage, 93 Hz)"}
+
+# Varianten: abgeleitet aus einer Stimme (base) per ffmpeg, vom Nutzer am 2026-10-12 nach Anhören ausgewählt.
+# Rezept (pitch = Gesamt-Tonhöhe, formant = Klangfarbe/Vokaltrakt, tempo = Geschwindigkeit; je als Faktor):
+#   ffmpeg -af "asetrate=<44100*formant>,aresample=44100,rubberband=pitch=<pitch/formant>:tempo=<tempo/formant>:formant=preserved"
+# Nicht gewählt: Variante Mädchen (aus Natasha). Umsetzung als Generator-Schritt kommt in Plan 3.
+variants:
+  alte_frau_rau: {base: "amira_german_b59d11", label: "Alte Frau (rau)", gender: f, pitch: 0.9, formant: 1.0, tempo: 0.9}
+  alte_frau: {base: "pia_87bebc", label: "Alte Frau", gender: f, pitch: 0.88, formant: 0.97, tempo: 0.92}
+  riese: {base: "deep_783f5c", label: "Riese", gender: m, pitch: 0.75, formant: 0.85, tempo: 0.93}
+  zwerg: {base: "erz_hler_c23420", label: "Zwerg", gender: m, pitch: 0.95, formant: 1.12, tempo: 1.0}
+  schurke_hell: {base: "german_d83fad", label: "Schurke (hell)", gender: m, pitch: 1.2, formant: 1.0, tempo: 1.0}
+  jugendlicher: {base: "ben_9e3f0e", label: "Jugendlicher", gender: m, pitch: 1.2, formant: 1.1, tempo: 1.0}
+  knabe: {base: "schales_7ef3ea", label: "Knabe", gender: m, pitch: 1.3, formant: 1.18, tempo: 1.03}

@@ -53,3 +53,15 @@ def test_voice_specs_resolve_fish_names_and_get_a_readable_slug(tmp_path):
 
 def test_label_beats_voice_for_the_slug():
     assert VoiceSpec("fish", voice="x" * 32, label="Lena").slug == "lena"
+
+
+def test_real_variants_point_to_existing_voices_with_sane_factors():
+    import yaml
+
+    raw = yaml.safe_load(REAL_TABLE.read_text(encoding="utf-8"))
+    table = load_fish_voices(REAL_TABLE)
+    assert raw["variants"]
+    for key, v in raw["variants"].items():
+        assert v["base"] in table, key
+        assert v["gender"] in ("m", "f")
+        assert all(0.5 <= v[f] <= 1.6 for f in ("pitch", "formant", "tempo")), key
