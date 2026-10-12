@@ -21,10 +21,12 @@ namespace DrovaVoice
         private int _frame;
         private bool _exportTriggerStuck;
         private bool _exportAllTriggerStuck;
+        private bool _exportNpcsTriggerStuck;
 
         private string ModDir => Path.Combine(MelonEnvironment.ModsDirectory, "DrovaVoice");
         private string TriggerPath => Path.Combine(ModDir, "export.trigger");
         private string TriggerAllPath => Path.Combine(ModDir, "export-all.trigger");
+        private string TriggerNpcsPath => Path.Combine(ModDir, "export-npcs.trigger");
 
         public override void OnInitializeMelon()
         {
@@ -43,6 +45,11 @@ namespace DrovaVoice
             bool all = _frame % 60 == 0 && ConsumeTrigger(TriggerAllPath, ref _exportAllTriggerStuck);
             if (all) RunExport(useCatalog: true);
             else if (trigger) RunExport(useCatalog: false);
+            if (_frame % 60 == 30 && ConsumeTrigger(TriggerNpcsPath, ref _exportNpcsTriggerStuck))
+            {
+                try { NpcExporter.Export(Path.Combine(ModDir, "Export", _language!.Value), LoggerInstance); }
+                catch (Exception e) { LoggerInstance.Error($"NPC-Export fehlgeschlagen: {e}"); }
+            }
         }
 
         /// <summary>True genau einmal pro Auslöser-Datei: Datei löschen und melden. Lässt sie sich nicht löschen, wird einmal gewarnt und nicht erneut ausgelöst, bis die Datei weg ist.</summary>
