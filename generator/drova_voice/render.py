@@ -8,6 +8,33 @@ KITTEN_MIN_INTENSITY = 0.3
 _HIGH_AROUSAL = {"angry", "excited", "surprised", "joyful", "stern"}
 _LOW_AROUSAL = {"sad", "tender", "contemplative", "mundane"}
 
+FISH_MIN_INTENSITY = 0.3
+FISH_STRONG_INTENSITY = 0.8
+# Emotionsname im Projekt -> Fish-Cue (englisch, frei formulierbar; nur Cues, die im Hörtest verwendet wurden).
+_FISH_CUES = {
+    "angry": "angry", "sad": "sad", "joyful": "happy", "stern": "stern", "excited": "excited",
+    "nervous": "nervous", "tender": "tender", "surprised": "surprised", "contemplative": "thoughtful",
+}
+# Laute, deren Wirkung geprüft ist; andere Ereignisse werden weggelassen.
+_FISH_EVENTS = {"sigh": "[sighing]", "laugh": "[laughing]", "pause": "[break]"}
+
+
+def render_fish(text: str, tag: EmotionTag) -> str:
+    s = text
+    n = len(text)
+    placed = sorted(
+        ((max(0, min(ev.pos, n)), i, ev) for i, ev in enumerate(tag.events) if ev.tag in _FISH_EVENTS), reverse=True
+    )
+    for p, _, ev in placed:
+        s = f"{s[:p]} {_FISH_EVENTS[ev.tag]} {s[p:]}"
+    s = re.sub(r"\s+", " ", s).strip()
+    for word in tag.emphasis:
+        s = re.sub(rf"(?<![\w\[\]])({re.escape(word)})(?![\w\[\]])", r"[emphasis] \1", s, count=1)
+    cue = _FISH_CUES.get(tag.emotion)
+    if cue and tag.intensity >= FISH_MIN_INTENSITY:
+        s = f"[{'very ' + cue if tag.intensity >= FISH_STRONG_INTENSITY else cue}] {s}"
+    return s
+
 
 def render_kitten(text: str, tag: EmotionTag) -> str:
     # Laut-Tags (<sigh>, <laugh> ...) werden bewusst nicht gerendert: Kitten spricht sie auf Deutsch laut aus
@@ -42,4 +69,6 @@ def render_request(engine: str, text: str, tag: EmotionTag) -> tuple[str, dict]:
         return text, chatterbox_params(tag)
     if engine in ("xtts", "fake"):
         return text, {}
+    if engine == "fish":
+        return render_fish(text, tag), {}
     raise ValueError(f"Unbekannte Engine: {engine}")
