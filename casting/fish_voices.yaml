@@ -1,0 +1,10 @@
+# Offizielle deutsche Fish-Stimmen (Autor "Fish Official"). Nur IDs und Labels, kein Audio.
+voices:
+  lena:      {id: "3937b44b604249f18b94913daef94043", label: "Lena",                    gender: f, region: de}
+  leon:      {id: "7b7c88bf825a4ab3bca27d55c26ddf16", label: "Leon",                    gender: m, region: de}
+  melanie:   {id: "d979e92f9c8a489fa581f55f6b9e48da", label: "Melanie",                 gender: f, region: de}
+  lukas:     {id: "c1e7cc926aa5469aa966c353094d4b0b", label: "Lukas (Österreich)",      gender: m, region: at}
+  emma:      {id: "3235abc9a84b407d92f73539a5651720", label: "Emma",                    gender: f, region: de}
+  elin:      {id: "0b96bf70a20d47f6b9e825d9cfe0e8c8", label: "Elin (Schweiz)",          gender: f, region: ch}
+  jonas:     {id: "44f1ec96a51e429f8b87776cbc55a997", label: "Jonas",                   gender: m, region: de}
+  valentina: {id: "e5fb46af69e0481fa0d2d0f209b07ae2", label: "Valentina (Österreich)",  gender: f, region: at}

@@ -134,10 +134,11 @@ class VoiceSpec:
     engine: str
     voice: str | None = None
     reference: str | None = None
+    label: str | None = None
 
     @property
     def slug(self) -> str:
-        base = self.voice or (Path(self.reference).stem if self.reference else "default")
+        base = self.label or self.voice or (Path(self.reference).stem if self.reference else "default")
         return re.sub(r"[^a-z0-9]+", "-", base.lower()).strip("-") or "default"
 
 
@@ -177,12 +178,21 @@ def _check_unique_slugs(voices: Sequence[VoiceSpec]) -> None:
 
 
 def load_voice_specs(path: Path, repo_root: Path) -> list[VoiceSpec]:
+    from drova_voice.fish_voices import load_fish_voices, resolve_fish_voice
+
+    table = None
     specs = []
     for item in yaml.safe_load(Path(path).read_text(encoding="utf-8")) or []:
         ref = item.get("reference")
         if ref and not Path(ref).is_absolute():
             ref = str((Path(repo_root) / ref).resolve())
-        specs.append(VoiceSpec(item["engine"], item.get("voice"), ref))
+        voice, label = item.get("voice"), None
+        if item["engine"] == "fish" and voice:
+            if table is None:
+                table = load_fish_voices(Path(repo_root) / "casting" / "fish_voices.yaml")
+            found = resolve_fish_voice(table, str(voice))
+            voice, label = found.id, found.key
+        specs.append(VoiceSpec(item["engine"], voice, ref, label))
     _check_unique_slugs(specs)
     return specs
 
