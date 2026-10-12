@@ -38,10 +38,11 @@ class FakeFish:
                 body = json.loads(self.rfile.read(length) or b"{}")
                 outer.requests.append({"path": self.path, "headers": {k.lower(): v for k, v in self.headers.items()}, "body": body})
                 status, payload, *extra = outer.responses.pop(0) if outer.responses else (503, b"leer")
+                headers = dict(extra[0]) if extra else {}
+                headers.setdefault("Content-Length", str(len(payload)))  # eigener Wert erlaubt: kurzer Body
                 self.send_response(status)
-                for k, v in (extra[0] if extra else {}).items():
+                for k, v in headers.items():
                     self.send_header(k, v)
-                self.send_header("Content-Length", str(len(payload)))
                 self.end_headers()
                 self.wfile.write(payload)
 
@@ -158,15 +159,13 @@ def test_key_with_whitespace_or_control_chars_fails_at_startup_without_leaking(t
 
 
 def test_unencodable_key_error_is_wrapped_and_does_not_leak(tmp_path, guarded):
-    key = "sk-€geheim-123"  # invented; nicht latin-1, daher scheitert der Header-Aufbau in http.client
-    with FakeFish([(200, _wav_bytes())]) as fake:
-        client = _client(guarded, fake, FISH_API_KEY=key)
-        try:
-            resp = guarded(lambda: client.synth(_req(tmp_path)))
-        finally:
-            client.close()
-    assert not resp.ok and "Fish-Anfrage fehlgeschlagen" in resp.error
-    assert "geheim" not in resp.error and "sk-" not in resp.error
+    # Angepasst: Nicht-ASCII-Schlüssel scheitern jetzt schon beim Start (vorher erst beim Header-Aufbau in http.client).
+    key = "sk-€geheim-123"  # invented
+    with FakeFish([]) as fake:
+        with pytest.raises(EngineError, match="nur ASCII erlaubt") as info:
+            _client(guarded, fake, FISH_API_KEY=key)
+    text = str(info.value)
+    assert "geheim" not in text and "sk-" not in text and not fake.requests
 
 
 def test_key_straddling_the_error_body_cut_is_masked_before_truncation(tmp_path, guarded):
@@ -179,3 +178,71 @@ def test_key_straddling_the_error_body_cut_is_masked_before_truncation(tmp_path,
             client.close()
     assert not resp.ok and "***" in resp.error
     assert KEY not in resp.error and "sk-test" not in resp.error and "geheim" not in resp.error
+
+
+@pytest.mark.parametrize("retry_after", ["-5", "bald", "nan"])
+def test_odd_retry_after_values_do_not_break_the_retry(tmp_path, guarded, retry_after):
+    # Negativ wird zu 0 geklemmt, nicht-numerisch fällt auf den Backoff zurück; beides darf die Wiederholung nicht abbrechen.
+    with FakeFish([(429, b"zu viele", {"Retry-After": retry_after}), (200, _wav_bytes())]) as fake:
+        client = _client(guarded, fake)
+        try:
+            resp = guarded(lambda: client.synth(_req(tmp_path)))
+        finally:
+            client.close()
+    assert resp.ok and len(fake.requests) == 2
+
+
+def test_truncated_body_is_retried_like_a_connection_error(tmp_path, guarded):
+    full = _wav_bytes()
+    # Content-Length größer als der Body: der Server schließt früh, http.client meldet IncompleteRead.
+    with FakeFish([(200, full[:30], {"Content-Length": str(len(full))}), (200, full)]) as fake:
+        client = _client(guarded, fake)
+        try:
+            resp = guarded(lambda: client.synth(_req(tmp_path)))
+        finally:
+            client.close()
+    assert resp.ok and len(fake.requests) == 2 and (tmp_path / "a.wav").stat().st_size == len(full)
+
+
+def test_truncated_body_on_every_attempt_gives_up_with_the_exception_name(tmp_path, guarded):
+    full = _wav_bytes()
+    short = (200, full[:30], {"Content-Length": str(len(full))})
+    with FakeFish([short] * 3) as fake:
+        client = _client(guarded, fake)
+        try:
+            resp = guarded(lambda: client.synth(_req(tmp_path)))
+        finally:
+            client.close()
+    assert not resp.ok and "nicht erreichbar nach 3 Versuchen" in resp.error
+    assert "(zuletzt IncompleteRead)" in resp.error and len(fake.requests) == 3
+
+
+def test_redirect_is_reported_and_not_followed_so_the_key_is_not_forwarded(tmp_path, guarded):
+    # Die zweite Antwort wäre ein Erfolg: würde umgeleitet, gäbe es zwei Anfragen statt einer.
+    with FakeFish([(302, b"", {"Location": "/v1/tts-umgeleitet"}), (200, _wav_bytes())]) as fake:
+        client = _client(guarded, fake)
+        try:
+            resp = guarded(lambda: client.synth(_req(tmp_path)))
+        finally:
+            client.close()
+    assert not resp.ok and "Fish leitet um (HTTP 302); nicht gefolgt" in resp.error
+    assert KEY not in resp.error and len(fake.requests) == 1
+
+
+def test_zero_max_attempts_is_clamped_to_one_attempt(tmp_path, guarded):
+    with FakeFish([(503, b"busy")] * 3) as fake:
+        client = _client(guarded, fake, FISH_MAX_ATTEMPTS="0")
+        try:
+            resp = guarded(lambda: client.synth(_req(tmp_path)))
+        finally:
+            client.close()
+    assert not resp.ok and "nach 1 Versuchen" in resp.error and len(fake.requests) == 1
+
+
+@pytest.mark.parametrize("name, value", [("FISH_MAX_ATTEMPTS", "drei"), ("FISH_BACKOFF_S", "schnell"),
+                                         ("FISH_BACKOFF_S", "nan"), ("FISH_BACKOFF_S", "-1")])
+def test_invalid_numbers_fail_at_startup_naming_the_variable(tmp_path, guarded, name, value):
+    with FakeFish([]) as fake:
+        with pytest.raises(EngineError, match=name) as info:
+            _client(guarded, fake, **{name: value})
+    assert KEY not in str(info.value) and not fake.requests

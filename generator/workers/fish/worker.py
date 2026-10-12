@@ -1,7 +1,9 @@
 """Fish-Audio-Worker: ruft die Cloud-API auf. Nur Standardbibliothek, kein venv nötig."""
 from __future__ import annotations
 
+import http.client
 import json
+import math
 import os
 import sys
 import time
@@ -18,19 +20,48 @@ MODEL = os.environ.get("FISH_MODEL", "s2.1-pro-free")
 _RETRY_STATUS = {429, 500, 502, 503, 504}
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Folgt keiner Weiterleitung: der Authorization-Header darf nie an einen anderen Ort gehen."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
+def _int_env(name: str, default: str) -> int:
+    try:
+        return int(os.environ.get(name, default))
+    except ValueError:
+        raise RuntimeError(f"{name} ist keine ganze Zahl") from None
+
+
+def _float_env(name: str, default: str) -> float:
+    try:
+        value = float(os.environ.get(name, default))
+    except ValueError:
+        raise RuntimeError(f"{name} ist keine Zahl") from None
+    if not math.isfinite(value) or value < 0:
+        raise RuntimeError(f"{name} muss eine endliche Zahl >= 0 sein")
+    return value
+
+
 def load() -> dict:
     key = os.environ.get("FISH_API_KEY", "").strip()
     if not key:
         raise RuntimeError("FISH_API_KEY fehlt: den Schlüssel nur als Umgebungsvariable setzen (nie in Dateien oder ins Repo)")
+    # Der Schlüssel selbst darf in keiner Meldung stehen – sonst landet er im Protokoll/Log.
+    if any(ord(ch) > 127 for ch in key):
+        raise RuntimeError("FISH_API_KEY enthält ungültige Zeichen (nur ASCII erlaubt)")
     if any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in key):
-        # Der Schlüssel selbst darf hier nicht in die Meldung – sonst landet er im Protokoll/Log.
         raise RuntimeError("FISH_API_KEY enthält ungültige Zeichen (Leerzeichen oder Zeilenumbruch?)")
     return {
         "key": key,
         "url": os.environ.get("FISH_API_URL", API_URL),
         "model": os.environ.get("FISH_MODEL", MODEL),
-        "attempts": int(os.environ.get("FISH_MAX_ATTEMPTS", "5")),
-        "backoff": float(os.environ.get("FISH_BACKOFF_S", "2.0")),
+        "attempts": max(1, _int_env("FISH_MAX_ATTEMPTS", "5")),
+        "backoff": _float_env("FISH_BACKOFF_S", "2.0"),
     }
 
 
@@ -40,9 +71,12 @@ def _clean(cfg: dict, text: str) -> str:
 
 def _retry_after(headers, default: float) -> float:
     try:
-        return min(60.0, float(headers.get("Retry-After")))
+        value = float(headers.get("Retry-After"))
     except (TypeError, ValueError):
         return default
+    if math.isnan(value):  # min() würde NaN zu 60 s machen – lieber den Backoff nehmen
+        return default
+    return max(0.0, min(60.0, value))
 
 
 def _post(cfg: dict, body: dict) -> bytes:
@@ -53,14 +87,18 @@ def _post(cfg: dict, body: dict) -> bytes:
     for attempt in range(cfg["attempts"]):
         wait = cfg["backoff"] * (2 ** attempt)
         try:
-            with urllib.request.urlopen(request, timeout=180) as resp:
+            with _OPENER.open(request, timeout=180) as resp:
                 return resp.read()
         except urllib.error.HTTPError as e:
+            if 300 <= e.code < 400:
+                raise RuntimeError(f"Fish leitet um (HTTP {e.code}); nicht gefolgt") from None
             # Erst maskieren, dann kürzen: sonst bleibt ein Schlüssel, der über die Kürzungsgrenze reicht, als Präfix stehen.
             detail = _clean(cfg, e.read().decode("utf-8", "replace"))[:200]
             if e.code not in _RETRY_STATUS:
                 raise RuntimeError(f"Fish lehnt die Anfrage ab (HTTP {e.code}): {detail}") from None
             last, wait = f"HTTP {e.code}", _retry_after(e.headers, wait)
+        except http.client.HTTPException as e:  # Antwort bricht mitten im Body ab (IncompleteRead, BadStatusLine)
+            last = type(e).__name__
         except OSError as e:  # Verbindungsfehler, Zeitüberschreitung
             last = type(e).__name__
         except Exception as e:  # noqa: BLE001 – z. B. ValueError/UnicodeEncodeError beim Header-Aufbau in http.client
