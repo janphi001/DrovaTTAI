@@ -18,6 +18,7 @@ namespace DrovaVoice
         private bool _exporting;
         private bool _hotkeyBroken;
         private int _frame;
+        private bool _exportTriggerStuck;
 
         private string ModDir => Path.Combine(MelonEnvironment.ModsDirectory, "DrovaVoice");
         private string TriggerPath => Path.Combine(ModDir, "export.trigger");
@@ -34,13 +35,25 @@ namespace DrovaVoice
         {
             _frame++;
             bool trigger = false;
-            if (_frame % 60 == 0 && File.Exists(TriggerPath))
-            {
-                try { File.Delete(TriggerPath); } catch (IOException) { }
-                trigger = true;
-            }
+            if (_frame % 60 == 0 && ConsumeTrigger(TriggerPath, ref _exportTriggerStuck)) trigger = true;
             if (!trigger && HotkeyPressed()) trigger = true;
             if (trigger) RunExport();
+        }
+
+        /// <summary>True genau einmal pro Auslöser-Datei: Datei löschen und melden. Lässt sie sich nicht löschen, wird einmal gewarnt und nicht erneut ausgelöst, bis die Datei weg ist.</summary>
+        private bool ConsumeTrigger(string path, ref bool stuck)
+        {
+            try
+            {
+                if (!File.Exists(path)) { stuck = false; return false; }
+                if (stuck) return false;
+                try { File.Delete(path); } catch (Exception) { }
+                if (!File.Exists(path)) return true;
+            }
+            catch (Exception) { }
+            stuck = true;
+            LoggerInstance.Warning($"Auslöser-Datei {Path.GetFileName(path)} lässt sich nicht löschen; kein erneuter Auslöser, bis sie entfernt ist.");
+            return false;
         }
 
         private bool HotkeyPressed()
