@@ -147,3 +147,35 @@ def test_broken_audio_answer_is_an_error_not_a_success(tmp_path, guarded):
         finally:
             client.close()
     assert not resp.ok
+
+
+def test_key_with_whitespace_or_control_chars_fails_at_startup_without_leaking(tmp_path, guarded):
+    with FakeFish([]) as fake:
+        with pytest.raises(EngineError, match="FISH_API_KEY") as info:
+            _client(guarded, fake, FISH_API_KEY="sk-ab\ncd")
+    text = str(info.value)
+    assert "sk-ab" not in text and "cd" not in text
+
+
+def test_unencodable_key_error_is_wrapped_and_does_not_leak(tmp_path, guarded):
+    key = "sk-€geheim-123"  # invented; nicht latin-1, daher scheitert der Header-Aufbau in http.client
+    with FakeFish([(200, _wav_bytes())]) as fake:
+        client = _client(guarded, fake, FISH_API_KEY=key)
+        try:
+            resp = guarded(lambda: client.synth(_req(tmp_path)))
+        finally:
+            client.close()
+    assert not resp.ok and "Fish-Anfrage fehlgeschlagen" in resp.error
+    assert "geheim" not in resp.error and "sk-" not in resp.error
+
+
+def test_key_straddling_the_error_body_cut_is_masked_before_truncation(tmp_path, guarded):
+    body = b"x" * 190 + KEY.encode() + b"tail"  # Schlüssel überschreitet die 200-Byte-Grenze
+    with FakeFish([(400, body)]) as fake:
+        client = _client(guarded, fake)
+        try:
+            resp = guarded(lambda: client.synth(_req(tmp_path)))
+        finally:
+            client.close()
+    assert not resp.ok and "***" in resp.error
+    assert KEY not in resp.error and "sk-test" not in resp.error and "geheim" not in resp.error

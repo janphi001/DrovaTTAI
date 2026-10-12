@@ -22,6 +22,9 @@ def load() -> dict:
     key = os.environ.get("FISH_API_KEY", "").strip()
     if not key:
         raise RuntimeError("FISH_API_KEY fehlt: den Schlüssel nur als Umgebungsvariable setzen (nie in Dateien oder ins Repo)")
+    if any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in key):
+        # Der Schlüssel selbst darf hier nicht in die Meldung – sonst landet er im Protokoll/Log.
+        raise RuntimeError("FISH_API_KEY enthält ungültige Zeichen (Leerzeichen oder Zeilenumbruch?)")
     return {
         "key": key,
         "url": os.environ.get("FISH_API_URL", API_URL),
@@ -53,12 +56,15 @@ def _post(cfg: dict, body: dict) -> bytes:
             with urllib.request.urlopen(request, timeout=180) as resp:
                 return resp.read()
         except urllib.error.HTTPError as e:
-            detail = _clean(cfg, e.read()[:200].decode("utf-8", "replace"))
+            # Erst maskieren, dann kürzen: sonst bleibt ein Schlüssel, der über die Kürzungsgrenze reicht, als Präfix stehen.
+            detail = _clean(cfg, e.read().decode("utf-8", "replace"))[:200]
             if e.code not in _RETRY_STATUS:
                 raise RuntimeError(f"Fish lehnt die Anfrage ab (HTTP {e.code}): {detail}") from None
             last, wait = f"HTTP {e.code}", _retry_after(e.headers, wait)
         except OSError as e:  # Verbindungsfehler, Zeitüberschreitung
             last = type(e).__name__
+        except Exception as e:  # noqa: BLE001 – z. B. ValueError/UnicodeEncodeError beim Header-Aufbau in http.client
+            raise RuntimeError(f"Fish-Anfrage fehlgeschlagen: {_clean(cfg, str(e))}") from None
         if attempt < cfg["attempts"] - 1:
             time.sleep(wait)
     raise RuntimeError(f"Fish nicht erreichbar nach {cfg['attempts']} Versuchen (zuletzt {last})")
