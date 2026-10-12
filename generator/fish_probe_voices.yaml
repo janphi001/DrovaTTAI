@@ -1,0 +1,2 @@
+# Messlauf für Durchsatz und Limits; Stimme per Name aus casting/fish_voices.yaml.
+- {engine: fish, voice: lena}
