@@ -19,6 +19,7 @@
       <HintPath>$(DrovaGameDir)\MelonLoader\net6\Il2CppInterop.Runtime.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="$(DrovaGameDir)\MelonLoader\Il2CppAssemblies\*.dll" Private="false" />
     <Reference Include="Drova_Modding_API">
       <HintPath>$(DrovaGameDir)\Mods\Drova_Modding_API.dll</HintPath>
       <Private>false</Private>
