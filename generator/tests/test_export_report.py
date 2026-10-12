@@ -107,3 +107,33 @@ def test_cli_fetch_copies_the_export_folder_from_the_game(tmp_path, loc_dir, cap
     assert main(["--config", str(cfg), "export", "fetch"]) == 0
     assert (repo / "data" / "export" / "de" / "manifest.json").read_text(encoding="utf-8") == '{"lines": []}'
     assert main(["--config", str(cfg), "export", "fetch"]) == 0  # wiederholbar
+
+
+def test_unreadable_entry_counts_as_uncovered(tmp_path):
+    d = tmp_path / "de"
+    (d / "Dialog").mkdir(parents=True)
+    (d / "Dialog" / "NPC_C_de.loc").write_text("Plh_1 { Erfundener Text. }\nPlh_2 kaputt ohne Klammer\n", encoding="utf-8")
+    cov = compute_coverage({"lines": [_line("Dialog/NPC_C", "Plh_1")]}, d, "de")
+    assert (cov.total, cov.covered, cov.unreadable) == (2, 1, 1)
+    assert len(cov.missing) == 1 and "unlesbar" in cov.missing[0]
+    assert cov.by_folder["Dialog"] == (2, 1)
+    assert cov.percent == 50.0
+
+
+def test_cli_report_fails_when_loc_folder_is_missing(tmp_path, capsys):
+    game = tmp_path / "game"
+    game.mkdir()
+    repo, cfg = _repo(tmp_path, game)
+    assert main(["--config", str(cfg), "export", "report"]) == 2
+    assert "Lokalisierungsordner nicht gefunden" in capsys.readouterr().err
+
+
+def test_cli_report_fails_when_no_entries_are_in_scope(tmp_path, capsys):
+    d = tmp_path / "Localization" / "de"
+    _loc(d, "Items_de.loc", ["Sword_name"])
+    repo, cfg = _repo(tmp_path, _game_with_loc(tmp_path, d))
+    manifest = repo / "data" / "export" / "de" / "manifest.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text('{"lines": []}', encoding="utf-8")
+    assert main(["--config", str(cfg), "export", "report"]) == 2
+    assert "Keine .loc-Einträge im Umfang" in capsys.readouterr().err

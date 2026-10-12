@@ -103,11 +103,17 @@ def _run(args: argparse.Namespace) -> int:
             shutil.copytree(src, export_dir, dirs_exist_ok=True)
             print(f"{src} -> {export_dir}")
             return 0
+        if not cfg.loc_dir.is_dir():
+            print(f"FEHLER: Lokalisierungsordner nicht gefunden: {cfg.loc_dir} (game_dir in config.yaml prüfen)", file=sys.stderr)
+            return 2
         manifest_path = args.manifest or (export_dir / "manifest.json")
         if not manifest_path.is_file():
             print(f"FEHLER: Manifest nicht gefunden: {manifest_path} (Export im Spiel auslösen, siehe docs/export.md)", file=sys.stderr)
             return 2
         cov = compute_coverage(json.loads(manifest_path.read_text(encoding="utf-8-sig")), cfg.loc_dir, cfg.language)
+        if cov.total == 0:
+            print(f"FEHLER: Keine .loc-Einträge im Umfang gefunden in {cfg.loc_dir} (game_dir in config.yaml prüfen)", file=sys.stderr)
+            return 2
         missing_path = manifest_path.with_name("coverage_missing.txt")
         missing_path.write_text("".join(f"{m}\n" for m in cov.missing), encoding="utf-8")
         print(format_report(cov, missing_path))
