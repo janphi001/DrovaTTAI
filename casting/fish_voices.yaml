@@ -1,10 +1,43 @@
-# Offizielle deutsche Fish-Stimmen (Autor "Fish Official"). Nur IDs und Labels, kein Audio.
+# Fish-Stimmen für DrovaVoice. Nur IDs, Labels und Kenndaten, kein Audio.
+# Gruppe 1: offizielle deutsche Fish-Stimmen (Autor "Fish Official").
+# Gruppe 2: Stimmen aus der öffentlichen Fish-Bibliothek, am 2026-10-12 vom Nutzer nach Anhören ausgewählt (Auswahlseite out/fish_voices).
+#   Community-Stimmen: nur private, nicht-kommerzielle Nutzung; Imitationen realer Personen wurden vorab ausgeschlossen.
+# Felder: id (32 Hex), label, gender (m|f), region, age (jung|mittel|alt, bei Bibliotheksstimmen laut Tags), source, tags, note.
 voices:
-  lena:      {id: "3937b44b604249f18b94913daef94043", label: "Lena",                    gender: f, region: de}
-  leon:      {id: "7b7c88bf825a4ab3bca27d55c26ddf16", label: "Leon",                    gender: m, region: de}
-  melanie:   {id: "d979e92f9c8a489fa581f55f6b9e48da", label: "Melanie",                 gender: f, region: de}
-  lukas:     {id: "c1e7cc926aa5469aa966c353094d4b0b", label: "Lukas (Österreich)",      gender: m, region: at}
-  emma:      {id: "3235abc9a84b407d92f73539a5651720", label: "Emma",                    gender: f, region: de}
-  elin:      {id: "0b96bf70a20d47f6b9e825d9cfe0e8c8", label: "Elin (Schweiz)",          gender: f, region: ch}
-  jonas:     {id: "44f1ec96a51e429f8b87776cbc55a997", label: "Jonas",                   gender: m, region: de}
-  valentina: {id: "e5fb46af69e0481fa0d2d0f209b07ae2", label: "Valentina (Österreich)",  gender: f, region: at}
+  lena: {id: "3937b44b604249f18b94913daef94043", label: "Lena", gender: f, region: de, source: offiziell}
+  leon: {id: "7b7c88bf825a4ab3bca27d55c26ddf16", label: "Leon", gender: m, region: de, source: offiziell}
+  melanie: {id: "d979e92f9c8a489fa581f55f6b9e48da", label: "Melanie", gender: f, region: de, source: offiziell}
+  lukas: {id: "c1e7cc926aa5469aa966c353094d4b0b", label: "Lukas (Österreich)", gender: m, region: at, source: offiziell}
+  emma: {id: "3235abc9a84b407d92f73539a5651720", label: "Emma", gender: f, region: de, source: offiziell}
+  elin: {id: "0b96bf70a20d47f6b9e825d9cfe0e8c8", label: "Elin (Schweiz)", gender: f, region: ch, source: offiziell}
+  jonas: {id: "44f1ec96a51e429f8b87776cbc55a997", label: "Jonas", gender: m, region: de, source: offiziell}
+  valentina: {id: "e5fb46af69e0481fa0d2d0f209b07ae2", label: "Valentina (Österreich)", gender: f, region: at, source: offiziell}
+  ben_9e3f0e: {id: "9e3f0ea9a0a44c4d9f0c422715d0229f", label: "Ben", gender: m, region: de, age: jung, source: bibliothek, tags: ["male", "young", "narration", "professional", "serious", "authoritative"]}
+  ben_9e0a50: {id: "9e0a50728a424b048575d286a79c42be", label: "Ben", gender: m, region: de, age: jung, source: bibliothek, tags: ["male", "young", "educational", "narration", "calm", "professional"]}
+  schales_7ef3ea: {id: "7ef3eae2ff754f398e90dbcafdb7c5c8", label: "Schales", gender: m, region: de, age: jung, source: bibliothek, tags: ["male", "young", "conversational", "friendly", "energetic", "storytelling"]}
+  vorlesen_stimlagen_90042f: {id: "90042f762dbf49baa2e7776d011eee6b", label: "Vorlesen Stimlagen", gender: m, region: de, age: mittel, source: bibliothek, tags: ["male", "middle-aged", "narration", "educational", "calm", "measured"]}
+  german_d83fad: {id: "d83fade735f4447698a08986de772c82", label: "German", gender: m, region: de, age: mittel, source: bibliothek, tags: ["male", "middle-aged", "narration", "deep", "calm", "smooth"]}
+  ben_a20517: {id: "a20517d0d23048319e4ced960899187e", label: "Ben", gender: m, region: de, age: mittel, source: bibliothek, tags: ["male", "middle-aged", "narration", "calm", "professional", "warm"]}
+  bao_de2_chau_e89195: {id: "e891954162584409bce5cf43aebd1726", label: "Bao DE2 Chau", gender: m, region: de, age: mittel, source: bibliothek, tags: ["male", "middle-aged", "narration", "documentary", "professional", "clear"]}
+  german_wisdom_m_3130ae: {id: "3130ae7c3d844e2998978289c7c11c98", label: "GERMAN WISDOM. M", gender: m, region: de, age: mittel, source: bibliothek, tags: ["male", "middle-aged", "narration", "deep", "calm", "mysterious"]}
+  germany_d5f684: {id: "d5f6842c9bc849408c4b6c2a51a1c044", label: "GERMANY", gender: m, region: de, age: mittel, source: bibliothek, tags: ["male", "middle-aged", "narration", "educational", "documentary", "deep"]}
+  deutscheman_voice_fur_ti_9c0305: {id: "9c03054b93ee4eda8c1db08767fd8d45", label: "Deutscheman_voice_fur_tiktok", gender: m, region: de, age: mittel, source: bibliothek, tags: ["male", "middle-aged", "narration", "educational", "conversational", "medium"]}
+  adam_570cf0: {id: "570cf019f1044c3cb2917553fdfa9d34", label: "Adam", gender: m, region: de, age: mittel, source: bibliothek, tags: ["male", "middle-aged", "narration", "educational", "calm", "serious"]}
+  almanca_i_yi_ses_7d4cbb: {id: "7d4cbb1b490744e4a5b4bad4759ff751", label: "ALMANCA İYİ SES", gender: m, region: de, age: mittel, source: bibliothek, tags: ["male", "middle-aged", "narration", "educational", "medium", "clear"]}
+  german_father_c07993: {id: "c079932b47564fcfad0a9f6874a49df7", label: "German Father", gender: m, region: de, age: alt, source: bibliothek, tags: ["male", "old", "narration", "deep", "calm", "professional"]}
+  father_german_usama_14ccc0: {id: "14ccc066ad16414487b60195328eed29", label: "father German Usama", gender: m, region: de, age: alt, source: bibliothek, tags: ["male", "old", "narration", "educational", "deep", "serious"]}
+  p0_2765f2: {id: "2765f263701044409059e23206bdd47f", label: "P0", gender: m, region: de, age: alt, source: bibliothek, tags: ["male", "old", "educational", "professional", "authoritative", "clear"]}
+  erz_hler_c23420: {id: "c2342039ff8248d4a335e5cc2091d40d", label: "Erzähler", gender: m, region: de, age: alt, source: bibliothek, tags: ["male", "old", "deep", "warm", "dark", "narration"]}
+  niko_ba082d: {id: "ba082dea53e841aeb420dc612cb804ed", label: "niko", gender: m, region: de, age: alt, source: bibliothek, tags: ["male", "old", "educational", "narration", "professional", "clear"]}
+  deep_783f5c: {id: "783f5c7cb4f64ef48a7c7f5166bbdc01", label: "DEEP", gender: m, region: de, age: alt, source: bibliothek, tags: ["male", "old", "narration", "low", "smooth", "dramatic"]}
+  emilia_german_194b99: {id: "194b99d7c27e462ea40694cddf1f7c96", label: "EMILIA GERMAN", gender: f, region: de, age: jung, source: bibliothek, tags: ["female", "young", "narration", "calm", "smooth", "medium"]}
+  natasha_deutsch_88b185: {id: "88b185f908c04ebea8b6ff642c8fea82", label: "Natasha Deutsch", gender: f, region: de, age: jung, source: bibliothek, tags: ["female", "young", "conversational", "serious", "clear", "professional"]}
+  tea_capcut_044275: {id: "04427518d0a043ae825b5185515882b5", label: "Tea (capcut)", gender: f, region: de, age: jung, source: bibliothek, tags: ["female", "young", "narration", "conversational", "warm", "smooth"]}
+  frau_110e73: {id: "110e739143fc4607a1754ba1b24d55cb", label: "Frau", gender: f, region: de, age: jung, source: bibliothek, tags: ["female", "young", "conversational", "medium", "smooth", "friendly"]}
+  douchland_old_story_2ef205: {id: "2ef205fde3f9475eaf908f87736cafec", label: "Douchland OLD STORY", gender: f, region: de, age: jung, source: bibliothek, tags: ["female", "young", "narration", "warm", "calm", "measured"]}
+  catrinja_c5b66a: {id: "c5b66a80d90749fc914c714e793d1a2f", label: "Catrinja", gender: f, region: de, age: mittel, source: bibliothek, tags: ["female", "middle-aged", "conversational", "soft", "breathy", "intimate"]}
+  deutsche_ansagestimme_a586d5: {id: "a586d5007b0249f0b25f32a036b1713c", label: "Deutsche Ansagestimme", gender: f, region: de, age: mittel, source: bibliothek, tags: ["female", "middle-aged", "narration", "educational", "conversational", "clear"], note: "Klingt wie eine Durchsage: im Spiel höchstens für Schilder, Steintafeln oder Ausrufe"}
+  said_deb281: {id: "deb28100c45547c8871753ab1fdf9856", label: "said", gender: f, region: de, age: mittel, source: bibliothek, tags: ["female", "middle-aged", "narration", "smooth", "calm", "measured"]}
+  amira_german_b59d11: {id: "b59d1164746a48bf971f4a0fd2cbf814", label: "Amira - German", gender: f, region: de, age: mittel, source: bibliothek, tags: ["female", "middle-aged", "narration", "deep", "dark", "mysterious"]}
+  almanca_yeni_22d4f9: {id: "22d4f9243101493a82ad8d27694a2038", label: "almanca yeni", gender: f, region: de, age: mittel, source: bibliothek, tags: ["female", "middle-aged", "narration", "calm", "measured", "professional"]}
+  pia_87bebc: {id: "87bebc5ad62a4deaaf254befad582453", label: "Pia", gender: f, region: de, age: alt, source: bibliothek, tags: ["female", "old", "conversational", "low", "calm", "relaxed"]}

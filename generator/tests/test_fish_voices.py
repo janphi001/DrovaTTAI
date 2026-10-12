@@ -16,10 +16,11 @@ def _table(tmp_path, body):
     return load_fish_voices(p)
 
 
-def test_real_table_has_the_eight_official_voices_with_valid_ids():
+def test_real_table_has_the_eight_official_voices_plus_selected_library_voices():
     table = load_fish_voices(REAL_TABLE)
-    assert len(table) == 8 and {"lena", "leon", "valentina"} <= set(table)
+    assert len(table) >= 8 and {"lena", "leon", "melanie", "lukas", "emma", "elin", "jonas", "valentina"} <= set(table)
     assert all(len(v.id) == 32 and v.gender in ("m", "f") for v in table.values())
+    assert len({v.id for v in table.values()}) == len(table)
 
 
 def test_resolve_by_name_ignores_case_and_passes_ids_through(tmp_path):
