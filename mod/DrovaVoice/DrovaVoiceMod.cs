@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using DrovaVoice.Core;
+using Il2CppCustomFramework.Localization;
 using DrovaVoice.Export;
 using MelonLoader;
 using MelonLoader.Utils;
@@ -80,6 +81,20 @@ namespace DrovaVoice
             }
         }
 
+        private void LogLanguage(string preference)
+        {
+            string current;
+            try { current = LocalizationDB.Instance.CurrentLanguage.ToString(); }
+            catch (Exception e)
+            {
+                LoggerInstance.Warning($"Spielsprache nicht lesbar ({e.GetType().Name}); ExportLanguage ist '{preference}'.");
+                return;
+            }
+            LoggerInstance.Msg($"Spielsprache: {current}, ExportLanguage: {preference}");
+            if (!LanguageCheck.Matches(current, preference))
+                LoggerInstance.Warning($"Spielsprache '{current}' weicht von ExportLanguage '{preference}' ab: Der Text im Manifest kommt in der Spielsprache, liegt aber im Ordner '{preference}'.");
+        }
+
         private void RunExport(bool useCatalog)
         {
             if (_exporting) { LoggerInstance.Warning("Export läuft bereits, Auslöser ignoriert."); return; }
@@ -87,8 +102,11 @@ namespace DrovaVoice
             try
             {
                 string lang = _language!.Value;
+                LogLanguage(lang);
                 var exporter = new DialogueExporter(lang, LoggerInstance);
                 IEnumerable<Il2CppNodeCanvas.DialogueTrees.DialogueTree> trees;
+                bool loaderGaveUp = false;
+                int? addressCount = null;
                 if (useCatalog)
                 {
                     string catalog = Path.Combine(MelonEnvironment.GameRootDirectory, "Drova_Data", "StreamingAssets", "aa", "catalog.json");
@@ -98,12 +116,22 @@ namespace DrovaVoice
                         return;
                     }
                     var addresses = CatalogReader.TreeAddresses(File.ReadAllText(catalog));
+                    addressCount = addresses.Count;
                     LoggerInstance.Msg($"Katalog: {addresses.Count} Baum-Adressen");
-                    trees = CatalogTreeLoader.Load(addresses, LoggerInstance);
+                    var catalogTrees = CatalogTreeLoader.Load(addresses, LoggerInstance, out loaderGaveUp);
+                    int fromCatalog = catalogTrees.Count;
+                    trees = TreeSource.CatalogUnionLoaded(catalogTrees, out int addedLoaded);
+                    LoggerInstance.Msg($"Bäume: {fromCatalog} aus dem Katalog, {addedLoaded} zusätzlich aus dem Speicher");
                 }
                 else trees = TreeSource.LoadedTrees();
                 var manifest = exporter.Export(trees);
-                string path = Path.Combine(ModDir, "Export", lang, "manifest.json");
+                string path = Path.Combine(ModDir, "Export", lang, useCatalog ? ManifestFile.FullName : ManifestFile.LoadedName);
+                string? blocked = ExportGuard.ShouldSave(manifest.Lines.Count, loaderGaveUp, addressCount);
+                if (blocked != null)
+                {
+                    LoggerInstance.Error($"Manifest NICHT geschrieben ({blocked}); eine vorhandene {Path.GetFileName(path)} bleibt unverändert: {path}");
+                    return;
+                }
                 ManifestFile.Save(manifest, path);
                 LoggerInstance.Msg($"Manifest geschrieben: {path} ({manifest.Lines.Count} Zeilen)");
             }

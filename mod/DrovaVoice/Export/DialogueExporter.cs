@@ -9,10 +9,13 @@ namespace DrovaVoice.Export
 {
     public sealed class ExportStats
     {
+        /// <summary>Weder Aussagen- noch Auswahl-Knoten: je .NET-Typname (kein Spieltext) die Anzahl.</summary>
+        public Dictionary<string, int> IgnoredNodeTypes { get; } = new Dictionary<string, int>();
         public int Trees, TreesFailed, TreesSkipped, Statements, Choices, SkippedUnused, SkippedDuplicates, SkippedInvalid, SkippedErrors;
         public override string ToString()
             => $"Bäume {Trees} (fehlgeschlagen {TreesFailed}, übersprungen {TreesSkipped}); Aussagen {Statements}, Optionen {Choices}; "
-             + $"ohne Text/unbenutzt {SkippedUnused}, doppelt {SkippedDuplicates}, ungültige ID {SkippedInvalid}, Fehler {SkippedErrors}";
+             + $"ohne Text/unbenutzt {SkippedUnused}, doppelt {SkippedDuplicates}, ungültige ID {SkippedInvalid}, Fehler {SkippedErrors}; "
+             + $"ignorierte Knotentypen: {NodeTypeCounts.Summarize(IgnoredNodeTypes)}";
     }
 
     public sealed class DialogueExporter
@@ -74,12 +77,20 @@ namespace DrovaVoice.Export
                     if (statement != null) { AddStatement(treeName, treeLoca, statement, lines, seen); continue; }
                     var choiceNode = node.TryCast<DS_MultipleChoiceNode>();
                     if (choiceNode != null) AddChoices(treeName, treeLoca, choiceNode, lines, seen);
+                    else CountIgnored(node);
                 }
                 catch (Exception e)
                 {
                     LineError(treeName, e);
                 }
             }
+        }
+
+        private void CountIgnored(Node node)
+        {
+            string type;
+            try { type = node.GetType().Name; } catch (Exception) { type = "?"; }
+            Stats.IgnoredNodeTypes[type] = Stats.IgnoredNodeTypes.TryGetValue(type, out int n) ? n + 1 : 1;
         }
 
         private void LineError(string treeName, Exception e)

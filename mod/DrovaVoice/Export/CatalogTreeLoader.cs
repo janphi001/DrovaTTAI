@@ -18,14 +18,14 @@ namespace DrovaVoice.Export
         /// Lädt jeden Baum synchron über seine Adresse. Fehler pro Baum werden gezählt, nie geworfen.
         /// Primär: LoadAssetAsync&lt;DialogueTree&gt;. Scheitern die ersten ProbeSize Versuche ohne einen einzigen Erfolg
         /// (Ausnahme oder null), wird von vorn mit LoadAssetAsync&lt;UnityEngine.Object&gt; + TryCast&lt;DialogueTree&gt;() begonnen.
-        /// Scheitert auch dort die ganze Probe, wird abgebrochen.
+        /// Scheitert auch dort die ganze Probe, wird abgebrochen; <paramref name="gaveUp"/> ist dann true (der Export darf nichts überschreiben).
         /// </summary>
-        public static List<DialogueTree> Load(IReadOnlyList<string> addresses, MelonLogger.Instance log)
+        public static List<DialogueTree> Load(IReadOnlyList<string> addresses, MelonLogger.Instance log, out bool gaveUp)
         {
             var trees = new List<DialogueTree>();
             var probe = new VariantProbe(ProbeSize);
             int failed = 0, logged = 0;
-            bool gaveUp = false;
+            gaveUp = false;
             string firstReason = "";
             for (int i = 0; i < addresses.Count; i++)
             {

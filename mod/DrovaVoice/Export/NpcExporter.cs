@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using DrovaVoice.Core;
 using Il2CppDrova;
 using Il2CppDrova.Sfx.Voices;
 using MelonLoader;
@@ -37,9 +38,22 @@ namespace DrovaVoice.Export
                 try { voices.Add(new { asset = map.name, voiceId = map.GetVoiceID().ToString(), bodyType = map.GetBodyType().ToString() }); }
                 catch (Exception e) { log.Warning($"VoiceMap {SafeName(map)}: {e.GetType().Name}"); }
             }
-            WriteAtomic(Path.Combine(dir, "npcs.json"), JsonSerializer.Serialize(npcs, Options));
-            WriteAtomic(Path.Combine(dir, "voices.json"), JsonSerializer.Serialize(voices, Options));
-            log.Msg($"NPC-Export: {npcs.Count} EntityInfo, {voices.Count} VoiceMap -> {dir}");
+            // Eine leere Liste (z. B. im Hauptmenü ohne geladene Entitäten) darf eine gute Datei nicht überschreiben.
+            bool wroteNpcs = WriteIfNotEmpty(Path.Combine(dir, "npcs.json"), npcs, "EntityInfo", log);
+            bool wroteVoices = WriteIfNotEmpty(Path.Combine(dir, "voices.json"), voices, "VoiceMap", log);
+            log.Msg($"NPC-Export: {npcs.Count} EntityInfo{(wroteNpcs ? "" : " (nicht geschrieben)")}, {voices.Count} VoiceMap{(wroteVoices ? "" : " (nicht geschrieben)")} -> {dir}");
+        }
+
+        private static bool WriteIfNotEmpty(string path, List<object> items, string what, MelonLogger.Instance log)
+        {
+            string? reason = ExportGuard.ShouldWriteList(items.Count);
+            if (reason != null)
+            {
+                log.Warning($"{Path.GetFileName(path)} nicht geschrieben ({what}: {reason}); eine vorhandene Datei bleibt unverändert. Für diesen Export einen Spielstand laden.");
+                return false;
+            }
+            WriteAtomic(path, JsonSerializer.Serialize(items, Options));
+            return true;
         }
 
         private static string SafeName(UnityEngine.Object? o)
