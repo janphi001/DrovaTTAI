@@ -14,3 +14,5 @@ Voraussetzung: Setup nach `docs/setup.md` (MelonLoader, Modding API, Mod gebaut)
 4. Kopieren und prüfen: `drova-voice export fetch`, dann `drova-voice export report` (Exit 0 ab 98 % Abdeckung; für die Datei der geladenen Bäume `drova-voice export report --manifest <Pfad>/manifest-loaded.json`). Fehlende Einträge stehen in `data/export/<lang>/coverage_missing.txt`.
 
 `data/` ist nicht im Git: Das Manifest enthält Spieltexte.
+
+**Stand nach dem ersten Lauf** (Details: `docs/decisions/2026-10-export-findings.md`): Export im Hauptmenü ausführen und das Spiel danach beenden, keinen Spielstand laden (das Spiel hing danach). Das Fenster muss im Vordergrund liegen. `export-all.trigger` (Katalog) funktioniert derzeit nicht; `export.trigger` liefert denselben Umfang, schreibt aber `manifest-loaded.json`: dafür `drova-voice export report --manifest data/export/de/manifest-loaded.json` verwenden.

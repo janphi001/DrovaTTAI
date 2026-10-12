@@ -11,10 +11,10 @@ namespace DrovaVoice.Export
     {
         /// <summary>Weder Aussagen- noch Auswahl-Knoten: je .NET-Typname (kein Spieltext) die Anzahl.</summary>
         public Dictionary<string, int> IgnoredNodeTypes { get; } = new Dictionary<string, int>();
-        public int Trees, TreesFailed, TreesSkipped, Statements, Choices, SkippedUnused, SkippedDuplicates, SkippedInvalid, SkippedErrors;
+        public int Trees, TreesFailed, TreesSkipped, Statements, Choices, SkippedUnused, SkippedDuplicates, SkippedInvalid, SkippedErrors, PostfixErrors, AlreadyDeserialized;
         public override string ToString()
             => $"Bäume {Trees} (fehlgeschlagen {TreesFailed}, übersprungen {TreesSkipped}); Aussagen {Statements}, Optionen {Choices}; "
-             + $"ohne Text/unbenutzt {SkippedUnused}, doppelt {SkippedDuplicates}, ungültige ID {SkippedInvalid}, Fehler {SkippedErrors}; "
+             + $"ohne Text/unbenutzt {SkippedUnused}, doppelt {SkippedDuplicates}, ungültige ID {SkippedInvalid}, Fehler {SkippedErrors}, Modding-API-Postfix-Fehler ignoriert {PostfixErrors}, bereits deserialisiert {AlreadyDeserialized}; "
              + $"ignorierte Knotentypen: {NodeTypeCounts.Summarize(IgnoredNodeTypes)}";
     }
 
@@ -49,6 +49,7 @@ namespace DrovaVoice.Export
                 {
                     Stats.TreesFailed++;
                     _log.Warning($"Baum {SafeName(tree)} nicht exportiert: {e.GetType().Name}: {e.Message}");
+                    if (Stats.TreesFailed == 1) _log.Warning("Erster Fehler im Detail: " + e);
                 }
             }
             _log.Msg("Export fertig: " + Stats + $"; Zeilen im Manifest {manifest.Lines.Count}");
@@ -60,10 +61,30 @@ namespace DrovaVoice.Export
             try { return tree.name; } catch { return "?"; }
         }
 
+        /// <summary>
+        /// Die Modding API hängt einen Postfix (DialogueTreePatch) an Graph.SelfDeserialize; dessen Audio-Initialisierung
+        /// kann im Hauptmenü mit einer TypeInitializationException scheitern, nachdem die eigentliche Deserialisierung
+        /// schon abgeschlossen ist. Diese Ausnahme ist für den Export unerheblich und wird gezählt statt weitergereicht.
+        /// </summary>
+        private void EnsureDeserialized(DialogueTree tree)
+        {
+            // Bereits deserialisierte Bäume nicht erneut anfassen: jeder SelfDeserialize-Aufruf löst den Modding-API-Postfix
+            // aus, dessen Fehler dann pro Baum im MainThreadDispatcher des Spiels landen (Log-Flut, Spiel hängt).
+            try
+            {
+                var existing = tree.allNodes;
+                if (existing != null && existing.Count > 0) { Stats.AlreadyDeserialized++; return; }
+            }
+            catch (Exception) { /* nicht lesbar: unten normal deserialisieren */ }
+            try { tree.SelfDeserialize(); }
+            catch (TypeInitializationException) { Stats.PostfixErrors++; }
+            try { tree.DeserializeIfNotDoneYet(true); }
+            catch (TypeInitializationException) { Stats.PostfixErrors++; }
+        }
+
         private void ExportTree(DialogueTree tree, List<ManifestLine> lines, HashSet<string> seen)
         {
-            tree.SelfDeserialize();
-            tree.DeserializeIfNotDoneYet(true);
+            EnsureDeserialized(tree);
             string treeName = tree.name;
             string treeLoca = tree.LocaPath ?? "";
             var nodes = tree.allNodes;
