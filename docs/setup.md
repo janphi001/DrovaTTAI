@@ -13,3 +13,5 @@ Die Modding API legt zusätzlich Lokalisierungsdateien an, die ebenfalls zu entf
 `Drova_Data/StreamingAssets/Localization/{de,en,fr}/ModdingUI_*.loc` sowie `{de,en}/Modding_API/`.
 Empfehlung: vor der Installation eine Kopie des ganzen Spielordners anlegen (z. B. `robocopy <Spielordner> <Backup> /E`);
 ein Abgleich mit `robocopy <Backup> <Spielordner> /MIR /L` zeigt als Trockenlauf, was zurückgebaut würde.
+
+Export: siehe docs/export.md.
