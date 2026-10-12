@@ -30,3 +30,11 @@ Adela-Zeilen extrahieren -> Stimme zuweisen -> synthetisieren -> kodieren -> ins
 
 ## Nächster Schritt
 Mit Skill `superpowers:writing-plans` daraus einen ausführbaren Plan mit Tasks und Tests machen.
+
+## Vorhandene Bausteine (aus Plan 1/2, nicht neu schreiben)
+- `ids.py`: `statement_id`, `choice_id`, `with_variant`, `audio_filename` (Dateiname der Zeile).
+- `speech_text.py`: `build_speech_text` (Stage-Directions, `substitute_gvars`, Lexikon, Zahlen), `player_name.py`: Namensvarianten.
+- `render.py`: Text + Emotion -> Anfrage je Engine; `emotions.py`: `EmotionTag`.
+- `engines/client.py`: `EngineClient` (ein Worker-Prozess je Strang -> so wurde parallel gemessen); `jsonl.py`: Wiederaufnahme.
+- `bakeoff.py`: `_synth_one` mit Sidecar-Text als Vorlage für den synth-Schritt.
+Folge: extract/synth sind überwiegend Verkabelung; neu sind vor allem cast (Stimmenzuordnung, Varianten), emote-Regeln, encode/install und die C#-Wiedergabe.
