@@ -33,7 +33,7 @@ namespace DrovaVoice.Core.Tests
         public void A_missing_choice_index_is_omitted_but_a_present_one_is_written()
         {
             var json = ManifestJson.Serialize(Sample());
-            Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(json, "choiceIndex").Count);
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(json, "choiceIndex"));
             Assert.Contains("\"choiceIndex\":1", json);
         }
 
