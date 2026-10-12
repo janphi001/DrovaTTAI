@@ -11,9 +11,9 @@ namespace DrovaVoice.Export
     {
         /// <summary>Weder Aussagen- noch Auswahl-Knoten: je .NET-Typname (kein Spieltext) die Anzahl.</summary>
         public Dictionary<string, int> IgnoredNodeTypes { get; } = new Dictionary<string, int>();
-        public int Trees, TreesFailed, TreesSkipped, Statements, Choices, SkippedUnused, SkippedDuplicates, SkippedInvalid, SkippedErrors, PostfixErrors, AlreadyDeserialized;
+        public int Trees, TreesFailed, TreesSkipped, Statements, Choices, SkippedUnused, SkippedDuplicates, SkippedInvalid, SkippedErrors, PostfixErrors, AlreadyDeserialized, TreesEmpty;
         public override string ToString()
-            => $"Bäume {Trees} (fehlgeschlagen {TreesFailed}, übersprungen {TreesSkipped}); Aussagen {Statements}, Optionen {Choices}; "
+            => $"Bäume {Trees} (fehlgeschlagen {TreesFailed}, übersprungen {TreesSkipped}, ohne Knoten {TreesEmpty}); Aussagen {Statements}, Optionen {Choices}; "
              + $"ohne Text/unbenutzt {SkippedUnused}, doppelt {SkippedDuplicates}, ungültige ID {SkippedInvalid}, Fehler {SkippedErrors}, Modding-API-Postfix-Fehler ignoriert {PostfixErrors}, bereits deserialisiert {AlreadyDeserialized}; "
              + $"ignorierte Knotentypen: {NodeTypeCounts.Summarize(IgnoredNodeTypes)}";
     }
@@ -42,8 +42,7 @@ namespace DrovaVoice.Export
                 try
                 {
                     if (tree.IsTestOrDebugDialogue) { Stats.TreesSkipped++; continue; }
-                    ExportTree(tree, manifest.Lines, seen);
-                    Stats.Trees++;
+                    if (ExportTree(tree, manifest.Lines, seen)) Stats.Trees++;
                 }
                 catch (Exception e)
                 {
@@ -82,12 +81,19 @@ namespace DrovaVoice.Export
             catch (TypeInitializationException) { Stats.PostfixErrors++; }
         }
 
-        private void ExportTree(DialogueTree tree, List<ManifestLine> lines, HashSet<string> seen)
+        private bool ExportTree(DialogueTree tree, List<ManifestLine> lines, HashSet<string> seen)
         {
             EnsureDeserialized(tree);
             string treeName = tree.name;
             string treeLoca = tree.LocaPath ?? "";
             var nodes = tree.allNodes;
+            if (nodes == null || nodes.Count == 0)
+            {
+                // Nach geschluckter Postfix-Ausnahme oder bei wirklich leerem Baum: nicht als exportiert zählen.
+                Stats.TreesEmpty++;
+                if (Stats.TreesEmpty <= MaxErrorLogs) _log.Warning($"Baum {treeName} hat nach dem Deserialisieren keine Knoten.");
+                return false;
+            }
             for (int i = 0; i < nodes.Count; i++)
             {
                 try
@@ -105,6 +111,7 @@ namespace DrovaVoice.Export
                     LineError(treeName, e);
                 }
             }
+            return true;
         }
 
         private void CountIgnored(Node node)

@@ -2,7 +2,7 @@
 
 Voraussetzung: Setup nach `docs/setup.md` (MelonLoader, Modding API, Mod gebaut).
 
-1. Spiel starten und im Hauptmenü warten (für `export-npcs` einen Spielstand laden).
+1. Spiel starten und im Hauptmenü warten (`export-npcs` liefert dort 332 statt 420 Einträge mit geladenem Spielstand; der Export mit geladenem Spielstand wurde nur einmal und mit Hänger getestet, siehe unten).
 2. Auslöser (eine leere Datei anlegen, die Mod löscht sie beim Erkennen):
    - `<Spiel>/Mods/DrovaVoice/export.trigger`: nur die zurzeit geladenen Dialogbäume (Ergebnis: `manifest-loaded.json`, ersetzt nie den vollständigen Export)
    - `<Spiel>/Mods/DrovaVoice/export-all.trigger`: alle Bäume über den Addressables-Katalog plus die zurzeit geladenen, die dort fehlen (Ergebnis: `manifest.json`; dauert einige Minuten, das Spiel kann währenddessen hängen)
