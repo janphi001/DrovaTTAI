@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -10,6 +12,7 @@ from drova_voice.config import DEFAULT_CONFIG_PATH, load_config
 from drova_voice.emotions import EmotionTag
 from drova_voice.engines.client import EngineClient, EngineError, cache_env, worker_command
 from drova_voice.engines.protocol import SynthRequest
+from drova_voice.export_report import compute_coverage, format_report
 from drova_voice.jsonl import read_jsonl, replace_with_retry, write_jsonl
 from drova_voice.render import render_request
 
@@ -55,6 +58,11 @@ def _parse(argv: list[str] | None) -> argparse.Namespace:
     refs.add_argument("--speaker", action="append", required=True)
     smoke = sub.add_parser("smoke", help="Engine mit einem Testsatz prüfen")
     smoke.add_argument("engine")
+    exp = sub.add_parser("export", help="Export-Ergebnis der Mod prüfen").add_subparsers(dest="ecmd", required=True)
+    rep = exp.add_parser("report", help="Abdeckung des Manifests gegen die .loc-Dateien")
+    rep.add_argument("--manifest", type=Path)
+    rep.add_argument("--min-coverage", type=float, default=98.0)
+    exp.add_parser("fetch", help="Export-Ordner aus dem Spielordner nach data/export kopieren")
     return p.parse_args(argv)
 
 
@@ -83,6 +91,27 @@ def _run(args: argparse.Namespace) -> int:
             resp = client.synth(SynthRequest(id="smoke", text=text, out_path=str(out), params=params))
         print(f"{args.engine}: {'OK' if resp.ok else 'FEHLER'} {resp.duration or ''} {resp.error or ''} -> {out}")
         return 0 if resp.ok else 1
+
+    if args.cmd == "export":
+        export_dir = cfg.data_dir / "export" / cfg.language
+        if args.ecmd == "fetch":
+            src = cfg.game_dir / "Mods" / "DrovaVoice" / "Export" / cfg.language
+            if not src.is_dir():
+                print(f"FEHLER: Export-Ordner nicht gefunden: {src} (Export im Spiel auslösen, siehe docs/export.md)", file=sys.stderr)
+                return 2
+            export_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(src, export_dir, dirs_exist_ok=True)
+            print(f"{src} -> {export_dir}")
+            return 0
+        manifest_path = args.manifest or (export_dir / "manifest.json")
+        if not manifest_path.is_file():
+            print(f"FEHLER: Manifest nicht gefunden: {manifest_path} (Export im Spiel auslösen, siehe docs/export.md)", file=sys.stderr)
+            return 2
+        cov = compute_coverage(json.loads(manifest_path.read_text(encoding="utf-8-sig")), cfg.loc_dir, cfg.language)
+        missing_path = manifest_path.with_name("coverage_missing.txt")
+        missing_path.write_text("".join(f"{m}\n" for m in cov.missing), encoding="utf-8")
+        print(format_report(cov, missing_path))
+        return 0 if cov.percent >= args.min_coverage else 1
 
     if args.bcmd == "select":
         try:
