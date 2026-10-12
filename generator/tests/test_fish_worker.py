@@ -1,5 +1,6 @@
 import io
 import json
+import struct
 import threading
 import wave
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -22,6 +23,17 @@ def _wav_bytes(seconds: float = 0.5, rate: int = 22050) -> bytes:
         w.setframerate(rate)
         w.writeframes(b"\x00\x00" * int(rate * seconds))
     return buf.getvalue()
+
+
+def _streaming_wav(seconds: float = 0.5, rate: int = 22050, list_chunk: bool = False) -> bytes:
+    """Wie Fish streamt: RIFF- und data-Größe sind Platzhalter (0xFFFFFFxx), die Audiodaten sind echt."""
+    good = _wav_bytes(seconds, rate)
+    at = good.index(b"data")
+    extra = b"LIST" + struct.pack("<I", 4) + b"INFO" if list_chunk else b""
+    out = bytearray(good[:at] + extra + good[at:])
+    struct.pack_into("<I", out, 4, 0xFFFFFFA4)
+    struct.pack_into("<I", out, at + len(extra) + 4, 0xFFFFFF00)
+    return bytes(out)
 
 
 class FakeFish:
@@ -246,3 +258,40 @@ def test_invalid_numbers_fail_at_startup_naming_the_variable(tmp_path, guarded, 
         with pytest.raises(EngineError, match=name) as info:
             _client(guarded, fake, **{name: value})
     assert KEY not in str(info.value) and not fake.requests
+
+
+@pytest.mark.parametrize("list_chunk", [False, True])
+def test_streaming_wav_with_placeholder_sizes_reports_its_real_duration(tmp_path, guarded, list_chunk):
+    with FakeFish([(200, _streaming_wav(0.5, 22050, list_chunk))]) as fake:
+        client = _client(guarded, fake)
+        try:
+            resp = guarded(lambda: client.synth(_req(tmp_path)))
+        finally:
+            client.close()
+    assert resp.ok and resp.sample_rate == 22050 and resp.duration == pytest.approx(0.5, abs=0.01)
+    with wave.open(str(tmp_path / "a.wav"), "rb") as w:
+        assert w.getnframes() == 11025
+
+
+def test_truncated_streaming_wav_drops_the_dangling_byte(tmp_path, guarded):
+    truncated = _streaming_wav(0.5, 22050)[:-1]  # 22049 Datenbytes: letztes Frame ist angefangen
+    with FakeFish([(200, truncated)]) as fake:
+        client = _client(guarded, fake)
+        try:
+            resp = guarded(lambda: client.synth(_req(tmp_path)))
+        finally:
+            client.close()
+    assert resp.ok and resp.duration == pytest.approx(11024 / 22050, abs=1e-6)
+    with wave.open(str(tmp_path / "a.wav"), "rb") as w:
+        assert w.getnframes() == 11024
+
+
+def test_wav_with_empty_data_chunk_is_an_error_and_the_file_is_removed(tmp_path, guarded):
+    with FakeFish([(200, _wav_bytes(0.0))]) as fake:
+        client = _client(guarded, fake)
+        try:
+            resp = guarded(lambda: client.synth(_req(tmp_path)))
+        finally:
+            client.close()
+    assert not resp.ok and "Fish lieferte kein gültiges WAV" in resp.error
+    assert not (tmp_path / "a.wav").exists()

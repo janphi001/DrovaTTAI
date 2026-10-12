@@ -5,6 +5,7 @@ import http.client
 import json
 import math
 import os
+import struct
 import sys
 import time
 import urllib.error
@@ -108,6 +109,43 @@ def _post(cfg: dict, body: dict) -> bytes:
     raise RuntimeError(f"Fish nicht erreichbar nach {cfg['attempts']} Versuchen (zuletzt {last})")
 
 
+def _fix_streaming_wav(audio: bytes) -> bytes:
+    """Fish streamt WAVs mit Platzhaltergrößen (RIFF- und data-Größe ~0xFFFFFFxx).
+
+    Maßgeblich sind die tatsächlich vorhandenen Bytes: Header auf diese Größen setzen und ein
+    angefangenes Frame abschneiden. Korrekte WAVs kommen unverändert zurück.
+    """
+    if len(audio) < 12 or audio[:4] != b"RIFF" or audio[8:12] != b"WAVE":
+        return audio  # wave.open meldet das in synth()
+    frame_size, data_at, declared = 0, None, 0
+    pos = 12
+    while pos + 8 <= len(audio) and (frame_size == 0 or data_at is None):
+        cid = audio[pos:pos + 4]
+        size = struct.unpack_from("<I", audio, pos + 4)[0]
+        body = pos + 8
+        if cid == b"fmt " and size >= 16 and body + 16 <= len(audio):
+            _tag, channels, _rate, _byte_rate, _align, bits = struct.unpack_from("<HHIIHH", audio, body)
+            frame_size = channels * ((bits + 7) // 8)
+        elif cid == b"data":
+            data_at, declared = pos, size
+        pos = body + size + (size & 1)  # Chunks sind auf gerade Länge gepolstert
+    if frame_size == 0:
+        raise ValueError("fmt-Chunk fehlt oder ist unbrauchbar")
+    if data_at is None:
+        raise ValueError("kein data-Chunk")
+    start = data_at + 8
+    usable = min(declared, len(audio) - start)
+    usable -= usable % frame_size
+    if usable <= 0:
+        raise ValueError("data-Chunk ohne Audio")
+    if usable == declared and struct.unpack_from("<I", audio, 4)[0] == len(audio) - 8:
+        return audio
+    fixed = bytearray(audio[:start + usable])
+    struct.pack_into("<I", fixed, 4, len(fixed) - 8)
+    struct.pack_into("<I", fixed, data_at + 4, usable)
+    return bytes(fixed)
+
+
 def synth(cfg: dict, req: dict) -> tuple[int, float]:
     if req.get("reference"):
         raise ValueError("Fish nutzt eine Stimmen-ID (voice = reference_id), keine lokale Referenz-WAV")
@@ -116,11 +154,11 @@ def synth(cfg: dict, req: dict) -> tuple[int, float]:
         body["reference_id"] = req["voice"]
     audio = _post(cfg, body)
     out = Path(req["out_path"])
-    out.write_bytes(audio)
     try:
+        out.write_bytes(_fix_streaming_wav(audio))
         with wave.open(str(out), "rb") as w:
             rate, frames = w.getframerate(), w.getnframes()
-    except (wave.Error, EOFError) as e:
+    except (wave.Error, EOFError, ValueError) as e:
         out.unlink(missing_ok=True)
         raise RuntimeError(f"Fish lieferte kein gültiges WAV: {e}") from None
     return rate, frames / rate
