@@ -137,3 +137,71 @@ def test_cli_report_fails_when_no_entries_are_in_scope(tmp_path, capsys):
     manifest.write_text('{"lines": []}', encoding="utf-8")
     assert main(["--config", str(cfg), "export", "report"]) == 2
     assert "Keine .loc-Einträge im Umfang" in capsys.readouterr().err
+
+
+def _text_line(path, key, text, gvars=None, **extra):
+    return {**_line(path, key), "text": text, "gvars": gvars or [], **extra}
+
+
+def test_text_cross_check_ignores_whitespace_and_lists_only_labels(tmp_path):
+    d = tmp_path / "de"
+    (d / "Dialog").mkdir(parents=True)
+    body = "\n".join(f"K_{i} {{ Erfundener  Text {i}. }}" for i in range(8)) + "\n"
+    (d / "Dialog" / "NPC_T_de.loc").write_text(body, encoding="utf-8")
+    lines = [_text_line("Dialog/NPC_T", "K_0", "Erfundener Text 0.\n"),  # nur Leerraum anders: gleich
+             *[_text_line("Dialog/NPC_T", f"K_{i}", "Ganz anderer Text.") for i in range(1, 7)]]  # 6 Abweichungen
+    cov = compute_coverage({"lines": lines}, d, "de")
+    assert (cov.text_checked, cov.text_mismatch) == (7, 6)
+    assert len(cov.text_mismatch_examples) == 5 and cov.text_mismatch_examples[0] == "Dialog/NPC_T:K_1"
+    assert cov.covered == 7 and cov.percent == pytest.approx(100 * 7 / 8)  # Prozent unberührt
+    text = format_report(cov, tmp_path / "m.txt")
+    assert "Text weicht von der .loc ab: 6 von 7" in text and "Dialog/NPC_T:K_1" in text
+    assert "Ganz anderer" not in text and "Erfundener" not in text
+
+
+def test_gvar_check_counts_loc_placeholders_without_manifest_gvars(tmp_path):
+    d = tmp_path / "de"
+    (d / "Dialog").mkdir(parents=True)
+    (d / "Dialog" / "NPC_G_de.loc").write_text(
+        "G_1 { Hallo $GVAR:EVars_Player.Name$. }\nG_2 { Wieder $GVAR:EVars_Player.Name$. }\nG_3 { Ohne. }\n", encoding="utf-8")
+    lines = [_text_line("Dialog/NPC_G", "G_1", "Hallo $GVAR:EVars_Player.Name$.", gvars=["EVars_Player.Name"]),
+             _text_line("Dialog/NPC_G", "G_2", "Wieder Fremder."),
+             _text_line("Dialog/NPC_G", "G_3", "Ohne.")]
+    cov = compute_coverage({"lines": lines}, d, "de")
+    assert (cov.gvar_checked, cov.gvar_missing) == (2, 1)
+    assert "leere gvars im Manifest: 1 von 2" in format_report(cov, tmp_path / "m.txt")
+
+
+def test_cli_report_exit_code_ignores_text_mismatch(tmp_path, loc_dir):
+    repo, cfg = _repo(tmp_path, _game_with_loc(tmp_path, loc_dir))
+    manifest = repo / "data" / "export" / "de" / "manifest.json"
+    manifest.parent.mkdir(parents=True)
+    lines = [_text_line(p, k, "Falscher Text.") for p, k in [("Dialog/NPC_A", f"Plh_{i}") for i in range(1, 5)]
+             + [("Dialogues/Quest_B", "Plh_1"), ("IntroWorldDialog", "W_1")]]
+    manifest.write_text(json.dumps({"lines": lines}), encoding="utf-8")
+    assert main(["--config", str(cfg), "export", "report"]) == 0
+
+
+def test_breakdown_counts_categories_and_top_combinations(tmp_path):
+    d = tmp_path / "de"
+    (d / "Dialog").mkdir(parents=True)
+    (d / "Dialog" / "NPC_B_de.loc").write_text("B_1 { Erfunden. }\n", encoding="utf-8")
+    lines = []
+    for i in range(20):  # 20 verschiedene Sprecher, je eine Zeile
+        lines.append({**_line("Dialog/NPC_B", f"X_{i}"), "actorName": f"Actor{i:02d}", "nodeType": "statement", "category": "dialog"})
+    lines += [{**_line("Dialog/NPC_B", f"P_{i}"), "actorName": "Player", "nodeType": "choice", "category": "player"} for i in range(5)]
+    lines.append({**_line("Dialog/NPC_B", "B_1"), "actorName": "x" * 100, "nodeType": "statement", "category": "dialog"})
+    cov = compute_coverage({"lines": lines}, d, "de")
+    assert cov.lines_total == 26 and cov.player_lines == 5
+    assert cov.by_category == {"dialog": 21, "player": 5}
+    assert len(cov.by_actor) == 15 and cov.by_actor[0] == (("Player", "choice", "player"), 5)
+    text = format_report(cov, tmp_path / "m.txt")
+    assert "davon player: 5 (19.2 %)" in text and "Je Kategorie: dialog 21, player 5" in text
+    assert "x" * 100 not in text
+    assert text.count("\n") < 40  # Länge begrenzt
+
+
+def test_old_style_coverage_construction_still_works():
+    from drova_voice.export_report import Coverage
+    cov = Coverage(total=1, covered=1, missing=(), extra=0, by_folder={})
+    assert "Text weicht von der .loc ab: 0 von 0" in format_report(cov, Path("m.txt"))
