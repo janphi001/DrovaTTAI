@@ -16,6 +16,7 @@ from drova_voice.fish_voices import load_fish_voices
 from drova_voice.install import install_audio
 from drova_voice.jsonl import append_jsonl, latest_by_id, read_jsonl_lenient, write_jsonl
 from drova_voice.lines import (Line, build_lines, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
+from drova_voice.preview import write_preview
 from drova_voice.report import build_report, format_report
 from drova_voice.synth import build_jobs, run_synth
 
@@ -204,6 +205,20 @@ def _report(cfg: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def _preview(cfg: Config, args: argparse.Namespace) -> int:
+    lines = _selected(cfg, args)
+    if lines is None:
+        return 2
+    try:
+        emotions = read_emotions(emotions_path(cfg))
+    except ValueError as e:
+        return _fail(str(e))
+    page = write_preview(lines, latest_by_id(read_jsonl_lenient(encoded_path(cfg))), emotions, audio_dir(cfg),
+                         cfg.out_dir / "preview" / "index.html", f"Hörprobe {args.npc or 'alle Zeilen'}")
+    print(f"Hörseite: {page}")
+    return 0
+
+
 HANDLERS: dict[str, Callable[[Config, argparse.Namespace], int]] = {
     "extract": _extract,
     "cast": _cast,
@@ -212,6 +227,7 @@ HANDLERS: dict[str, Callable[[Config, argparse.Namespace], int]] = {
     "encode": _encode,
     "install": _install,
     "report": _report,
+    "preview": _preview,
 }
 
 
@@ -235,3 +251,5 @@ def add_parsers(sub) -> None:
     ins.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht (frühere Einträge bleiben erhalten)")
     rp = sub.add_parser("report", help="Status je Kategorie: offen, erzeugt, kodiert, installiert, übersprungen")
     rp.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
+    pv = sub.add_parser("preview", help="Hörseite out/preview/index.html (Zeilen mit Emotion und Audio)")
+    pv.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
