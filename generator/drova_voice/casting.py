@@ -38,7 +38,9 @@ def load_casting(path: Path, voices: Mapping[str, FishVoice]) -> Casting:
     speakers: dict[str, str] = {}
     for name, spec in (raw.get("speakers") or {}).items():
         key = str(name).lower()
-        voice = str((spec or {}).get("voice", "")).lower()
+        if not isinstance(spec, dict):
+            raise ValueError(f"{path}: Sprecher '{name}' muss als '{name}: {{voice: <Stimme>}}' angegeben werden")
+        voice = str(spec.get("voice", "")).lower()
         if key in speakers:
             raise ValueError(f"{path}: Sprecher '{name}' ist doppelt (Groß-/Kleinschreibung zählt nicht)")
         if voice not in voices:

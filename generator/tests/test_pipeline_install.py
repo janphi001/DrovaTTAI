@@ -28,3 +28,16 @@ def test_install_without_encoded_fails_clearly(pipeline_repo, capsys):
     main(["--config", str(pipeline_repo.cfg), "extract"])
     assert main(["--config", str(pipeline_repo.cfg), "install"]) == 2
     assert "encode" in capsys.readouterr().err
+
+
+@needs_ffmpeg
+def test_install_drops_entries_of_speakers_that_lost_their_voice(pipeline_repo, guarded):
+    base = ["--config", str(pipeline_repo.cfg)]
+    main(base + ["extract"])
+    guarded(lambda: main(base + ["synth", "--engine", "fake"]))
+    guarded(lambda: main(base + ["encode"]))
+    assert main(base + ["install"]) == 0
+    (pipeline_repo.casting / "casting.yaml").write_text("default_player: leon\nspeakers: {}\n", encoding="utf-8")
+    assert main(base + ["install"]) == 0
+    index = json.loads((pipeline_repo.install_dir / "index.json").read_text(encoding="utf-8"))
+    assert sorted(index["entries"]) == ["DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_3|c0"]  # nur noch die Spielerzeile

@@ -3,3 +3,4 @@
 default_player: leon      # alle Spielerzeilen (Auswahloptionen); Stimmsets folgen in M5
 speakers:
   adela: {voice: melanie}
+  jero: {voice: german_wisdom_m_3130ae}   # vorläufig (mittelalt, tief, ruhig, geheimnisvoll); Hörtest entscheidet

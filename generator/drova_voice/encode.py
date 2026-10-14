@@ -13,6 +13,7 @@ from drova_voice.lines import Line
 
 _TRIM = "silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.05"
 LOUDNORM = "loudnorm=I=-16:TP=-1.5:LRA=11"
+SAMPLE_RATE = 48000  # loudnorm tastet intern auf 192 kHz hoch; ohne aresample vor und nach ihm kommt 192 kHz heraus
 WHISPER_GAIN_DB = -6
 
 
@@ -23,7 +24,8 @@ def rel_audio_path(line: Line) -> str:
 
 def build_filter(notes: Sequence[str]) -> str:
     # Stille vorn und hinten entfernen (hinten: Umkehren, vorn trimmen, zurückdrehen), dann auf -16 LUFS.
-    parts = [_TRIM, "areverse", _TRIM, "areverse", LOUDNORM]
+    # (aresample vor UND nach loudnorm: mit ffmpeg 7.0 bricht jede andere Stellung des Filters ab.)
+    parts = [_TRIM, "areverse", _TRIM, "areverse", f"aresample={SAMPLE_RATE}", LOUDNORM, f"aresample={SAMPLE_RATE}"]
     if "whisper" in notes:  # *flüstert*: leiser (das "gehauchte" kommt später, falls der Hörtest es verlangt)
         parts.append(f"volume={WHISPER_GAIN_DB}dB")
     return ",".join(parts)
@@ -74,7 +76,7 @@ def encode_one(ffmpeg: str, ffprobe: str, wav: Path, dst: Path, notes: Sequence[
 def run_encode(lines: Sequence[Line], synth_rows: Mapping[str, dict], emotions: Mapping[str, EmotionTag],
                audio_dir: Path, workers: int = 4) -> tuple[list[dict], list[str]]:
     ffmpeg, ffprobe = find_tools()
-    todo = [(l, synth_rows[l.id]) for l in lines if l.id in synth_rows and synth_rows[l.id].get("ok")]
+    todo = [(l, synth_rows[l.id]) for l in lines if not l.skip and l.id in synth_rows and synth_rows[l.id].get("ok")]
 
     def work(item):
         line, row = item
@@ -85,7 +87,7 @@ def run_encode(lines: Sequence[Line], synth_rows: Mapping[str, dict], emotions: 
         rel = rel_audio_path(line)
         try:
             duration = encode_one(ffmpeg, ffprobe, wav, Path(audio_dir) / rel, notes, row["key"])
-        except (RuntimeError, OSError, ValueError) as e:
+        except (RuntimeError, OSError, ValueError, subprocess.CalledProcessError) as e:
             return None, f"{line.id}: {e}"
         return {"id": line.id, "rel": rel, "duration": round(duration, 3), "key": row["key"]}, None
 

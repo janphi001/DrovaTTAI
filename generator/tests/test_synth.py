@@ -132,3 +132,55 @@ def test_on_result_is_called_for_each_job(tmp_path):
     seen = []
     run_synth([job("a"), job("b", "Zum Brunnen, bitte.")], "fake", factory([]), tmp_path, workers=2, on_result=seen.append)
     assert sorted(r.id for r in seen) == ["a", "b"]
+
+
+class BoomClient(StubClient):
+    """Wirft für bestimmten Text eine unerwartete Ausnahme (kein EngineError)."""
+
+    def synth(self, req):
+        if "BOOM" in req.text:
+            raise RuntimeError("kaputt")
+        return super().synth(req)
+
+
+def test_unexpected_exception_fails_only_that_job_and_does_not_hang(tmp_path):
+    jobs = [job("a", "Das ist BOOM hier."), job("b", "Danach kommt noch etwas.")]
+    results = run_synth(jobs, "fake", lambda engine: contextlib.nullcontext(BoomClient([])), tmp_path, workers=1)
+    by_id = {r.id: r for r in results}
+    assert not by_id["a"].ok and "RuntimeError" in by_id["a"].error
+    assert by_id["b"].ok  # der Worker bleibt benutzbar
+
+
+def test_cached_lines_are_not_reported_as_errors_when_all_workers_are_dead(tmp_path):
+    run_synth([job("b", "Danach kommt noch etwas.")], "fake", factory([]), tmp_path)
+    jobs = [job("a", "Das ist STOPP hier."), job("b", "Danach kommt noch etwas.")]
+    results = run_synth(jobs, "fake", factory([], die_on="STOPP"), tmp_path, workers=1)
+    by_id = {r.id: r for r in results}
+    assert not by_id["a"].ok and by_id["b"].ok and by_id["b"].attempts == 0
+
+
+class ThenFailClient(StubClient):
+    """Erster Versuch liefert unplausibel langen Ton, alle weiteren scheitern."""
+
+    def __init__(self, calls):
+        super().__init__(calls, seconds=40.0)
+        self.n = 0
+
+    def synth(self, req):
+        self.n += 1
+        if self.n > 1:
+            return SynthResponse(req.id, False, error="HTTP 500")
+        return super().synth(req)
+
+
+def test_usable_audio_is_kept_when_a_later_attempt_fails(tmp_path):
+    (r,) = run_synth([job("a")], "fake", lambda engine: contextlib.nullcontext(ThenFailClient([])), tmp_path)
+    assert r.ok and r.flagged and wav_duration(r.wav) == pytest.approx(40.0, abs=0.1)
+    assert list(tmp_path.glob("*.part.wav")) == []
+
+
+def test_corrupt_cache_file_is_replaced(tmp_path):
+    key = make_key("fake", "stub-1", None, "Der Weg nach Norden ist weit.", {})
+    (tmp_path / f"{key}.wav").write_bytes(b"kein WAV")
+    (r,) = run_synth([job("a")], "fake", factory([]), tmp_path)
+    assert r.ok and r.attempts == 1 and wav_duration(r.wav) == pytest.approx(2.0, abs=0.01)

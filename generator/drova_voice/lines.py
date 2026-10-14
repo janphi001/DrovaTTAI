@@ -69,19 +69,19 @@ def _expected_id(row: Mapping) -> str:
 
 def build_lines(manifest: Mapping, loc_texts: Mapping[tuple[str, str], str],
                 lexicon: Mapping[str, str] | None = None) -> list[Line]:
-    seen: set[str] = set()
+    seen: set[tuple[str, bool]] = set()
     out: list[Line] = []
     for row in manifest.get("lines", []):
         line_id = row["id"]
-        if line_id in seen:  # gleiche Bäume können mehrfach im Speicher liegen
-            continue
-        seen.add(line_id)
-        path = normalize_loca_path(row["locaPath"])
-        raw = loc_texts.get((path, row["locaKey"]), row.get("text") or "")
         try:
             id_ok = _expected_id(row) == line_id
         except (KeyError, TypeError, ValueError):
             id_ok = False
+        if (line_id, id_ok) in seen:  # gleiche Bäume können mehrfach im Speicher liegen
+            continue
+        seen.add((line_id, id_ok))
+        path = normalize_loca_path(row["locaPath"])
+        raw = loc_texts.get((path, row["locaKey"]), row.get("text") or "")
         speech, stage, skip = "", (), None
         if not id_ok:
             skip = SKIP_ID_MISMATCH
@@ -98,7 +98,8 @@ def build_lines(manifest: Mapping, loc_texts: Mapping[tuple[str, str], str],
             choice_index=row.get("choiceIndex"), actor=row.get("actorName") or "", category=row.get("category") or "dialog",
             generic=bool(row.get("generic")), raw=raw, speech=speech, stage=stage, skip=skip,
         ))
-    return out
+    valid_ids = {l.id for l in out if l.skip != SKIP_ID_MISMATCH}
+    return [l for l in out if not (l.skip == SKIP_ID_MISMATCH and l.id in valid_ids)]  # gültige Zeile geht vor
 
 
 def select_npc(lines: Sequence[Line], npc: str) -> list[Line]:

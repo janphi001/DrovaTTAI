@@ -92,3 +92,10 @@ def test_load_lexicon_missing_or_empty(tmp_path):
     assert load_lexicon(tmp_path / "lex.yaml") == {}
     (tmp_path / "lex.yaml").write_text("Zorgrad: Sorgrad\n", encoding="utf-8")
     assert load_lexicon(tmp_path / "lex.yaml") == {"Zorgrad": "Sorgrad"}
+
+
+def test_valid_line_wins_over_an_earlier_mismatched_duplicate_id():
+    good_id = statement_id(TREE, PATH, "Plh_1")
+    bad = mline("Plh_1", id=good_id, locaKey="Plh_9")  # Schlüssel passt nicht zur ID
+    lines = build_lines(manifest(bad, mline("Plh_1")), {})
+    assert len(lines) == 1 and lines[0].skip is None and lines[0].loca_key == "Plh_1"

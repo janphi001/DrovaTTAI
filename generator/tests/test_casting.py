@@ -55,3 +55,8 @@ def test_cast_report_counts_missing_and_usage(tmp_path):
     report = cast_report(lines, c)
     assert report.missing == {"Fremder": 1}
     assert report.usage == {"lena": 2, "leon": 1}
+
+
+def test_short_form_speaker_entry_is_a_clear_error(tmp_path):
+    with pytest.raises(ValueError, match="mira.*voice"):
+        load_casting(write(tmp_path, "default_player: leon\nspeakers:\n  mira: lena\n"), VOICES)

@@ -13,7 +13,7 @@ Audio/de/
 └─ player/default/…                Spielerzeilen (Auswahloptionen); weitere Sets später als player/<set>/
 ```
 
-Dateien sind OGG Vorbis, mono, auf −16 LUFS angeglichen, Stille am Anfang und Ende entfernt.
+Dateien sind OGG Vorbis, **48 kHz**, mono, auf −16 LUFS angeglichen, Stille am Anfang und Ende entfernt.
 
 ## index.json
 

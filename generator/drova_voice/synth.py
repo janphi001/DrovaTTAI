@@ -96,28 +96,41 @@ def build_jobs(lines: Sequence[Line], casting: Casting, fish_table: Mapping[str,
     return jobs, skipped
 
 
-def synth_one(client, job: SynthJob, key: str, cache_dir: Path, max_attempts: int = MAX_ATTEMPTS) -> SynthResult:
+def cache_hit(job: SynthJob, key: str, cache_dir: Path) -> SynthResult | None:
+    """Fertige WAV im Cache (nur fertige Dateien liegen unter dem endgültigen Namen); kaputte Dateien werden verworfen."""
     wav = Path(cache_dir) / f"{key}.wav"
-    if wav.exists():  # Cache-Treffer: nur fertige Dateien liegen unter dem endgültigen Namen
+    if not wav.exists():
+        return None
+    try:
         duration = wav_duration(wav)
-        return SynthResult(job.id, key, str(wav), duration, True, 0, not plausible(duration, job.speech_len), None)
+    except (wave.Error, EOFError, OSError, ZeroDivisionError):
+        wav.unlink(missing_ok=True)
+        return None
+    return SynthResult(job.id, key, str(wav), duration, True, 0, not plausible(duration, job.speech_len), None)
+
+
+def synth_one(client, job: SynthJob, key: str, cache_dir: Path, max_attempts: int = MAX_ATTEMPTS) -> SynthResult:
+    hit = cache_hit(job, key, cache_dir)
+    if hit is not None:
+        return hit
+    wav = Path(cache_dir) / f"{key}.wav"
     wav.parent.mkdir(parents=True, exist_ok=True)
     part = wav.with_name(f"{key}.part.wav")
-    duration: float | None = None
+    duration: float | None = None  # Dauer der Datei, die gerade unter dem endgültigen Namen liegt
     error: str | None = None
     attempt = 0
     for attempt in range(1, max_attempts + 1):
         resp = client.synth(SynthRequest(id=job.id, text=job.text, out_path=str(part), voice=job.voice, params=job.params))
         if not resp.ok:
-            error, duration = resp.error or "unbekannter Fehler", None
+            error = resp.error or "unbekannter Fehler"
             part.unlink(missing_ok=True)
             continue
-        error, duration = None, resp.duration
+        replace_with_retry(part, wav)  # brauchbaren Ton sofort sichern, auch wenn ein späterer Versuch scheitert
+        duration, error = resp.duration, None
         if plausible(duration, job.speech_len):
             break
     if duration is None:
         return SynthResult(job.id, key, None, None, False, attempt, False, error)
-    replace_with_retry(part, wav)
     return SynthResult(job.id, key, str(wav), duration, True, attempt, not plausible(duration, job.speech_len), None)
 
 
@@ -163,21 +176,28 @@ def run_synth(jobs: Sequence[SynthJob], engine: str, client_factory: Callable[[s
 
         def work(job: SynthJob) -> None:
             key = keys[job.id]
-            client = _acquire(idle, alive, lock)
-            if client is None:
-                r = SynthResult(job.id, key, None, None, False, 0, False, "kein Worker mehr verfügbar")
-            else:
-                try:
-                    r = synth_one(client, job, key, cache_dir)
-                except EngineError as e:  # Worker tot: nicht zurücklegen, Rest dieses Laufs scheitert sauber
-                    with lock:
-                        alive[0] -= 1
-                    r = SynthResult(job.id, key, None, None, False, 0, False, str(e))
+            r = cache_hit(job, key, cache_dir)  # Cache-Treffer brauchen keinen Worker (auch nicht, wenn alle tot sind)
+            if r is None:
+                client = _acquire(idle, alive, lock)
+                if client is None:
+                    r = SynthResult(job.id, key, None, None, False, 0, False, "kein Worker mehr verfügbar")
                 else:
-                    idle.put(client)
+                    try:
+                        r = synth_one(client, job, key, cache_dir)
+                    except EngineError as e:  # Worker tot: nicht zurücklegen, Rest dieses Laufs scheitert sauber
+                        with lock:
+                            alive[0] -= 1
+                        r = SynthResult(job.id, key, None, None, False, 0, False, str(e))
+                    except Exception as e:  # z. B. gesperrte Cache-Datei: Worker ist in Ordnung, dieser Auftrag nicht
+                        idle.put(client)
+                        r = SynthResult(job.id, key, None, None, False, 0, False, f"{type(e).__name__}: {e}")
+                    else:
+                        idle.put(client)
+                    if not r.ok:
+                        (Path(cache_dir) / f"{key}.part.wav").unlink(missing_ok=True)
             emit(r)
             for other in followers.get(key, []):
-                emit(SynthResult(other.id, key, r.wav, r.duration, r.ok, 0, r.flagged, r.error))
+                emit(SynthResult(other.id, key, r.wav, r.duration, r.ok, r.attempts, r.flagged, r.error))
 
         with ThreadPoolExecutor(max_workers=len(clients)) as pool:
             list(pool.map(work, first_by_key.values()))

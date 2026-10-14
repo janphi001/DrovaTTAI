@@ -46,22 +46,29 @@ def append_jsonl(path: Path, row: dict) -> None:
     # Anhängen statt neu schreiben: Ein Abbruch kostet höchstens die letzte (halbe) Zeile.
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a", encoding="utf-8", newline="\n") as f:
-        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    data = (json.dumps(row, ensure_ascii=False) + "\n").encode("utf-8")
+    with open(path, "a+b") as f:
+        f.seek(0, os.SEEK_END)
+        if f.tell() > 0:
+            f.seek(-1, os.SEEK_END)
+            if f.read(1) != b"\n":  # halbe Zeile eines abgebrochenen Laufs: beenden, damit die neue Zeile gültig bleibt
+                data = b"\n" + data
+        f.write(data)
 
 
 def read_jsonl_lenient(path: Path) -> list[dict]:
-    """Wie read_jsonl, aber: fehlende Datei -> [], nicht lesbare Zeilen (z. B. abgebrochenes Schreiben) werden übersprungen."""
+    """Wie read_jsonl, aber: fehlende Datei -> [], nicht lesbare Zeilen (z. B. abgebrochenes Schreiben, auch mitten in
+    einem Umlaut) werden übersprungen."""
     path = Path(path)
     if not path.exists():
         return []
     rows = []
-    for line in path.read_text(encoding="utf-8-sig").split("\n"):
-        if not line.strip():
+    for raw in path.read_bytes().split(b"\n"):
+        if not raw.strip():
             continue
         try:
-            row = json.loads(line)
-        except json.JSONDecodeError:
+            row = json.loads(raw.decode("utf-8-sig"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
             continue
         if isinstance(row, dict):
             rows.append(row)

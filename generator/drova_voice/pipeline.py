@@ -178,9 +178,24 @@ def _install(cfg: Config, args: argparse.Namespace) -> int:
     encoded = latest_by_id(read_jsonl_lenient(encoded_path(cfg)))
     if not encoded:
         return _fail(f"{encoded_path(cfg)} fehlt oder ist leer (zuerst `drova-voice encode` ausführen)")
-    wanted = {l.id for l in lines}
-    rows = [r for i, r in encoded.items() if i in wanted]
-    result = install_audio(rows, audio_dir(cfg), cfg.install_dir, cfg.language)
+    try:
+        _, casting = _load_casting(cfg)
+    except (OSError, ValueError) as e:
+        return _fail(str(e))
+    synth_rows = latest_by_id(read_jsonl_lenient(synth_results_path(cfg)))
+    active = {l.id for l in lines if not l.skip and casting.voice_for(l) is not None}
+    rows, stale = [], []
+    for line_id, row in encoded.items():
+        if line_id not in active:
+            continue
+        synth_row = synth_rows.get(line_id)
+        if synth_row is None or not synth_row.get("ok") or synth_row.get("key") != row.get("key"):
+            stale.append(f"{line_id}: Ton ist veraltet (synth und encode erneut ausführen)")
+        else:
+            rows.append(row)
+    drop = {l.id for l in lines} - {r["id"] for r in rows}
+    result = install_audio(rows, audio_dir(cfg), cfg.install_dir, cfg.language, drop_ids=drop)
+    result.errors.extend(stale)
     print(f"{result.copied} Dateien kopiert, index.json mit {result.entries} Einträgen -> {cfg.install_dir}")
     for e in result.errors[:10]:
         print(f"FEHLER {e}", file=sys.stderr)

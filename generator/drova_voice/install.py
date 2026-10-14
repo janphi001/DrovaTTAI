@@ -4,7 +4,7 @@ import json
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Sequence
+from typing import Collection, Sequence
 
 from drova_voice.ids import VARIANT_SEP
 from drova_voice.jsonl import replace_with_retry
@@ -43,11 +43,14 @@ def _same_file(src: Path, dst: Path) -> bool:
     return a.st_size == b.st_size and int(a.st_mtime) == int(b.st_mtime)
 
 
-def install_audio(rows: Sequence[dict], audio_dir: Path, install_dir: Path, language: str) -> InstallResult:
+def install_audio(rows: Sequence[dict], audio_dir: Path, install_dir: Path, language: str,
+                  drop_ids: Collection[str] = ()) -> InstallResult:
     audio_dir, install_dir = Path(audio_dir), Path(install_dir)
     index_path = install_dir / "index.json"
     # frühere Einträge behalten, aber nur solche, deren Datei noch da ist
     entries = {i: e for i, e in _load_index(index_path, language).items() if (install_dir / e.get("file", "")).is_file()}
+    # Zeilen, die jetzt nicht mehr installiert werden sollen (übersprungen, ohne Stimme, veraltet), verlieren ihren Eintrag
+    entries = {i: e for i, e in entries.items() if split_variant(i)[0] not in drop_ids}
     result = InstallResult()
     for row in rows:
         src, dst = audio_dir / row["rel"], install_dir / row["rel"]

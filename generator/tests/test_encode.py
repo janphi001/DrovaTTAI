@@ -20,10 +20,10 @@ def line(key="Plh_1", category="dialog"):
                 actor="Mira", category=category, generic=False, raw="x", speech="x", stage=(), skip=None)
 
 
-def sine_wav(path, seconds=1.0, lead_silence=0.3, rate=22050):
+def sine_wav(path, seconds=1.0, lead_silence=0.3, rate=22050, trail_silence=0.0):
     frames = []
-    for i in range(int(rate * (lead_silence + seconds))):
-        v = 0 if i < rate * lead_silence else int(8000 * math.sin(2 * math.pi * 220 * i / rate))
+    for i in range(int(rate * (lead_silence + seconds + trail_silence))):
+        v = 0 if (i < rate * lead_silence or i >= rate * (lead_silence + seconds)) else int(8000 * math.sin(2 * math.pi * 220 * i / rate))
         frames.append(struct.pack("<h", v))
     with wave.open(str(path), "wb") as w:
         w.setnchannels(1)
@@ -52,6 +52,30 @@ def test_ffmpeg_command_shape(tmp_path):
     assert cmd[0] == "ffmpeg" and "libvorbis" in cmd and cmd[cmd.index("-ac") + 1] == "1" and cmd[-1].endswith("a.ogg")
 
 
+def test_find_tools_reports_ffmpeg_without_vorbis(monkeypatch):
+    class Result:
+        stdout = " A..... aac  AAC (Advanced Audio Coding)\n"
+
+    monkeypatch.setattr("drova_voice.encode.shutil.which", lambda name: name)
+    monkeypatch.setattr("drova_voice.encode.subprocess.run", lambda *a, **k: Result())
+    with pytest.raises(ValueError, match="libvorbis"):
+        find_tools()
+
+
+@needs_ffmpeg
+def test_output_is_48khz_mono_vorbis(tmp_path):
+    import subprocess
+
+    ffmpeg, ffprobe = find_tools()
+    wav = tmp_path / "in.wav"
+    sine_wav(wav, rate=44100)
+    dst = tmp_path / "x.ogg"
+    encode_one(ffmpeg, ffprobe, wav, dst, [], "k")
+    info = subprocess.run([ffprobe, "-v", "error", "-show_entries", "stream=codec_name,sample_rate,channels",
+                           "-of", "csv=p=0", str(dst)], capture_output=True, text=True, check=True).stdout.strip()
+    assert info == "vorbis,48000,1"
+
+
 def test_find_tools_reports_missing_ffmpeg(monkeypatch):
     monkeypatch.setattr("drova_voice.encode.shutil.which", lambda name: None)
     with pytest.raises(ValueError, match="ffmpeg"):
@@ -62,10 +86,10 @@ def test_find_tools_reports_missing_ffmpeg(monkeypatch):
 def test_encode_one_trims_silence_and_is_resumable(tmp_path):
     ffmpeg, ffprobe = find_tools()
     wav = tmp_path / "in.wav"
-    sine_wav(wav, seconds=1.0, lead_silence=0.5)
+    sine_wav(wav, seconds=1.0, lead_silence=0.5, trail_silence=0.5)
     dst = tmp_path / "out" / "dialog" / "x.ogg"
     duration = encode_one(ffmpeg, ffprobe, wav, dst, [], "key1")
-    assert dst.is_file() and 0.8 < duration < 1.3  # Stille vorn ist weg (vorher 1,5 s)
+    assert dst.is_file() and 0.8 < duration < 1.3  # Stille vorn und hinten ist weg (vorher 2,0 s)
     stamp_before = dst.stat().st_mtime_ns
     assert encode_one(ffmpeg, ffprobe, wav, dst, [], "key1") == pytest.approx(duration, abs=0.01)
     assert dst.stat().st_mtime_ns == stamp_before  # nichts neu kodiert
