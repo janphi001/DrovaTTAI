@@ -13,6 +13,7 @@ from drova_voice.emote import merge_emotions, read_emotions, write_emotions
 from drova_voice.encode import run_encode
 from drova_voice.engines.client import EngineClient, cache_env, worker_command
 from drova_voice.fish_voices import load_fish_voices
+from drova_voice.install import install_audio
 from drova_voice.jsonl import append_jsonl, latest_by_id, read_jsonl_lenient, write_jsonl
 from drova_voice.lines import (Line, build_lines, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
 from drova_voice.synth import build_jobs, run_synth
@@ -168,12 +169,29 @@ def _encode(cfg: Config, args: argparse.Namespace) -> int:
     return 1 if errors else 0
 
 
+def _install(cfg: Config, args: argparse.Namespace) -> int:
+    lines = _selected(cfg, args)
+    if lines is None:
+        return 2
+    encoded = latest_by_id(read_jsonl_lenient(encoded_path(cfg)))
+    if not encoded:
+        return _fail(f"{encoded_path(cfg)} fehlt oder ist leer (zuerst `drova-voice encode` ausführen)")
+    wanted = {l.id for l in lines}
+    rows = [r for i, r in encoded.items() if i in wanted]
+    result = install_audio(rows, audio_dir(cfg), cfg.install_dir, cfg.language)
+    print(f"{result.copied} Dateien kopiert, index.json mit {result.entries} Einträgen -> {cfg.install_dir}")
+    for e in result.errors[:10]:
+        print(f"FEHLER {e}", file=sys.stderr)
+    return 1 if result.errors else 0
+
+
 HANDLERS: dict[str, Callable[[Config, argparse.Namespace], int]] = {
     "extract": _extract,
     "cast": _cast,
     "emote": _emote,
     "synth": _synth,
     "encode": _encode,
+    "install": _install,
 }
 
 
@@ -193,3 +211,5 @@ def add_parsers(sub) -> None:
     en = sub.add_parser("encode", help="WAV -> OGG (Stille trimmen, -16 LUFS, mono) nach out/audio/<Sprache>")
     en.add_argument("--workers", type=int, default=4)
     en.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
+    ins = sub.add_parser("install", help="Dateien in den Mod-Ordner kopieren und index.json schreiben")
+    ins.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht (frühere Einträge bleiben erhalten)")
