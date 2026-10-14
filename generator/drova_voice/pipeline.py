@@ -9,6 +9,7 @@ from typing import Callable
 
 from drova_voice.casting import cast_report, load_casting
 from drova_voice.config import Config
+from drova_voice.emote import merge_emotions, read_emotions, write_emotions
 from drova_voice.fish_voices import load_fish_voices
 from drova_voice.lines import (Line, build_lines, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
 
@@ -75,9 +76,28 @@ def _cast(cfg: Config, args: argparse.Namespace) -> int:
     return 1 if report.missing else 0
 
 
+def emotions_path(cfg: Config) -> Path:
+    return cfg.casting_dir / "emotions.jsonl"
+
+
+def _emote(cfg: Config, args: argparse.Namespace) -> int:
+    lines = _selected(cfg, args)
+    if lines is None:
+        return 2
+    try:
+        merged = merge_emotions(read_emotions(emotions_path(cfg)), lines)
+    except ValueError as e:
+        return _fail(str(e))
+    write_emotions(emotions_path(cfg), merged)
+    sources = Counter(t.source for t in merged.values())
+    print(f"{len(merged)} Emotionen -> {emotions_path(cfg)}; " + ", ".join(f"{s}: {n}" for s, n in sorted(sources.items())))
+    return 0
+
+
 HANDLERS: dict[str, Callable[[Config, argparse.Namespace], int]] = {
     "extract": _extract,
     "cast": _cast,
+    "emote": _emote,
 }
 
 
@@ -87,3 +107,5 @@ def add_parsers(sub) -> None:
     cast = sub.add_parser("cast", help="Prüft, ob jeder Sprecher eine Stimme hat (casting/casting.yaml)")
     cast.add_argument("--check", action="store_true", help="nur prüfen (Standard und einzige Betriebsart in Plan 3)")
     cast.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
+    em = sub.add_parser("emote", help="Emotionen aus Regieanweisungen nach casting/emotions.jsonl (llm/manual bleiben)")
+    em.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
