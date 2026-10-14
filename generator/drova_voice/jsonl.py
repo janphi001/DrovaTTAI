@@ -40,3 +40,33 @@ def read_jsonl(path: Path) -> list[dict]:
     # Nur "\n" als Trennzeichen: str.splitlines() würde auch U+2028/U+2029/U+0085 splitten,
     # die json.dumps(ensure_ascii=False) roh schreibt.
     return [json.loads(line) for line in Path(path).read_text(encoding="utf-8-sig").split("\n") if line.strip()]
+
+
+def append_jsonl(path: Path, row: dict) -> None:
+    # Anhängen statt neu schreiben: Ein Abbruch kostet höchstens die letzte (halbe) Zeile.
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8", newline="\n") as f:
+        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def read_jsonl_lenient(path: Path) -> list[dict]:
+    """Wie read_jsonl, aber: fehlende Datei -> [], nicht lesbare Zeilen (z. B. abgebrochenes Schreiben) werden übersprungen."""
+    path = Path(path)
+    if not path.exists():
+        return []
+    rows = []
+    for line in path.read_text(encoding="utf-8-sig").split("\n"):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
+def latest_by_id(rows: Iterable[dict]) -> dict[str, dict]:
+    return {row["id"]: row for row in rows if "id" in row}

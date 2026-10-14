@@ -1,0 +1,3 @@
+# Aussprache-Lexikon: Wort im Text -> so soll es gesprochen werden (Fantasienamen, Eigennamen).
+# Format: `Wort: Aussprache`. Wird beim extract-Schritt auf den Sprechtext angewendet.
+# Bewusst leer: Einträge kommen aus Hörtests (nur Wörter, keine Sätze aus dem Spiel).

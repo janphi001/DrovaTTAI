@@ -13,6 +13,7 @@ from drova_voice.emotions import EmotionTag
 from drova_voice.engines.client import EngineClient, EngineError, cache_env, worker_command
 from drova_voice.engines.protocol import SynthRequest
 from drova_voice.export_report import compute_coverage, format_report
+from drova_voice import pipeline
 from drova_voice.jsonl import read_jsonl, replace_with_retry, write_jsonl
 from drova_voice.render import render_request
 
@@ -63,6 +64,7 @@ def _parse(argv: list[str] | None) -> argparse.Namespace:
     rep.add_argument("--manifest", type=Path)
     rep.add_argument("--min-coverage", type=float, default=98.0)
     exp.add_parser("fetch", help="Export-Ordner aus dem Spielordner nach data/export kopieren")
+    pipeline.add_parsers(sub)
     return p.parse_args(argv)
 
 
@@ -82,6 +84,10 @@ def _run(args: argparse.Namespace) -> int:
     bake_out = cfg.out_dir / "bakeoff"
     samples_path = bake_data / "samples.jsonl"
     results_path = bake_out / "results.jsonl"
+
+    handler = pipeline.HANDLERS.get(args.cmd)
+    if handler is not None:
+        return handler(cfg, args)
 
     if args.cmd == "smoke":
         out = cfg.out_dir / "smoke" / f"{args.engine}.wav"

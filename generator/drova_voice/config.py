@@ -34,6 +34,18 @@ class Config:
     def workers_dir(self) -> Path:
         return self.repo_root / "generator" / "workers"
 
+    @property
+    def cache_dir(self) -> Path:
+        return self.repo_root / "cache"
+
+    @property
+    def casting_dir(self) -> Path:
+        return self.repo_root / "casting"
+
+    @property
+    def install_dir(self) -> Path:
+        return self.game_dir / "Mods" / "DrovaVoice" / "Audio" / self.language
+
 
 def load_config(path: Path) -> Config:
     try:

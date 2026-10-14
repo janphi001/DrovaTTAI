@@ -1,0 +1,116 @@
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Mapping, Sequence
+
+import yaml
+
+from drova_voice.export_report import loca_path_of
+from drova_voice.ids import choice_id, normalize_loca_path, statement_id
+from drova_voice.jsonl import read_jsonl, write_jsonl
+from drova_voice.loc import parse_loc
+from drova_voice.speech_text import build_speech_text
+
+SKIP_GVAR = "gvar"
+SKIP_UNSPEAKABLE = "unspeakable"
+SKIP_ID_MISMATCH = "id_mismatch"
+
+
+@dataclass(frozen=True)
+class Line:
+    id: str
+    tree: str
+    loca_path: str
+    loca_key: str
+    node_type: str
+    choice_index: int | None
+    actor: str
+    category: str
+    generic: bool
+    raw: str  # Text der .loc (oder des Manifests), noch mit Regieanweisungen und Platzhaltern
+    speech: str  # Sprechtext, leer bei übersprungenen Zeilen
+    stage: tuple[dict, ...] = ()  # [{"text": "seufzt", "pos": 0}], pos = Zeichenindex im Sprechtext
+    skip: str | None = None
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Line":
+        return cls(**{**d, "stage": tuple(d.get("stage", ()))})
+
+
+def load_loc_texts(loc_dir: Path, language: str) -> dict[tuple[str, str], str]:
+    texts: dict[tuple[str, str], str] = {}
+    loc_dir = Path(loc_dir)
+    for file in sorted(loc_dir.rglob("*.loc")):
+        path = loca_path_of(file, loc_dir, language)
+        for entry in parse_loc(file.read_text(encoding="utf-8-sig", errors="replace")).entries:
+            texts[(path, entry.key)] = entry.text
+    return texts
+
+
+def load_lexicon(path: Path) -> dict[str, str]:
+    path = Path(path)
+    if not path.exists():
+        return {}
+    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"{path}: Lexikon muss aus 'Wort: Aussprache'-Zeilen bestehen")
+    return {str(k): str(v) for k, v in raw.items()}
+
+
+def _expected_id(row: Mapping) -> str:
+    if row.get("nodeType") == "choice":
+        return choice_id(row["tree"], row["locaPath"], row["locaKey"], int(row["choiceIndex"]))
+    return statement_id(row["tree"], row["locaPath"], row["locaKey"])
+
+
+def build_lines(manifest: Mapping, loc_texts: Mapping[tuple[str, str], str],
+                lexicon: Mapping[str, str] | None = None) -> list[Line]:
+    seen: set[str] = set()
+    out: list[Line] = []
+    for row in manifest.get("lines", []):
+        line_id = row["id"]
+        if line_id in seen:  # gleiche Bäume können mehrfach im Speicher liegen
+            continue
+        seen.add(line_id)
+        path = normalize_loca_path(row["locaPath"])
+        raw = loc_texts.get((path, row["locaKey"]), row.get("text") or "")
+        try:
+            id_ok = _expected_id(row) == line_id
+        except (KeyError, TypeError, ValueError):
+            id_ok = False
+        speech, stage, skip = "", (), None
+        if not id_ok:
+            skip = SKIP_ID_MISMATCH
+        elif "$GVAR:" in raw:
+            skip = SKIP_GVAR
+        else:
+            st = build_speech_text(raw, None, lexicon)
+            if st.is_speakable:
+                speech, stage = st.text, tuple({"text": s.text, "pos": s.pos} for s in st.stage)
+            else:
+                skip = SKIP_UNSPEAKABLE
+        out.append(Line(
+            id=line_id, tree=row["tree"], loca_path=path, loca_key=row["locaKey"], node_type=row["nodeType"],
+            choice_index=row.get("choiceIndex"), actor=row.get("actorName") or "", category=row.get("category") or "dialog",
+            generic=bool(row.get("generic")), raw=raw, speech=speech, stage=stage, skip=skip,
+        ))
+    return out
+
+
+def select_npc(lines: Sequence[Line], npc: str) -> list[Line]:
+    """Alle Zeilen der Bäume, in denen der NPC spricht (inklusive Spieler-Auswahloptionen derselben Bäume)."""
+    wanted = npc.lower()
+    trees = {l.tree for l in lines if l.actor.lower() == wanted}
+    return [l for l in lines if l.tree in trees]
+
+
+def write_lines(path: Path, lines: Sequence[Line]) -> None:
+    write_jsonl(path, (l.to_dict() for l in lines))
+
+
+def read_lines(path: Path) -> list[Line]:
+    return [Line.from_dict(d) for d in read_jsonl(path)]
