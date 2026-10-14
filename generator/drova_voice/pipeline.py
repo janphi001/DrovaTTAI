@@ -10,8 +10,11 @@ from typing import Callable
 from drova_voice.casting import cast_report, load_casting
 from drova_voice.config import Config
 from drova_voice.emote import merge_emotions, read_emotions, write_emotions
+from drova_voice.engines.client import EngineClient, cache_env, worker_command
 from drova_voice.fish_voices import load_fish_voices
+from drova_voice.jsonl import append_jsonl
 from drova_voice.lines import (Line, build_lines, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
+from drova_voice.synth import build_jobs, run_synth
 
 WORKERS_DIR = Path(__file__).resolve().parents[1] / "workers"
 
@@ -94,10 +97,52 @@ def _emote(cfg: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def synth_results_path(cfg: Config) -> Path:
+    return cfg.data_dir / "synth" / "results.jsonl"
+
+
+def _client_factory(cfg: Config):
+    def make(engine: str) -> EngineClient:
+        return EngineClient(worker_command(WORKERS_DIR, engine), env=cache_env(cfg.cache_dir))
+    return make
+
+
+def _synth(cfg: Config, args: argparse.Namespace) -> int:
+    lines = _selected(cfg, args)
+    if lines is None:
+        return 2
+    try:
+        voices, casting = _load_casting(cfg)
+        emotions = read_emotions(emotions_path(cfg))
+    except (OSError, ValueError) as e:
+        return _fail(str(e))
+    jobs, skipped = build_jobs(lines, casting, voices, emotions, args.engine)
+    if args.limit:
+        jobs = jobs[: args.limit]
+    cache_dir = cfg.cache_dir / "synth"
+    path = synth_results_path(cfg)
+    results = run_synth(jobs, args.engine, _client_factory(cfg), cache_dir, args.workers,
+                        on_result=lambda r: append_jsonl(path, r.to_dict()))
+    done = [r for r in results if r.ok]
+    new = [r for r in done if r.attempts > 0]
+    failed = [r for r in results if not r.ok]
+    flagged = [r for r in done if r.flagged]
+    reasons = Counter(skipped.values())
+    detail = ", ".join(f"{k}: {n}" for k, n in sorted(reasons.items())) or "keine"
+    print(f"{len(done)} erzeugt ({len(done) - len(new)} aus dem Cache, {len(new)} neu erzeugt), {len(failed)} Fehler, "
+          f"{len(flagged)} auffällige Dauer; übersprungen: {detail}")
+    for r in failed[:10]:
+        print(f"FEHLER {r.id}: {r.error}", file=sys.stderr)
+    for r in flagged[:10]:
+        print(f"AUFFÄLLIG {r.id}: Dauer {r.duration:.1f} s", file=sys.stderr)
+    return 1 if failed else 0
+
+
 HANDLERS: dict[str, Callable[[Config, argparse.Namespace], int]] = {
     "extract": _extract,
     "cast": _cast,
     "emote": _emote,
+    "synth": _synth,
 }
 
 
@@ -109,3 +154,8 @@ def add_parsers(sub) -> None:
     cast.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
     em = sub.add_parser("emote", help="Emotionen aus Regieanweisungen nach casting/emotions.jsonl (llm/manual bleiben)")
     em.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
+    sy = sub.add_parser("synth", help="Sprache erzeugen (Cache unter cache/synth, wiederaufnehmbar)")
+    sy.add_argument("--engine", default="fish")
+    sy.add_argument("--workers", type=int, default=8, help="parallele Anfragen (Standard 8, gemessen ohne 429 bis 16)")
+    sy.add_argument("--limit", type=int, help="nur die ersten N Aufträge (zum Ausprobieren)")
+    sy.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
