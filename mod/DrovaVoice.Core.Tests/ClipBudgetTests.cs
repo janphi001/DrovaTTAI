@@ -101,5 +101,14 @@ namespace DrovaVoice.Core.Tests
             Assert.Equal(new[] { "a", "b", "c" }, evicted.ToArray());
             Assert.Equal(90, b.TotalBytes);
         }
+    
+        [Fact]
+        public void ProtectedCountBelowOneIsTreatedAsOne()
+        {
+            var b = new ClipBudget(10, 0);
+            Assert.Empty(b.Add("a", 100));       // der jüngste Eintrag bleibt immer
+            Assert.Equal(new[] { "a" }, b.Add("b", 100));
+            Assert.True(b.Contains("b"));
+        }
     }
 }

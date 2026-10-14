@@ -31,6 +31,26 @@ namespace DrovaVoice.Core
             return Statement(tree, locaPath, locaKey) + Separator + "c" + choiceIndex.ToString(CultureInfo.InvariantCulture);
         }
 
+        /// <summary>Loca-Pfad einer Zeile: der globale Pfad der Aussage, falls sie einen nutzt, sonst der Pfad des Baums (wie im Export).</summary>
+        public static string ResolveLocaPath(bool useGlobalLoca, string? globalLocaPath, string? treeLocaPath)
+            => (useGlobalLoca ? globalLocaPath : treeLocaPath) ?? string.Empty;
+
+        /// <summary>Wie <see cref="Statement"/>, aber ohne Ausnahme: false bei leeren oder unzulässigen Teilen.</summary>
+        public static bool TryStatement(string? tree, string? locaPath, string? locaKey, out string id)
+        {
+            id = string.Empty;
+            try { id = Statement(tree!, locaPath!, locaKey!); return true; }
+            catch (ArgumentException) { id = string.Empty; return false; }
+        }
+
+        /// <summary>Wie <see cref="Choice"/>, aber ohne Ausnahme.</summary>
+        public static bool TryChoice(string? tree, string? locaPath, string? locaKey, int choiceIndex, out string id)
+        {
+            id = string.Empty;
+            try { id = Choice(tree!, locaPath!, locaKey!, choiceIndex); return true; }
+            catch (ArgumentException) { id = string.Empty; return false; }
+        }
+
         public static string WithVariant(string lineId, string? variant)
         {
             if (string.IsNullOrEmpty(variant)) return lineId;

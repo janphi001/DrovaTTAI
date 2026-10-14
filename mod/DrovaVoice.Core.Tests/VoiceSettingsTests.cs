@@ -80,5 +80,17 @@ namespace DrovaVoice.Core.Tests
             Assert.Equal(60, s.PercentFor(VoiceCategory.Player));
             Assert.True(s.Diagnostics);
         }
+    
+        [Theory]
+        [InlineData(0, 8)]
+        [InlineData(200, 512)]
+        public void BoundaryValuesPassWithoutWarnings(int percent, int cacheMb)
+        {
+            var w = new List<string>();
+            var s = VoiceSettings.Create(true, percent, percent, "de", cacheMb, false, w);
+            Assert.Equal(percent, s.DialogPercent);
+            Assert.Equal(cacheMb, s.CacheMegabytes);
+            Assert.Empty(w);
+        }
     }
 }

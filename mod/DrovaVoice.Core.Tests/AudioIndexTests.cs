@@ -110,5 +110,44 @@ namespace DrovaVoice.Core.Tests
         [InlineData("bark/x.ogg", VoiceCategory.Dialog)]
         public void CategoryComesFromFolder(string file, VoiceCategory expected) =>
             Assert.Equal(expected, AudioIndex.CategoryOf(file));
+    
+        private const string Choices = @"{
+  ""version"": 1, ""language"": ""de"",
+  ""entries"": {
+    ""DT_X|Dialog/A|Q1|c2"": {""file"": ""player/a.ogg"", ""duration"": 1},
+    ""DT_X|Dialog/A|Q2|c0"": {""file"": ""player/b.ogg"", ""duration"": 1},
+    ""DT_X|Dialog/A|Q2|c1"": {""file"": ""player/c.ogg"", ""duration"": 1},
+    ""DT_X|Dialog/A|Q3|c0#neutral"": {""file"": ""player/d.ogg"", ""duration"": 1},
+    ""DT_X|Dialog/A|S1"": {""file"": ""dialog/e.ogg"", ""duration"": 1}
+  }
+}";
+
+        [Fact]
+        public void UniqueChoiceByKeyFindsTheOnlyChoiceEntry()
+        {
+            var index = AudioIndex.Parse(Choices, "de");
+            Assert.True(index.TryGetUniqueChoice("DT_X|Dialog/A|Q1", out string id, out var entry));
+            Assert.Equal("DT_X|Dialog/A|Q1|c2", id);
+            Assert.Equal("player/a.ogg", entry.File);
+        }
+
+        [Fact]
+        public void UniqueChoiceByKeyIsRefusedWhenAmbiguous()
+        {
+            var index = AudioIndex.Parse(Choices, "de");
+            Assert.False(index.TryGetUniqueChoice("DT_X|Dialog/A|Q2", out string id, out _));
+            Assert.Equal("", id);
+        }
+
+        [Theory]
+        [InlineData("DT_X|Dialog/A|S1")]      // Aussage, keine Auswahl
+        [InlineData("DT_X|Dialog/A|Q3")]      // nur Variante vorhanden
+        [InlineData("DT_X|Dialog/A|nope")]
+        [InlineData("")]
+        public void UniqueChoiceByKeyMissesOtherKeys(string baseId)
+        {
+            var index = AudioIndex.Parse(Choices, "de");
+            Assert.False(index.TryGetUniqueChoice(baseId, out _, out _));
+        }
     }
 }

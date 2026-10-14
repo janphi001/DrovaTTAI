@@ -22,11 +22,13 @@ namespace DrovaVoice.Core
     {
         public const int SupportedVersion = 1;
         private readonly Dictionary<string, IndexEntry> _entries;
+        private readonly Dictionary<string, List<string>> _choiceIdsByStatement;
 
         private AudioIndex(Dictionary<string, IndexEntry> entries, int skipped)
         {
             _entries = entries;
             Skipped = skipped;
+            _choiceIdsByStatement = BuildChoiceLookup(entries.Keys);
         }
 
         public int Count => _entries.Count;
@@ -37,6 +39,40 @@ namespace DrovaVoice.Core
             if (!string.IsNullOrEmpty(id) && _entries.TryGetValue(id!, out var found)) { entry = found; return true; }
             entry = null!;
             return false;
+        }
+
+        /// <summary>
+        /// Fallback für Auswahloptionen: Verschiebt das Spiel die Optionsliste (einmalige Optionen, "Zurück"), passt der
+        /// Index <c>k</c> nicht mehr zum Export. Der Schlüssel der Zeile bestimmt den Text eindeutig; gibt es zu
+        /// <paramref name="statementId"/> (Baum|Pfad|Schlüssel) genau einen Auswahl-Eintrag, ist es die gesuchte Zeile.
+        /// </summary>
+        public bool TryGetUniqueChoice(string? statementId, out string choiceId, out IndexEntry entry)
+        {
+            choiceId = string.Empty;
+            entry = null!;
+            if (string.IsNullOrEmpty(statementId)) return false;
+            if (!_choiceIdsByStatement.TryGetValue(statementId!, out var ids) || ids.Count != 1) return false;
+            choiceId = ids[0];
+            entry = _entries[choiceId];
+            return true;
+        }
+
+        private static Dictionary<string, List<string>> BuildChoiceLookup(IEnumerable<string> ids)
+        {
+            var map = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            foreach (string id in ids)
+            {
+                if (id.IndexOf(LineIds.VariantSeparator) >= 0) continue;          // Varianten zählen nicht
+                int cut = id.LastIndexOf(LineIds.Separator);
+                if (cut < 0 || cut + 2 > id.Length || id[cut + 1] != 'c') continue;
+                bool digits = id.Length > cut + 2;
+                for (int i = cut + 2; i < id.Length; i++) if (id[i] < '0' || id[i] > '9') { digits = false; break; }
+                if (!digits) continue;
+                string statementId = id.Substring(0, cut);
+                if (!map.TryGetValue(statementId, out var list)) map[statementId] = list = new List<string>();
+                list.Add(id);
+            }
+            return map;
         }
 
         public static AudioIndex Parse(string json, string expectedLanguage)

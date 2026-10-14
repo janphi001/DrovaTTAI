@@ -98,5 +98,12 @@ namespace DrovaVoice.Core.Tests
 
         [Fact]
         public void EmptyArrayIsFine() => Gain.Apply(Array.Empty<float>(), 150);
+    
+        [Fact]
+        public void LimiterIsSymmetricForNegativeValues()
+        {
+            for (float y = 0f; y <= 4f; y += 0.05f)
+                Assert.Equal(-Gain.Limit(y), Gain.Limit(-y));
+        }
     }
 }
