@@ -10,9 +10,10 @@ from typing import Callable
 from drova_voice.casting import cast_report, load_casting
 from drova_voice.config import Config
 from drova_voice.emote import merge_emotions, read_emotions, write_emotions
+from drova_voice.encode import run_encode
 from drova_voice.engines.client import EngineClient, cache_env, worker_command
 from drova_voice.fish_voices import load_fish_voices
-from drova_voice.jsonl import append_jsonl
+from drova_voice.jsonl import append_jsonl, latest_by_id, read_jsonl_lenient, write_jsonl
 from drova_voice.lines import (Line, build_lines, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
 from drova_voice.synth import build_jobs, run_synth
 
@@ -138,11 +139,41 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
+def encoded_path(cfg: Config) -> Path:
+    return cfg.data_dir / "encoded.jsonl"
+
+
+def audio_dir(cfg: Config) -> Path:
+    return cfg.out_dir / "audio" / cfg.language
+
+
+def _encode(cfg: Config, args: argparse.Namespace) -> int:
+    lines = _selected(cfg, args)
+    if lines is None:
+        return 2
+    synth_rows = latest_by_id(read_jsonl_lenient(synth_results_path(cfg)))
+    if not synth_rows:
+        return _fail(f"{synth_results_path(cfg)} fehlt oder ist leer (zuerst `drova-voice synth` ausführen)")
+    try:
+        emotions = read_emotions(emotions_path(cfg))
+        rows, errors = run_encode(lines, synth_rows, emotions, audio_dir(cfg), args.workers)
+    except ValueError as e:
+        return _fail(str(e))
+    merged = latest_by_id(read_jsonl_lenient(encoded_path(cfg)))
+    merged.update({r["id"]: r for r in rows})
+    write_jsonl(encoded_path(cfg), merged.values())
+    print(f"{len(rows)} kodiert -> {audio_dir(cfg)}; {len(errors)} Fehler")
+    for e in errors[:10]:
+        print(f"FEHLER {e}", file=sys.stderr)
+    return 1 if errors else 0
+
+
 HANDLERS: dict[str, Callable[[Config, argparse.Namespace], int]] = {
     "extract": _extract,
     "cast": _cast,
     "emote": _emote,
     "synth": _synth,
+    "encode": _encode,
 }
 
 
@@ -159,3 +190,6 @@ def add_parsers(sub) -> None:
     sy.add_argument("--workers", type=int, default=8, help="parallele Anfragen (Standard 8, gemessen ohne 429 bis 16)")
     sy.add_argument("--limit", type=int, help="nur die ersten N Aufträge (zum Ausprobieren)")
     sy.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
+    en = sub.add_parser("encode", help="WAV -> OGG (Stille trimmen, -16 LUFS, mono) nach out/audio/<Sprache>")
+    en.add_argument("--workers", type=int, default=4)
+    en.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
