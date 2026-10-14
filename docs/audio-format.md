@@ -35,3 +35,9 @@ Dateien sind OGG Vorbis, **48 kHz**, mono, auf −16 LUFS angeglichen, Stille am
 - `variants` listet je Basis-ID die vorhandenen Varianten; Zeilen ohne Variante stehen nicht darin. Fehlt die gewünschte Variante, gilt die Basis-ID.
 - Zeilen ohne Eintrag bleiben stumm (Untertitel wie im Original). Es gibt keine Einträge für Zeilen mit `$GVAR:` im Text, bis die Namensvarianten gebaut sind.
 - Der Generator ergänzt den Index bei jedem `install` (frühere Einträge bleiben, solange ihre Datei existiert).
+
+## Lautstärke
+
+- Alle Dateien sind auf −16 LUFS normiert (Sprache), unabhängig von Figur und Emotion; wie laut das im Verhältnis zu Musik und Effekten des Spiels wirkt, lässt sich erst im Spiel beurteilen.
+- Deshalb muss die Mod Regler anbieten: Dialog, Spieler (später Barks, Briefe), jeweils in Prozent. Der Bereich geht über 100 % hinaus (Boost, z. B. bis 200 %): `AudioSource.volume` endet bei 1,0, also wird die Verstärkung beim Dekodieren auf die Samples angewendet (mit Begrenzung gegen Übersteuern).
+- Der Generator ändert die Dateien dafür nicht; eine andere Zielloudness wäre nur ein neuer `encode`-Lauf (Konstante `LOUDNORM` in `generator/drova_voice/encode.py`).
