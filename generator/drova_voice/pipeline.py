@@ -16,6 +16,7 @@ from drova_voice.fish_voices import load_fish_voices
 from drova_voice.install import install_audio
 from drova_voice.jsonl import append_jsonl, latest_by_id, read_jsonl_lenient, write_jsonl
 from drova_voice.lines import (Line, build_lines, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
+from drova_voice.report import build_report, format_report
 from drova_voice.synth import build_jobs, run_synth
 
 WORKERS_DIR = Path(__file__).resolve().parents[1] / "workers"
@@ -185,6 +186,24 @@ def _install(cfg: Config, args: argparse.Namespace) -> int:
     return 1 if result.errors else 0
 
 
+def _report(cfg: Config, args: argparse.Namespace) -> int:
+    lines = _selected(cfg, args)
+    if lines is None:
+        return 2
+    try:
+        _, casting = _load_casting(cfg)
+    except (OSError, ValueError) as e:
+        return _fail(str(e))
+    index_path = cfg.install_dir / "index.json"
+    entries = {}
+    if index_path.is_file():
+        entries = json.loads(index_path.read_text(encoding="utf-8-sig")).get("entries", {})
+    statuses = build_report(lines, casting, latest_by_id(read_jsonl_lenient(synth_results_path(cfg))),
+                            latest_by_id(read_jsonl_lenient(encoded_path(cfg))), entries)
+    print(format_report(statuses))
+    return 0
+
+
 HANDLERS: dict[str, Callable[[Config, argparse.Namespace], int]] = {
     "extract": _extract,
     "cast": _cast,
@@ -192,6 +211,7 @@ HANDLERS: dict[str, Callable[[Config, argparse.Namespace], int]] = {
     "synth": _synth,
     "encode": _encode,
     "install": _install,
+    "report": _report,
 }
 
 
@@ -213,3 +233,5 @@ def add_parsers(sub) -> None:
     en.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
     ins = sub.add_parser("install", help="Dateien in den Mod-Ordner kopieren und index.json schreiben")
     ins.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht (frühere Einträge bleiben erhalten)")
+    rp = sub.add_parser("report", help="Status je Kategorie: offen, erzeugt, kodiert, installiert, übersprungen")
+    rp.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
