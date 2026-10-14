@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using DrovaVoice.Core;
+using Drova_Modding_API.Systems.Audio;
+using Drova_Modding_API.Systems.WorldEvents;
 using Il2CppCustomFramework.Localization;
 using DrovaVoice.Export;
+using DrovaVoice.Playback;
 using MelonLoader;
 using MelonLoader.Utils;
 using UnityEngine;
@@ -23,6 +26,9 @@ namespace DrovaVoice
         private bool _exportTriggerStuck;
         private bool _exportAllTriggerStuck;
         private bool _exportNpcsTriggerStuck;
+        private VoiceService? _voice;
+        private bool _connectorInstalled;
+        private bool _connectorFailed;
 
         private string ModDir => Path.Combine(MelonEnvironment.ModsDirectory, "DrovaVoice");
         private string TriggerPath => Path.Combine(ModDir, "export.trigger");
@@ -31,15 +37,70 @@ namespace DrovaVoice
 
         public override void OnInitializeMelon()
         {
-            _language = MelonPreferences.CreateCategory("DrovaVoice").CreateEntry("ExportLanguage", "de", description: "Sprache des Exports (Ordnername)");
+            var category = MelonPreferences.CreateCategory("DrovaVoice");
+            _language = category.CreateEntry("ExportLanguage", "de", description: "Sprache des Exports (Ordnername)");
+            var enabled = category.CreateEntry("Enabled", true, description: "Vertonung an/aus");
+            var dialogVolume = category.CreateEntry("DialogVolume", 100, description: "Lautstärke NPC-Stimmen in Prozent (0-200, über 100 = Verstärkung)");
+            var playerVolume = category.CreateEntry("PlayerVolume", 100, description: "Lautstärke Spielerzeilen in Prozent (0-200, über 100 = Verstärkung)");
+            var audioLanguage = category.CreateEntry("AudioLanguage", "de", description: "Unterordner unter Mods/DrovaVoice/Audio");
+            var cacheMb = category.CreateEntry("CacheMB", 64, description: "Obergrenze für geladene Clips in MB (8-512)");
+            var diagnostics = category.CreateEntry("Diagnostics", false, description: "Jede Zeile einmal loggen (geladen/ohne Eintrag)");
             Directory.CreateDirectory(ModDir);
             string probe = LineIds.AudioFileName(LineIds.Statement("DT_Main_NPC_Adela", "Dialog/NPC_Adela", "Plh_5"));
             LoggerInstance.Msg($"DrovaVoice {Info.Version} geladen (Core ok: {probe}). Export: Datei export.trigger in {ModDir} anlegen oder F9 drücken.");
+
+            var warnings = new List<string>();
+            var settings = VoiceSettings.Create(enabled.Value, dialogVolume.Value, playerVolume.Value, audioLanguage.Value, cacheMb.Value, diagnostics.Value, warnings);
+            foreach (string w in warnings) LoggerInstance.Warning(w);
+            _voice = CreateVoice(settings);
+            ChoiceHook.Service = _voice;
+        }
+
+        private VoiceService? CreateVoice(VoiceSettings settings)
+        {
+            if (!settings.Enabled) { LoggerInstance.Msg("Vertonung ist ausgeschaltet (Enabled=false)."); return null; }
+            string root = Path.Combine(ModDir, "Audio", settings.Language);
+            string indexPath = Path.Combine(root, "index.json");
+            try
+            {
+                if (!File.Exists(indexPath)) { LoggerInstance.Warning($"Kein index.json unter {indexPath}; Vertonung bleibt aus."); return null; }
+                var index = AudioIndex.Parse(File.ReadAllText(indexPath), settings.Language);
+                LoggerInstance.Msg($"Index: {index.Count} Zeilen ({index.Skipped} übersprungen), Dialog {settings.DialogPercent} %, Spieler {settings.PlayerPercent} %, Cache {settings.CacheMegabytes} MB.");
+                return new VoiceService(index, root, settings, LoggerInstance);
+            }
+            catch (Exception e)
+            {
+                LoggerInstance.Error($"Index nicht nutzbar, Vertonung bleibt aus: {e.GetType().Name}: {e.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// AudioManager der API legt in seinem statischen Konstruktor einen Provider an, der WorldEventSystemManager.Instance braucht;
+        /// im Hauptmenü ist die noch null, und ein fehlgeschlagener statischer Konstruktor bleibt dauerhaft kaputt.
+        /// Deshalb wird der Connector erst ersetzt, wenn die Instanz existiert.
+        /// </summary>
+        private void TryInstallConnector()
+        {
+            if (_voice == null || _connectorInstalled || _connectorFailed) return;
+            if (WorldEventSystemManager.Instance == null) return;
+            try
+            {
+                AudioManager.ReplaceDialogueAudioConnector(new VoiceConnector(_voice));
+                _connectorInstalled = true;
+                LoggerInstance.Msg("Audio-Connector der Modding API ersetzt.");
+            }
+            catch (Exception e)
+            {
+                _connectorFailed = true;
+                LoggerInstance.Error($"Connector konnte nicht ersetzt werden, Vertonung bleibt aus: {e.GetType().Name}: {e.Message}");
+            }
         }
 
         public override void OnUpdate()
         {
             _frame++;
+            if (_frame % 60 == 15) TryInstallConnector();
             bool trigger = false;
             if (_frame % 60 == 0 && ConsumeTrigger(TriggerPath, ref _exportTriggerStuck)) trigger = true;
             if (!trigger && HotkeyPressed()) trigger = true;
