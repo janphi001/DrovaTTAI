@@ -41,7 +41,7 @@
 
 | Datei | Verantwortung |
 |---|---|
-| `mod/DrovaVoice.Core/AudioIndex.cs` (neu) | `LineCategory`, `IndexEntry`, `IndexFormatException`, `AudioIndex` (Parsen, Lookup, Pfadsicherheit) |
+| `mod/DrovaVoice.Core/AudioIndex.cs` (neu) | `VoiceCategory`, `IndexEntry`, `IndexFormatException`, `AudioIndex` (Parsen, Lookup, Pfadsicherheit) |
 | `mod/DrovaVoice.Core/Gain.cs` (neu) | Prozent → Faktor, Anwendung mit weichem Begrenzer |
 | `mod/DrovaVoice.Core/ClipBudget.cs` (neu) | LRU-Verwaltung nach Bytes mit geschützten jüngsten Einträgen |
 | `mod/DrovaVoice.Core/VoiceSettings.cs` (neu) | validierte Einstellungen, Warnungen |
@@ -69,12 +69,12 @@ Testbefehl für Core: `dotnet test mod/DrovaVoice.Core.Tests` (aus der Repo-Wurz
 
 **Interfaces:**
 - Produces:
-  - `enum LineCategory { Dialog, Player }`
-  - `sealed record IndexEntry(string File, double Duration, LineCategory Category)`
+  - `enum VoiceCategory { Dialog, Player }`
+  - `sealed record IndexEntry(string File, double Duration, VoiceCategory Category)`
   - `sealed class IndexFormatException : Exception`
   - `AudioIndex.Parse(string json, string expectedLanguage) -> AudioIndex` (wirft `IndexFormatException`)
   - `AudioIndex.TryGet(string? id, out IndexEntry entry) -> bool`; `AudioIndex.Count`, `AudioIndex.Skipped`
-  - `AudioIndex.IsSafeRelativePath(string file) -> bool`, `AudioIndex.ResolvePath(string root, string file) -> string?`, `AudioIndex.CategoryOf(string file) -> LineCategory`
+  - `AudioIndex.IsSafeRelativePath(string file) -> bool`, `AudioIndex.ResolvePath(string root, string file) -> string?`, `AudioIndex.CategoryOf(string file) -> VoiceCategory`
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -107,9 +107,9 @@ namespace DrovaVoice.Core.Tests
             Assert.True(index.TryGet("DT_X|Dialog/A|Plh_1", out var a));
             Assert.Equal("dialog/0123456789abcdef.ogg", a.File);
             Assert.Equal(3.214, a.Duration, 3);
-            Assert.Equal(LineCategory.Dialog, a.Category);
+            Assert.Equal(VoiceCategory.Dialog, a.Category);
             Assert.True(index.TryGet("DT_X|Dialog/A|Plh_2|c0", out var b));
-            Assert.Equal(LineCategory.Player, b.Category);
+            Assert.Equal(VoiceCategory.Player, b.Category);
         }
 
         [Fact]
@@ -188,10 +188,10 @@ namespace DrovaVoice.Core.Tests
         }
 
         [Theory]
-        [InlineData("player/default/x.ogg", LineCategory.Player)]
-        [InlineData("dialog/x.ogg", LineCategory.Dialog)]
-        [InlineData("bark/x.ogg", LineCategory.Dialog)]
-        public void CategoryComesFromFolder(string file, LineCategory expected) =>
+        [InlineData("player/default/x.ogg", VoiceCategory.Player)]
+        [InlineData("dialog/x.ogg", VoiceCategory.Dialog)]
+        [InlineData("bark/x.ogg", VoiceCategory.Dialog)]
+        public void CategoryComesFromFolder(string file, VoiceCategory expected) =>
             Assert.Equal(expected, AudioIndex.CategoryOf(file));
     }
 }
@@ -216,9 +216,9 @@ using System.Text.Json;
 
 namespace DrovaVoice.Core
 {
-    public enum LineCategory { Dialog, Player }
+    public enum VoiceCategory { Dialog, Player }
 
-    public sealed record IndexEntry(string File, double Duration, LineCategory Category);
+    public sealed record IndexEntry(string File, double Duration, VoiceCategory Category);
 
     public sealed class IndexFormatException : Exception
     {
@@ -285,8 +285,8 @@ namespace DrovaVoice.Core
             }
         }
 
-        public static LineCategory CategoryOf(string file) =>
-            file.StartsWith("player/", StringComparison.Ordinal) ? LineCategory.Player : LineCategory.Dialog;
+        public static VoiceCategory CategoryOf(string file) =>
+            file.StartsWith("player/", StringComparison.Ordinal) ? VoiceCategory.Player : VoiceCategory.Dialog;
 
         /// <summary>Relativ, mit '/', ohne '..', ohne Laufwerk, ohne Rückwärtsstrich.</summary>
         public static bool IsSafeRelativePath(string file)
@@ -724,10 +724,10 @@ git commit -m "Add the LRU clip budget with protected recent entries"
 - Test: `mod/DrovaVoice.Core.Tests/VoiceSettingsTests.cs`, `mod/DrovaVoice.Core.Tests/OnceLogTests.cs`
 
 **Interfaces:**
-- Consumes: `LineCategory` (Task 1), `Gain.MaxPercent` (Task 2).
+- Consumes: `VoiceCategory` (Task 1), `Gain.MaxPercent` (Task 2).
 - Produces:
   - `VoiceSettings.Create(bool enabled, int dialogPercent, int playerPercent, string? language, int cacheMegabytes, bool diagnostics, List<string> warnings) -> VoiceSettings`
-  - Eigenschaften `Enabled`, `DialogPercent`, `PlayerPercent`, `Language`, `CacheMegabytes`, `Diagnostics`, `CacheBytes` (long); `PercentFor(LineCategory) -> int`
+  - Eigenschaften `Enabled`, `DialogPercent`, `PlayerPercent`, `Language`, `CacheMegabytes`, `Diagnostics`, `CacheBytes` (long); `PercentFor(VoiceCategory) -> int`
   - `new OnceLog(int cap = 10000)`, `OnceLog.ShouldLog(string key) -> bool`
 
 - [ ] **Step 1: Write the failing tests**
@@ -813,8 +813,8 @@ namespace DrovaVoice.Core.Tests
         public void PercentForUsesCategory()
         {
             var s = VoiceSettings.Create(true, 150, 60, "de", 64, true, new List<string>());
-            Assert.Equal(150, s.PercentFor(LineCategory.Dialog));
-            Assert.Equal(60, s.PercentFor(LineCategory.Player));
+            Assert.Equal(150, s.PercentFor(VoiceCategory.Dialog));
+            Assert.Equal(60, s.PercentFor(VoiceCategory.Player));
             Assert.True(s.Diagnostics);
         }
     }
@@ -885,7 +885,7 @@ namespace DrovaVoice.Core
         public bool Diagnostics { get; private set; }
         public long CacheBytes => CacheMegabytes * 1024L * 1024L;
 
-        public int PercentFor(LineCategory category) => category == LineCategory.Player ? PlayerPercent : DialogPercent;
+        public int PercentFor(VoiceCategory category) => category == VoiceCategory.Player ? PlayerPercent : DialogPercent;
 
         public static VoiceSettings Create(bool enabled, int dialogPercent, int playerPercent, string? language,
                                            int cacheMegabytes, bool diagnostics, List<string> warnings)
@@ -1558,7 +1558,7 @@ git commit -m "Record the in-game playback result for Adela and Jero"
 
 - Spec §1 Umfang → Tasks 1–8; Nicht-Umfang bewusst nicht enthalten.
 - §2 Befunde → Plan-Befund (8) und Task 8 (Connector `OnDialogueTreeLoaded` No-op, `OnWorldDialogueStatement`, Choice-Prefix auf `OnExecute`).
-- §3 Architektur → Dateitabelle; `LineCategory` kommt aus dem Pfad (Task 1).
+- §3 Architektur → Dateitabelle; `VoiceCategory` kommt aus dem Pfad (Task 1).
 - §4 Ablauf, §7 Fehlerverhalten → Tasks 6–8 (500 ms, `_failed`, Einmal-Log, try/catch, Zerstören verdrängter Clips, Index-Fehler schalten ab).
 - §5 Lautstärke → Task 2 (100 % exakt, Begrenzer, Clamp) und Task 6 (Gain beim Laden).
 - §6 Einstellungen → Task 4 und Task 8 (`Diagnostics` zusätzlich, in Task 9 in der Spec nachgetragen).

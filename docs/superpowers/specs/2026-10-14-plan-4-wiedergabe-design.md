@@ -25,7 +25,7 @@ Stand: 2026-10-14 · Status: vom Nutzer im Chat freigegeben (Umfang, Ansatz A, R
 ```
 DrovaVoice.Core (net6.0, ohne Il2Cpp, xUnit)
 ├─ AudioIndex      index.json lesen, validieren, Lookup(id) -> IndexEntry(file, duration, category)
-├─ LineCategory    Dialog | Player (aus dem Dateipfad: "player/" -> Player, sonst Dialog)
+├─ VoiceCategory    Dialog | Player (aus dem Dateipfad: "player/" -> Player, sonst Dialog)
 ├─ Gain            Prozent -> Faktor, Anwendung auf float[] mit weichem Begrenzer
 ├─ ClipBudget      LRU nach Bytes; die jüngsten N Einträge sind unverdrängbar
 ├─ VoiceSettings   Enabled, DialogPercent, PlayerPercent, CacheMegabytes (gültige Bereiche)
