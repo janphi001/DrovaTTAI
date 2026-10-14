@@ -15,7 +15,8 @@ namespace DrovaVoice.Playback
         private readonly ClipLoader _loader;
         private readonly MelonLogger.Instance _log;
         private readonly HashSet<string> _failed = new HashSet<string>(StringComparer.Ordinal);
-        private readonly OnceLog _onceLog = new OnceLog();
+        private readonly OnceLog _lineLog = new OnceLog();   // Diagnose je Zeile (miss/hit)
+        private readonly OnceLog _problemLog = new OnceLog(); // Warnungen und Fehler, eigene Obergrenze
 
         public VoiceService(AudioIndex index, string audioRoot, VoiceSettings settings, MelonLogger.Instance log)
         {
@@ -26,34 +27,59 @@ namespace DrovaVoice.Playback
             _loader = new ClipLoader(audioRoot);
         }
 
+        public bool Diagnostics => _settings.Diagnostics;
+
         public AudioClip? GetClip(string? id)
         {
             if (string.IsNullOrEmpty(id)) return null;
             if (!_index.TryGet(id, out var entry))
             {
-                if (_settings.Diagnostics && _onceLog.ShouldLog("miss|" + id)) _log.Msg($"[Zeile] ohne Eintrag: {id}");
+                Diag("miss|" + id, $"[Zeile] ohne Eintrag: {id}");
                 return null;
             }
             if (_store.TryGet(id!, out var cached)) return cached;
             if (_failed.Contains(id!)) return null;
 
-            var clip = _loader.Load(id!, entry, _settings.PercentFor(entry.Category), out long bytes, out string? error);
+            var clip = _loader.Load(entry, _settings.PercentFor(entry.Category), out long bytes, out long elapsedMs, out string? error);
             if (clip == null)
             {
                 _failed.Add(id!);
-                if (_onceLog.ShouldLog("fail|" + id)) _log.Warning($"Zeile bleibt stumm ({error}): {id}");
+                Problem("fail|" + id, $"Zeile bleibt stumm ({error}): {id}", error: false);
                 return null;
             }
             _store.Put(id!, clip, bytes);
-            if (_settings.Diagnostics && _onceLog.ShouldLog("hit|" + id))
-                _log.Msg($"[Zeile] geladen: {id} ({entry.File}, {entry.Duration:0.00} s, {entry.Category}); Cache {_store.Count} Clips, {_store.TotalBytes / 1024 / 1024} MB");
+            if (elapsedMs > ClipLoader.SlowMilliseconds) Problem("slow|" + id, $"Laden dauerte {elapsedMs} ms (Ruckler möglich): {id}", error: false);
+            Diag("hit|" + id, $"[Zeile] geladen: {id} ({entry.File}, {entry.Duration:0.00} s, {entry.Category}, {elapsedMs} ms); Cache {_store.Count} Clips, {_store.TotalBytes / 1024 / 1024} MB");
             return clip;
         }
 
-        public void LogError(string where, Exception e)
+        /// <summary>
+        /// Auswahloption: erst die exakte ID (Baum|Pfad|Schlüssel|c&lt;k&gt;); passt <c>k</c> nicht mehr zum Export, weil das Spiel die
+        /// Optionsliste verändert hat, gilt der einzige Auswahl-Eintrag mit demselben Schlüssel.
+        /// </summary>
+        public AudioClip? GetChoiceClip(string statementId, string choiceId)
         {
-            if (_onceLog.ShouldLog("err|" + where + "|" + e.GetType().Name))
-                _log.Error($"{where}: {e.GetType().Name}: {e.Message}");
+            if (_index.TryGet(choiceId, out _)) return GetClip(choiceId);
+            if (_index.TryGetUniqueChoice(statementId, out string alternative, out _))
+            {
+                Diag("alt|" + choiceId, $"[Zeile] Option {choiceId} -> {alternative} (Index der Option hat sich verschoben)");
+                return GetClip(alternative);
+            }
+            return GetClip(choiceId);   // meldet den Fehltreffer
         }
+
+        public void Diag(string key, string message)
+        {
+            if (_settings.Diagnostics && _lineLog.ShouldLog(key)) _log.Msg(message);
+        }
+
+        public void Problem(string key, string message, bool error)
+        {
+            if (!_problemLog.ShouldLog(key)) return;
+            if (error) _log.Error(message); else _log.Warning(message);
+        }
+
+        public void LogError(string where, string? id, Exception e) =>
+            Problem("err|" + where + "|" + id + "|" + e.GetType().Name, $"{where}: {e.GetType().Name}: {e.Message} (Zeile: {id ?? "?"})", error: true);
     }
 }

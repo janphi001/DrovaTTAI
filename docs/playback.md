@@ -7,7 +7,7 @@ Die Mod spielt die vom Generator erzeugten Stimmen im Spiel ab. Grundlage: `docs
 1. Beim Start liest die Mod `Mods/DrovaVoice/Audio/<AudioLanguage>/index.json`. Fehlt sie oder passt Version oder Sprache nicht, bleibt die Vertonung aus und das Spiel läuft unverändert.
 2. Sobald das Spiel in einer Welt ist (`WorldEventSystemManager.Instance` existiert), ersetzt die Mod den Audio-Connector der Modding API durch den eigenen. Vorher nicht: Im Hauptmenü scheitert `AudioManager` und bliebe die ganze Sitzung kaputt.
 3. Führt das Spiel eine Aussage aus, fragt die API den Connector (nur wenn die Zeile noch keinen Clip hat). Der Connector bildet die Zeilen-ID (Baum, Loca-Pfad, Schlüssel), sucht sie im Index, dekodiert die OGG-Datei (NVorbis), wendet die Lautstärke an und hängt den `AudioClip` an die Zeile. Abgespielt wird er vom Spiel; die Untertitel laufen passend zur Cliplänge.
-4. Bei Auswahlknoten lädt ein Harmony-Prefix auf `DS_MultipleChoiceNode.OnExecute` die Clips aller Optionen (ID mit `|c<Index>`), damit die gewählte Option gesprochen wird.
+4. Bei Auswahlknoten, die die Auswahl sprechen (`saySelection`), lädt ein Harmony-Prefix auf `DS_MultipleChoiceNode.OnExecute` die Clips aller Optionen (ID mit `|c<Index>`), damit die gewählte Option gesprochen wird. Er ist erst aktiv, nachdem der Connector ersetzt wurde. Verschiebt das Spiel die Optionsliste, findet die Mod die Option über ihren Schlüssel.
 5. Geladene Clips bleiben im Cache (Standard 64 MB). Verdrängte Clips werden zerstört und beim nächsten Mal neu geladen; die 8 jüngsten werden nie verdrängt.
 
 Zeilen ohne Eintrag (und Zeilen mit `$GVAR:`) bleiben stumm, die Untertitel laufen wie im Original.
@@ -26,7 +26,7 @@ Datei: `<Spiel>/UserData/MelonPreferences.cfg`, Abschnitt `[DrovaVoice]` (entste
 | `Diagnostics` | `false` | — | Jede Zeile einmal loggen (geladen / ohne Eintrag) |
 | `ExportLanguage` | `de` | — | Ordnername des Exports (siehe `docs/export.md`) |
 
-Die Dateien sind auf −16 LUFS normiert; wie laut das im Verhältnis zu Musik und Effekten wirkt, muss man im Spiel hören. 100 % lässt die Dateien bit-genau unverändert; ab 101 % begrenzt ein weicher Begrenzer Spitzen über 0,8, damit nichts hart übersteuert (die lautesten Dateien erreichen 0,91).
+Die Dateien sind auf −16 LUFS normiert; wie laut das im Verhältnis zu Musik und Effekten wirkt, muss man im Spiel hören. 100 % lässt die Dateien bit-genau unverändert; ab 101 % begrenzt ein weicher Begrenzer Spitzen über 0,8, damit nichts hart übersteuert (über alle 255 Dateien, Dialog und Spieler, erreicht der höchste Peak 0,91).
 
 ## Log-Meldungen (`MelonLoader/Latest.log`)
 
@@ -34,9 +34,13 @@ Die Dateien sind auf −16 LUFS normiert; wie laut das im Verhältnis zu Musik u
 |---|---|
 | `Index: N Zeilen (M übersprungen) …` | Index gelesen; M = Einträge mit kaputtem Format oder unsicherem Pfad |
 | `Kein index.json unter …` / `Index nicht nutzbar …` | Vertonung bleibt aus; Pfad, Version, Sprache prüfen |
-| `Audio-Connector der Modding API ersetzt.` | Wiedergabe aktiv (erscheint erst in der Welt) |
+| `Audio-Connector der Modding API ersetzt.` | Wiedergabe aktiv (erscheint erst in der Welt, innerhalb eines Frames nach `WorldEventSystemManager.Instance`) |
 | `Connector konnte nicht ersetzt werden …` | `AudioManager` ist kaputt (z. B. durch einen zu frühen Zugriff einer anderen Mod); Vertonung bleibt aus |
-| `Zeile bleibt stumm (…): <ID>` | Datei fehlt/defekt/zu langsam (über 500 ms); nur einmal pro ID |
+| `Zeile bleibt stumm (…): <ID>` | Datei fehlt oder ist defekt; nur einmal pro ID |
+| `Laden dauerte N ms (Ruckler möglich): <ID>` | Zeile wurde trotzdem abgespielt; typisch nur bei der allerersten Zeile (JIT, kalter Dateicache) |
+| `[Zeile] Option … -> … (Index der Option hat sich verschoben)` | Das Spiel hat die Optionsliste verändert; der Eintrag wurde über den Schlüssel gefunden (nur `Diagnostics`) |
+| `[Zeile] Auswahlknoten … spricht die Auswahl nicht (saySelection aus)` | Der Knoten bleibt wie im Original ohne Spielerstimme (nur `Diagnostics`) |
+| `Export im Hauptmenü: …` | Ein Export im Hauptmenü macht die Vertonung in dieser Sitzung wirkungslos; Spiel neu starten |
 | `[Zeile] geladen: <ID> …` / `[Zeile] ohne Eintrag: <ID>` | nur mit `Diagnostics = true` |
 
 ## Abnahme-Checkliste (im Spiel)

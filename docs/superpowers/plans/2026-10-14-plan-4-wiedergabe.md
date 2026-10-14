@@ -14,7 +14,7 @@
 
 - Core bleibt ohne Il2Cpp und ohne Spielverzeichnis baubar (`net6.0`, nur BCL). Alles, was `UnityEngine`/Il2Cpp/NVorbis braucht, liegt in `mod/DrovaVoice/Playback`.
 - Ausnahmen in Hooks werden immer abgefangen; die Mod darf das Spiel nie anhalten oder Zeilen ändern, für die es keinen Eintrag gibt (Spec §7).
-- Das Dekodieren läuft synchron auf dem Hauptthread; dauert es länger als 500 ms, bleibt die Zeile stumm (Spec §4, §7).
+- Das Dekodieren läuft synchron auf dem Hauptthread; Ladezeiten über 500 ms werden nur gemeldet, der Clip bleibt (Spec §10, geändert nach dem Review).
 - 100 % Lautstärke ist bit-genau Identität (kein Begrenzer unter/bei 100 %); über 100 % weicher Begrenzer, Ausgabe nie über ±1,0.
 - Einstellungen: `Enabled` (Standard `true`), `DialogVolume` 100 (0–200), `PlayerVolume` 100 (0–200), `AudioLanguage` `de`, `CacheMB` 64 (8–512), `Diagnostics` `false` (Spec §6; `Diagnostics` ist neu, siehe Task 8).
 - **`AudioManager` der API erst anfassen, wenn `WorldEventSystemManager.Instance != null`** (siehe Plan-Befund unten), sonst bleibt die Klasse die ganze Sitzung unbrauchbar.
@@ -33,7 +33,7 @@
 - Boost 200 % bei lauten Samples: nie über ±1,0, 100 % unverändert (Task 2).
 - Cache über Budget, während ein Clip läuft: die jüngsten 8 werden nie verdrängt (Task 3).
 - Defekte, abgeschnittene oder leere OGG-Datei: `OggDecoder.TryDecode` gibt `false`, wirft nicht (Task 5, Smoke-Test).
-- Index mit UTF-8-BOM, falscher Sprache oder Version ≠ 1: Fehler mit klarer Meldung, kein Absturz (Task 1; Task 9 schaltet die Vertonung dann ab).
+- Index mit falscher Sprache oder Version ≠ 1: Fehler mit klarer Meldung, kein Absturz (Task 1; Task 8 schaltet die Vertonung dann ab). Ein UTF-8-BOM entfernt `File.ReadAllText`.
 
 ---
 
@@ -1564,3 +1564,9 @@ git commit -m "Record the in-game playback result for Adela and Jero"
 - §6 Einstellungen → Task 4 und Task 8 (`Diagnostics` zusätzlich, in Task 9 in der Spec nachgetragen).
 - §8 Phasen: Phase 0 entfällt als eigener Mess-Build, weil `Diagnostics` die Messung in Task 10 liefert; Phase 1–4 = Tasks 1–9, Phase 5 = Task 10.
 - Typ-Konsistenz: `IndexEntry(File, Duration, Category)`, `GetClip(string?)`, `ClipStore.Put(id, clip, bytes)`, `VoiceSettings.Create(..., List<string>)` stimmen in allen Tasks überein.
+
+---
+
+## Änderungen nach dem Review (2026-10-14)
+
+Der lesende Opus-Review fand Abweichungen, die nach der Umsetzung der Tasks 1–9 behoben wurden; maßgeblich ist Spec §10, der Code ist die Wahrheit, die Code-Blöcke der Tasks 6–8 oben sind der Stand vor dem Review. Geändert: `ClipLoader.Load(entry, percent, out bytes, out elapsedMs, out error)` (kein Verwerfen bei 500 ms, Ausnahmen gefangen, Clip im Fehlerpfad zerstört), `VoiceService.GetChoiceClip/Diag/Problem/LogError(where, id, e)`, `VoiceConnector` und `ChoiceHook` mit `LineIds.TryStatement/TryChoice/ResolveLocaPath`, `ChoiceHook` nur bei `saySelection` und erst nach dem Ersatz des Connectors, `AudioIndex.TryGetUniqueChoice`, Installation in jedem Frame, Export-Warnung im Hauptmenü.

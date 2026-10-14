@@ -35,8 +35,8 @@ DrovaVoice.Core (net6.0, ohne Il2Cpp, xUnit)
 DrovaVoice (Il2Cpp-Schicht, dünn)
 ├─ Playback/VoiceConnector   IAudioConnector: OnDialogueTreeLoaded = No-op,
 │                            OnWorldDialogueStatement = ID bilden, laden, statement.audio setzen
-├─ Playback/ClipLoader       NVorbis -> float[] -> Gain -> AudioClip; 500-ms-Grenze; fängt alles ab
-├─ Playback/ChoiceHook       Harmony-Postfix am Auswahlknoten: Optionsclips (ID "|c<index>") laden
+├─ Playback/ClipLoader       NVorbis -> float[] -> Gain -> AudioClip; meldet Ladezeiten über 500 ms; fängt alles ab
+├─ Playback/ChoiceHook       Harmony-Prefix auf `DS_MultipleChoiceNode.OnExecute`: Optionsclips (ID "|c<index>") laden, nur bei `saySelection`
 ├─ Playback/ClipStore        ClipBudget + Dictionary<id, AudioClip>; verdrängte Clips werden zerstört
 └─ DrovaVoiceMod             Einstellungen lesen, Index laden, Connector ersetzen, Hook installieren
 ```
@@ -47,9 +47,9 @@ Regel: Was ohne Spiel prüfbar ist, liegt in `Core`. Die Il2Cpp-Schicht enthält
 
 1. Das Spiel führt eine Aussage aus; der API-Prefix ruft `OnWorldDialogueStatement(node)`, weil `audio == null`.
 2. Der Connector bildet `LineIds.Statement(tree.name, locaPath, locaKey)` (Loca-Pfad wie oben unter 2.4) und fragt `AudioIndex.Lookup`. Kein Eintrag: nichts tun (stumm, Untertitel wie im Original).
-3. Ein Eintrag: `ClipStore` liefert den Clip oder `ClipLoader` erzeugt ihn (Gain nach Kategorie) und legt ihn ab. Fehler oder mehr als 500 ms: stumm, ID einmal loggen.
+3. Ein Eintrag: `ClipStore` liefert den Clip oder `ClipLoader` erzeugt ihn (Gain nach Kategorie) und legt ihn ab. Fehler: stumm, ID einmal loggen.
 4. Der Connector setzt `node.statement.audio`. Das Spiel spielt ihn ab und die Untertitel laufen synchron.
-5. Auswahlknoten: der Postfix geht über `availableChoices`, bildet `LineIds.Choice(..., index)` und setzt bei jeder Option mit Eintrag `choice.statement.audio` (Kategorie `player`).
+5. Auswahlknoten: der Prefix (nur bei Knoten mit `saySelection`, nach Installation des Connectors) geht über `availableChoices`, bildet `LineIds.Choice(..., index)` und setzt bei jeder Option mit Eintrag `choice.statement.audio` (Kategorie `player`).
 6. Zeilen mit `$GVAR:` im Text haben keinen Eintrag im Index und bleiben stumm (bereits so im Vertrag).
 
 ## 5. Lautstärke
@@ -96,7 +96,20 @@ Phase 0 und 5 brauchen den Nutzer im Spiel; Phasen 1–4 sind ohne Spielstart ba
 | # | Risiko | Gegenmaßnahme |
 |---|---|---|
 | P1 | `AudioManager` scheitert im Hauptmenü (siehe §2.8) | Connector erst in `OnUpdate` ersetzen, wenn `WorldEventSystemManager.Instance != null` (umgesetzt, `TryInstallConnector`) |
-| P2 | Dekodieren auf dem Hauptthread ruckelt | 500-ms-Grenze; bei Messung Hintergrund-Vorladen der Folgezeilen |
+| P2 | Dekodieren auf dem Hauptthread ruckelt | Ladezeiten über 500 ms werden einmal pro Zeile gemeldet (Clip bleibt hörbar); bei Messung Hintergrund-Vorladen der Folgezeilen |
 | P3 | Loca-Pfad am Knoten weicht vom exportierten ab | Phase 0 vergleicht gebildete IDs mit dem Index; Export nutzt dieselbe Regel |
 | P4 | Auswahlknoten-Methode heißt anders / ist anders erreichbar | Phase 0 ermittelt sie; Fallback: Laden im `DS_StatementNode`-Prefix des Folgeknotens |
 | P5 | Clip wird beim Überspringen nicht gestoppt (R5) | In Phase 0 beobachten; ggf. `localSource.Stop()` am Handler |
+
+## 10. Änderungen nach dem Review (2026-10-14)
+
+Quelle: lesender Opus-Review von `7948ab5..HEAD`. Wo dieser Abschnitt der übrigen Spec widerspricht, gilt dieser Abschnitt.
+
+- **Kein Abbruch bei 500 ms** (ersetzt die 500-ms-Regel aus §4/§7 und der Hauptspec §9): Die Zeit lässt sich erst nach dem Dekodieren messen; das Verwerfen hätte den Ruckler nicht verhindert und die Zeile dauerhaft stumm gemacht. Jetzt bleibt der fertige Clip erhalten, eine Dauer über 500 ms wird nur einmal pro Zeile gemeldet. Fehler beim Dekodieren oder Erzeugen machen die Zeile für die Sitzung stumm.
+- **`ChoiceHook` erst nach erfolgreichem Ersatz des Connectors aktiv:** Ein gesetztes Optionsaudio schickt die API über ihren `AudioManager`, der ohne Initialisierung Ausnahmen wirft.
+- **`saySelection`:** Der Hook setzt Optionsaudio nur bei Knoten, die die Auswahl laut Spiel sprechen (NodeCanvas-Feld `saySelection`); sonst würde der API-Prefix die Option plötzlich sprechen lassen.
+- **Index-Verschiebung bei Optionen:** Passt der Index `k` nicht (das Spiel entfernt einmalige Optionen oder fügt „Zurück“ hinzu), gilt der einzige Auswahl-Eintrag mit demselben Schlüssel (`AudioIndex.TryGetUniqueChoice`); bei mehreren bleibt die Option stumm.
+- **IDs ohne Ausnahmen:** `LineIds.TryStatement/TryChoice` und `LineIds.ResolveLocaPath` ersetzen das Fangen von `ArgumentException`; ungültige IDs sind ein stiller Fehltreffer (Diagnose-Meldung), keine Fehlermeldung.
+- **Installation:** Der Connector wird in jedem Frame geprüft, bis er installiert ist.
+- **Export im Hauptmenü** macht die Vertonung für die Sitzung wirkungslos (der Export löst den Postfix-Fehler im `AudioManager` aus); die Mod warnt davor.
+- **Logging:** Warnungen und Fehler haben eine eigene Obergrenze und nennen die Zeilen-ID.

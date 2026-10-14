@@ -52,8 +52,7 @@ namespace DrovaVoice
             var warnings = new List<string>();
             var settings = VoiceSettings.Create(enabled.Value, dialogVolume.Value, playerVolume.Value, audioLanguage.Value, cacheMb.Value, diagnostics.Value, warnings);
             foreach (string w in warnings) LoggerInstance.Warning(w);
-            _voice = CreateVoice(settings);
-            ChoiceHook.Service = _voice;
+            _voice = CreateVoice(settings);   // ChoiceHook.Service folgt erst, wenn der Connector ersetzt ist
         }
 
         private VoiceService? CreateVoice(VoiceSettings settings)
@@ -88,6 +87,7 @@ namespace DrovaVoice
             {
                 AudioManager.ReplaceDialogueAudioConnector(new VoiceConnector(_voice));
                 _connectorInstalled = true;
+                ChoiceHook.Service = _voice;
                 LoggerInstance.Msg("Audio-Connector der Modding API ersetzt.");
             }
             catch (Exception e)
@@ -100,7 +100,7 @@ namespace DrovaVoice
         public override void OnUpdate()
         {
             _frame++;
-            if (_frame % 60 == 15) TryInstallConnector();
+            if (!_connectorInstalled) TryInstallConnector();   // billig: nur ein statischer Null-Test pro Frame bis zur Installation
             bool trigger = false;
             if (_frame % 60 == 0 && ConsumeTrigger(TriggerPath, ref _exportTriggerStuck)) trigger = true;
             if (!trigger && HotkeyPressed()) trigger = true;
@@ -162,6 +162,8 @@ namespace DrovaVoice
             _exporting = true;
             try
             {
+                if (_voice != null && !_connectorInstalled && WorldEventSystemManager.Instance == null)
+                    LoggerInstance.Warning("Export im Hauptmenü: Die Modding API scheitert dabei beim Initialisieren ihres AudioManagers; die Vertonung bleibt in dieser Sitzung aus. Zum Hören das Spiel neu starten.");
                 string lang = _language!.Value;
                 LogLanguage(lang);
                 var exporter = new DialogueExporter(lang, LoggerInstance);
