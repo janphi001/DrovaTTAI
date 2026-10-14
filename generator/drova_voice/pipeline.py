@@ -7,7 +7,9 @@ from collections import Counter
 from pathlib import Path
 from typing import Callable
 
+from drova_voice.casting import cast_report, load_casting
 from drova_voice.config import Config
+from drova_voice.fish_voices import load_fish_voices
 from drova_voice.lines import (Line, build_lines, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
 
 WORKERS_DIR = Path(__file__).resolve().parents[1] / "workers"
@@ -54,11 +56,34 @@ def _extract(cfg: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def _load_casting(cfg: Config):
+    voices = load_fish_voices(cfg.casting_dir / "fish_voices.yaml")
+    return voices, load_casting(cfg.casting_dir / "casting.yaml", voices)
+
+
+def _cast(cfg: Config, args: argparse.Namespace) -> int:
+    lines = _selected(cfg, args)
+    if lines is None:
+        return 2
+    try:
+        _, casting = _load_casting(cfg)
+    except (OSError, ValueError) as e:
+        return _fail(str(e))
+    report = cast_report(lines, casting)
+    print("Stimmen (Zeilen): " + (", ".join(f"{v}: {n}" for v, n in sorted(report.usage.items())) or "keine"))
+    print("Sprecher ohne Stimme: " + (", ".join(f"{a}: {n}" for a, n in sorted(report.missing.items())) or "keine"))
+    return 1 if report.missing else 0
+
+
 HANDLERS: dict[str, Callable[[Config, argparse.Namespace], int]] = {
     "extract": _extract,
+    "cast": _cast,
 }
 
 
 def add_parsers(sub) -> None:
     ex = sub.add_parser("extract", help="Manifest + .loc -> data/lines.jsonl (Sprechtext)")
     ex.add_argument("--manifest", type=Path, help="Standard: data/export/<Sprache>/manifest.json")
+    cast = sub.add_parser("cast", help="Prüft, ob jeder Sprecher eine Stimme hat (casting/casting.yaml)")
+    cast.add_argument("--check", action="store_true", help="nur prüfen (Standard und einzige Betriebsart in Plan 3)")
+    cast.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")

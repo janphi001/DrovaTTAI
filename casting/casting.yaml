@@ -1,0 +1,5 @@
+# Sprecher -> Stimme (Schlüssel aus casting/fish_voices.yaml). Sprechernamen ohne Beachtung der Schreibung.
+# VORLÄUFIG: Zuordnung für den Durchstich; der Nutzer entscheidet nach dem Hörtest (Plan 3, Task 9).
+default_player: leon      # alle Spielerzeilen (Auswahloptionen); Stimmsets folgen in M5
+speakers:
+  adela: {voice: melanie}
