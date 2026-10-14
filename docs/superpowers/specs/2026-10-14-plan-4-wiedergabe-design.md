@@ -19,6 +19,7 @@ Stand: 2026-10-14 · Status: vom Nutzer im Chat freigegeben (Umfang, Ansatz A, R
 5. `DS_MultipleChoiceNodePatch.Prefix` (auf `OnOptionSelected`) spielt die Option nur dann mit Ton, wenn `choice.statement.audio` schon gesetzt ist. `IAudioHandler.HandleMultipleChoiceRequest` ist leer und wird nirgends aufgerufen. Die Optionsclips müssen wir also selbst laden, bevor der Spieler wählt.
 6. `DialogueAudioDistanceManager` regelt `AudioSource.volume` nach Entfernung. Ein Gain auf den Samples bleibt davon unberührt.
 7. `FileAudioProvider.LoadOggAudioAsync` ist die Vorlage: `VorbisReader` (NVorbis) liest alle Samples, `AudioClip.Create(name, samples/ch, ch, rate, false)` plus `SetData` laufen auf dem Hauptthread. `NVorbis.dll` liegt schon in `UserLibs`.
+8. **`AudioManager` ist im Hauptmenü nicht initialisierbar.** Sein statischer Konstruktor erzeugt `new AssetBundleAudioProvider()`, dessen Konstruktor `WorldEventSystemManager.Instance.AreaNameSystem` liest; im Hauptmenü ist `Instance` noch `null`. Das ist die `TypeInitializationException` aus dem Export, und ein fehlgeschlagener statischer Konstruktor bleibt für die ganze Sitzung kaputt. Die Mod darf `AudioManager` deshalb erst berühren, wenn `Instance` existiert.
 
 ## 3. Architektur
 
@@ -66,6 +67,7 @@ Regel: Was ohne Spiel prüfbar ist, liegt in `Core`. Die Il2Cpp-Schicht enthält
 | `PlayerVolume` | `100` | 0–200 | Spielerzeilen in Prozent |
 | `AudioLanguage` | `de` | — | Unterordner unter `Audio/` |
 | `CacheMB` | `64` | 8–512 | Obergrenze für geladene Clips |
+| `Diagnostics` | `false` | — | Jede Zeile einmal loggen (geladen / ohne Eintrag), für die Abnahme |
 
 Ungültige Werte werden auf den Bereich begrenzt und einmal geloggt.
 
@@ -93,7 +95,7 @@ Phase 0 und 5 brauchen den Nutzer im Spiel; Phasen 1–4 sind ohne Spielstart ba
 
 | # | Risiko | Gegenmaßnahme |
 |---|---|---|
-| P1 | Die API setzt ihren Connector nach unserem Start erneut | Ersetzen später (nach der ersten Szene) wiederholen; Phase 0 misst es |
+| P1 | `AudioManager` scheitert im Hauptmenü (siehe §2.8) | Connector erst in `OnUpdate` ersetzen, wenn `WorldEventSystemManager.Instance != null` (umgesetzt, `TryInstallConnector`) |
 | P2 | Dekodieren auf dem Hauptthread ruckelt | 500-ms-Grenze; bei Messung Hintergrund-Vorladen der Folgezeilen |
 | P3 | Loca-Pfad am Knoten weicht vom exportierten ab | Phase 0 vergleicht gebildete IDs mit dem Index; Export nutzt dieselbe Regel |
 | P4 | Auswahlknoten-Methode heißt anders / ist anders erreichbar | Phase 0 ermittelt sie; Fallback: Laden im `DS_StatementNode`-Prefix des Folgeknotens |
