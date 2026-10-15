@@ -44,9 +44,9 @@ namespace DrovaVoice.Playback
                 if (clip != null)
                 {
                     statement.audio = clip;
-                    // Barks und Poolzeilen teilen die Aussage mit anderen Figuren: nach dem Abspielen wieder freigeben
-                    if ((clip.name != null && clip.name.StartsWith(BarkDistance.BarkClipPrefix, StringComparison.Ordinal)) || _service.IsPoolLine(id))
-                        _service.BarkDistance?.Watch(statement, clip);
+                    // Der Clip bleibt sonst an der Aussage stehen: Wiederholungen riefen den Connector nicht mehr auf (falsche Figur bei
+                    // geteilten Aussagen, neue Lautstärke aus dem Optionsmenü käme nie an). Nach dem Abspielstart wieder freigeben.
+                    _service.BarkDistance?.Watch(statement, clip);
                 }
             }
             catch (Exception e) { _service.LogError("OnWorldDialogueStatement", id, e); }

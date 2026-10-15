@@ -42,7 +42,11 @@ namespace DrovaVoice.Playback
         private void RegisterTexts()
         {
             var entries = new List<LocalizationAccess.LocalizationEntry>();
+            // Die API schreibt je Sprache eine .loc-Datei in Drova_Data/StreamingAssets/Localization/<Sprache>/; nur vorhandene Ordner bedienen
+            // (sonst loggt sie für jede fehlende Sprache einen Fehler). Die Namen der Enum-Werte entsprechen den Ordnernamen.
+            string locRoot = System.IO.Path.Combine(MelonLoader.Utils.MelonEnvironment.GameRootDirectory, "Drova_Data", "StreamingAssets", "Localization");
             foreach (var language in Enum.GetValues(typeof(LocalizationDB.ELanguage)))
+                if (System.IO.Directory.Exists(System.IO.Path.Combine(locRoot, language.ToString()!)))
                 foreach (var (key, text) in Texts)
                     entries.Add(new LocalizationAccess.LocalizationEntry(key, text, (LocalizationDB.ELanguage)language));
             LocalizationAccess.CreateLocalizationEntries(entries, ModName);

@@ -9,7 +9,7 @@ using UnityEngine;
 namespace DrovaVoice.Playback
 {
     /// <summary>
-    /// Zwei Aufgaben für Barks und Poolzeilen (generische Figuren), deren Aussage für alle Figuren dieselbe ist:
+    /// Zwei Aufgaben (Freigabe für alle Zeilen, Entfernung nur für Barks); Barks und Poolzeilen (generische Figuren) teilen die Aussage mit anderen Figuren:
     /// 1. <b>Aussage freigeben:</b> Hängt der Connector einen Clip an <c>statement.audio</c>, bleibt er dort stehen; bei jeder
     ///    Wiederholung ruft die API den Connector nicht mehr auf, und eine andere Figur spielte die Stimme der ersten (auch mit
     ///    falschem Geschlecht). Sobald der Clip abspielt (oder nach <see cref="TimeoutFrames"/> Frames), wird <c>statement.audio</c>
