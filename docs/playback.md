@@ -55,6 +55,7 @@ Die Dateien sind auf −16 LUFS normiert; wie laut das im Verhältnis zu Musik u
 
 ## Bekannte Grenzen
 
+- Der Spieler spricht seine gewählte Antwortoption nicht (wie im Original); der Generator erzeugt dafür keine Dateien (`player_choice`). Der Auswahl-Hook der Mod ist deshalb nur eine Reserve, falls später Optionsdateien im Index stehen.
 - Namensvarianten (`#arden`/`#neutral`) und Spielerstimm-Sets fehlen noch; es gilt die Basis-ID.
 - Barks und Briefe haben noch keine Dateien und keine Regler.
 - Keine Regler im Spiel; Werte nur per Datei und Neustart.

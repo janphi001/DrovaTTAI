@@ -11,7 +11,7 @@ Der Generator `drova-voice` macht aus dem Export Sprachdateien für die Mod. All
 
 ## Reihenfolge
 
-Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in denen dieser NPC spricht (inklusive der Spieler-Auswahloptionen in diesen Bäumen). Ohne `--npc` gilt alles.
+Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in denen dieser NPC spricht (Spieler-Auswahloptionen derselben Bäume werden als `player_choice` übersprungen, siehe unten). Ohne `--npc` gilt alles.
 
 | Schritt | Befehl | Ergebnis |
 |---|---|---|
@@ -42,7 +42,7 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 ## Grenzen von Plan 3
 
 - Zeilen mit `$GVAR:` im Text (Spielername, Quest-Werte) werden übersprungen und im Bericht als `gvar` gezählt. Namensvarianten folgen später.
-- Spielerzeilen nutzen eine feste Stimme (`default_player`), keine Stimmsets.
+- Spielerzeilen nutzen eine feste Stimme (`default_player`), keine Stimmsets. Gesprochen werden nur Aussagen des Spielers (119 im Spiel); **Auswahloptionen** (6.491 Zeilen) bleiben stumm wie im Original (Nutzerentscheidung 2026-10-15, Grund `player_choice`).
 - Keine Varianten für generische Sprecher, keine Barks, keine Briefe.
 - Die Stimmenzuordnung in `casting/casting.yaml` ist vorläufig und wird nach dem Hörtest festgelegt.
 - Fish ist eine Cloud-Engine: der Sprechtext geht an `api.fish.audio`. Nur nach ausdrücklichem Ja des Nutzers mit echten Spieltexten benutzen.
