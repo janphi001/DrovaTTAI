@@ -17,6 +17,7 @@ from drova_voice.install import install_audio
 from drova_voice.jsonl import append_jsonl, latest_by_id, read_jsonl_lenient, write_jsonl
 from drova_voice.lines import (Line, build_lines, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
 from drova_voice.preview import write_preview
+from drova_voice.profiles import LOW_CONFIDENCE, Profile, merge_import, prepare_packets, read_profiles, write_profiles
 from drova_voice.report import build_report, format_report
 from drova_voice.selection import (DEFAULT_BATCH_CHARS, batch_lines, plan_batches, read_batches, sample_lines,
                                    speaker_stats, write_batches)
@@ -275,6 +276,62 @@ def _batches(cfg: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def profiles_path(cfg: Config) -> Path:
+    return cfg.casting_dir / "profiles.jsonl"
+
+
+def _profile(cfg: Config, args: argparse.Namespace) -> int:
+    try:
+        profiles = read_profiles(profiles_path(cfg))
+    except ValueError as e:
+        return _fail(str(e))
+    if args.set:
+        if not args.gender or not args.age:
+            return _fail("--set braucht --gender und --age")
+        try:
+            p = Profile.from_dict({"speaker": args.set, "gender": args.gender, "age": args.age, "type": args.type,
+                                   "confidence": 1.0, "note": args.note or "", "source": "manual"})
+        except ValueError as e:
+            return _fail(str(e))
+        profiles[p.speaker] = p
+        write_profiles(profiles_path(cfg), profiles.values())
+        print(f"{p.speaker}: {p.gender}, {p.age}{', ' + p.type if p.type else ''} -> {profiles_path(cfg)}")
+        return 0
+    path = lines_path(cfg)
+    if not path.is_file():
+        return _fail(f"{path} fehlt (zuerst `drova-voice extract` ausführen)")
+    lines = read_lines(path)
+    if args.prepare:
+        packets = prepare_packets(lines, profiles, args.size, include_known=args.all)
+        out = cfg.out_dir / "subagent" / "profile"
+        out.mkdir(parents=True, exist_ok=True)
+        for old in out.glob("packet_*.json"):
+            old.unlink()
+        for i, packet in enumerate(packets, start=1):
+            (out / f"packet_{i:03d}.json").write_text(json.dumps(packet, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"{sum(len(p) for p in packets)} Sprecher in {len(packets)} Paketen -> {out}")
+        return 0
+    if args.import_files:
+        rows = [row for f in args.import_files for row in read_jsonl_lenient(f)]
+        merged, errors = merge_import(profiles, rows, {s.name for s in speaker_stats(lines)})
+        write_profiles(profiles_path(cfg), merged.values())
+        print(f"{len(merged)} Steckbriefe ({len(merged) - len(profiles)} neu) -> {profiles_path(cfg)}")
+        for e in errors[:20]:
+            print(f"FEHLER {e}", file=sys.stderr)
+        return 1 if errors else 0
+    stats = speaker_stats(lines)
+    for s in stats:
+        p = profiles.get(s.name)
+        if p is None:
+            print(f"{s.display} ({s.lines}): kein Steckbrief")
+        else:
+            flag = " UNSICHER" if p.confidence < LOW_CONFIDENCE else ""
+            print(f"{s.display} ({s.lines}): {p.gender}, {p.age}{', ' + p.type if p.type else ''}, "
+                  f"{p.confidence:.1f}{flag}, {p.source}: {p.note}")
+    print(f"{sum(1 for s in stats if s.name in profiles)} von {len(stats)} Sprechern haben einen Steckbrief")
+    return 0
+
+
 HANDLERS: dict[str, Callable[[Config, argparse.Namespace], int]] = {
     "extract": _extract,
     "cast": _cast,
@@ -285,6 +342,7 @@ HANDLERS: dict[str, Callable[[Config, argparse.Namespace], int]] = {
     "report": _report,
     "preview": _preview,
     "batches": _batches,
+    "profile": _profile,
 }
 
 
@@ -318,3 +376,13 @@ def add_parsers(sub) -> None:
     _add_selection(pv)
     bt = sub.add_parser("batches", help="Etappen für den Vollauf planen (data/batches.json)")
     bt.add_argument("--max-chars", type=int, default=DEFAULT_BATCH_CHARS, help="Zeichen je Etappe (Standard 100000)")
+    pr = sub.add_parser("profile", help="Steckbriefe der Sprecher (casting/profiles.jsonl): Pakete für Subagents, Import, Anzeige")
+    pr.add_argument("--prepare", action="store_true", help="Pakete für Subagents nach out/subagent/profile schreiben")
+    pr.add_argument("--size", type=int, default=20, help="Sprecher je Paket (Standard 20)")
+    pr.add_argument("--all", action="store_true", help="auch Sprecher mit Steckbrief in die Pakete aufnehmen")
+    pr.add_argument("--import", dest="import_files", nargs="+", type=Path, metavar="DATEI", help="JSONL-Ergebnisse der Subagents einlesen")
+    pr.add_argument("--set", metavar="NAME", help="Steckbrief von Hand setzen (braucht --gender und --age)")
+    pr.add_argument("--gender", choices=["m", "f"])
+    pr.add_argument("--age", choices=["kind", "jung", "mittel", "alt"])
+    pr.add_argument("--type", choices=["riese", "zwerg", "schurke"])
+    pr.add_argument("--note", help="ein Satz zum Charakter, ohne wörtliche Zitate")
