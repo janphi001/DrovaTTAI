@@ -18,6 +18,8 @@ from drova_voice.jsonl import append_jsonl, latest_by_id, read_jsonl_lenient, wr
 from drova_voice.lines import (Line, build_lines, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
 from drova_voice.preview import write_preview
 from drova_voice.report import build_report, format_report
+from drova_voice.selection import (DEFAULT_BATCH_CHARS, batch_lines, plan_batches, read_batches, sample_lines,
+                                   speaker_stats, write_batches)
 from drova_voice.synth import build_jobs, run_synth
 
 WORKERS_DIR = Path(__file__).resolve().parents[1] / "workers"
@@ -32,8 +34,13 @@ def lines_path(cfg: Config) -> Path:
     return cfg.data_dir / "lines.jsonl"
 
 
+def batches_path(cfg: Config) -> Path:
+    return cfg.data_dir / "batches.json"
+
+
 def _selected(cfg: Config, args: argparse.Namespace) -> list[Line] | None:
-    """Zeilen aus data/lines.jsonl, bei --npc gefiltert; None (mit Meldung), wenn extract noch nicht lief."""
+    """Zeilen aus data/lines.jsonl, gefiltert nach --npc (ganze Bäume), --sample (eine Zeile je Sprecher) und
+    --batch N (Etappe); None (mit Meldung), wenn die Auswahl nicht möglich ist."""
     path = lines_path(cfg)
     if not path.is_file():
         _fail(f"{path} fehlt (zuerst `drova-voice extract` ausführen)")
@@ -45,6 +52,18 @@ def _selected(cfg: Config, args: argparse.Namespace) -> list[Line] | None:
         if not lines:
             _fail(f"Keine Zeilen für NPC '{npc}' gefunden")
             return None
+    if getattr(args, "sample", False):
+        lines = sample_lines(lines)
+    batch_n = getattr(args, "batch", None)
+    if batch_n is not None:
+        if not batches_path(cfg).is_file():
+            _fail(f"{batches_path(cfg)} fehlt (zuerst `drova-voice batches` ausführen)")
+            return None
+        chosen = [b for b in read_batches(batches_path(cfg)) if b.n == batch_n]
+        if not chosen:
+            _fail(f"Etappe {batch_n} gibt es nicht (siehe `drova-voice batches`)")
+            return None
+        lines = batch_lines(lines, chosen[0])
     return lines
 
 
@@ -241,6 +260,21 @@ def _preview(cfg: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def _batches(cfg: Config, args: argparse.Namespace) -> int:
+    path = lines_path(cfg)
+    if not path.is_file():
+        return _fail(f"{path} fehlt (zuerst `drova-voice extract` ausführen)")
+    lines = read_lines(path)
+    batches = plan_batches(lines, args.max_chars)
+    write_batches(batches_path(cfg), batches, args.max_chars)
+    display = {s.name: s.display for s in speaker_stats(lines)}
+    for b in batches:
+        who = ", ".join(display[n] for n in b.speakers[:6]) + (", ..." if len(b.speakers) > 6 else "")
+        print(f"Etappe {b.n}: {len(b.speakers)} Sprecher{' + Spieler' if b.player else ''}, {b.lines} Zeilen, {b.chars} Zeichen ({who})")
+    print(f"{len(batches)} Etappen, {sum(b.chars for b in batches)} Zeichen -> {batches_path(cfg)}")
+    return 0
+
+
 HANDLERS: dict[str, Callable[[Config, argparse.Namespace], int]] = {
     "extract": _extract,
     "cast": _cast,
@@ -250,7 +284,14 @@ HANDLERS: dict[str, Callable[[Config, argparse.Namespace], int]] = {
     "install": _install,
     "report": _report,
     "preview": _preview,
+    "batches": _batches,
 }
+
+
+def _add_selection(parser, npc_help: str = "nur Bäume, in denen dieser NPC spricht") -> None:
+    parser.add_argument("--npc", help=npc_help)
+    parser.add_argument("--sample", action="store_true", help="nur eine Beispielzeile je Sprecher (Hörstufe)")
+    parser.add_argument("--batch", type=int, help="nur die Zeilen dieser Etappe (siehe `batches`)")
 
 
 def add_parsers(sub) -> None:
@@ -265,13 +306,15 @@ def add_parsers(sub) -> None:
     sy.add_argument("--engine", default="fish")
     sy.add_argument("--workers", type=int, default=8, help="parallele Anfragen (Standard 8, gemessen ohne 429 bis 16)")
     sy.add_argument("--limit", type=int, help="nur die ersten N Aufträge (zum Ausprobieren)")
-    sy.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
+    _add_selection(sy)
     en = sub.add_parser("encode", help="WAV -> OGG (Stille trimmen, -16 LUFS, mono) nach out/audio/<Sprache>")
     en.add_argument("--workers", type=int, default=4)
-    en.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
+    _add_selection(en)
     ins = sub.add_parser("install", help="Dateien in den Mod-Ordner kopieren und index.json schreiben")
-    ins.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht (frühere Einträge bleiben erhalten)")
+    _add_selection(ins, "nur Bäume, in denen dieser NPC spricht (frühere Einträge bleiben erhalten)")
     rp = sub.add_parser("report", help="Status je Kategorie: offen, erzeugt, kodiert, installiert, übersprungen")
-    rp.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
+    _add_selection(rp)
     pv = sub.add_parser("preview", help="Hörseite out/preview/index.html (Zeilen mit Emotion und Audio)")
-    pv.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
+    _add_selection(pv)
+    bt = sub.add_parser("batches", help="Etappen für den Vollauf planen (data/batches.json)")
+    bt.add_argument("--max-chars", type=int, default=DEFAULT_BATCH_CHARS, help="Zeichen je Etappe (Standard 100000)")
