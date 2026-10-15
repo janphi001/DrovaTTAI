@@ -19,7 +19,10 @@ namespace DrovaVoice.Playback
         private readonly Dictionary<int, string> _lastState = new Dictionary<int, string>();
         private int _frame;
 
-        public StaleAudioProbe(MelonLogger.Instance log) { _log = log; }
+        private readonly bool _verbose;
+        private readonly Dictionary<int, int> _idleScans = new Dictionary<int, int>();
+
+        public StaleAudioProbe(MelonLogger.Instance log, bool verbose) { _log = log; _verbose = verbose; }
 
         public void Update()
         {
@@ -30,7 +33,7 @@ namespace DrovaVoice.Playback
 
         private void Scan()
         {
-            var sources = UnityEngine.Object.FindObjectsOfType<AudioSource>();
+            var sources = UnityEngine.Object.FindObjectsOfType<AudioSource>(true);
             var seen = new HashSet<int>();
             foreach (var source in sources)
             {
@@ -41,13 +44,21 @@ namespace DrovaVoice.Playback
                 if (!name.StartsWith(ClipLoader.ClipNamePrefix, StringComparison.Ordinal)) continue;
                 int id = source.GetInstanceID();
                 seen.Add(id);
+                if (CleanIdle(source, id)) continue;
+                if (!_verbose) continue;
                 string state = source.isPlaying ? "spielt" : "haelt";
                 string key = state + "|" + name;
                 if (_lastState.TryGetValue(id, out var previous) && previous == key) continue;
                 _lastState[id] = key;
                 _log.Msg($"[Sonde] {state}: {name} auf {PathOf(source.transform)} (playOnAwake={source.playOnAwake}, loop={source.loop}, zeit={source.time:0.00}/{clip.length:0.00} s, volume={source.volume:0.00}, aktiv={source.gameObject.activeInHierarchy})");
             }
-            if (_lastState.Count > seen.Count)
+            if (_idleScans.Count > seen.Count)
+            {
+                var stale = new List<int>();
+                foreach (int id in _idleScans.Keys) if (!seen.Contains(id)) stale.Add(id);
+                foreach (int id in stale) _idleScans.Remove(id);
+            }
+            if (_verbose && _lastState.Count > seen.Count)
             {
                 var gone = new List<int>();
                 foreach (int id in _lastState.Keys) if (!seen.Contains(id)) gone.Add(id);
@@ -57,6 +68,22 @@ namespace DrovaVoice.Playback
                     _lastState.Remove(id);
                 }
             }
+        }
+
+        /// <summary>
+        /// Das Spiel lässt den Clip nach dem Abspielen an der AudioSource (playOnAwake=True) stehen; wird der NPC später neu
+        /// aktiviert, spielt die Quelle ihn erneut ab. Steht die Quelle in zwei Läufen hintereinander still, wird der Clip abgenommen.
+        /// </summary>
+        private bool CleanIdle(AudioSource source, int id)
+        {
+            if (source.isPlaying) { _idleScans.Remove(id); return false; }
+            _idleScans.TryGetValue(id, out int n);
+            if (n + 1 < 2) { _idleScans[id] = n + 1; return false; }
+            _idleScans.Remove(id);
+            if (_verbose) _log.Msg($"[Sonde] Clip abgenommen: {source.clip.name} auf {PathOf(source.transform)}");
+            source.clip = null;
+            _lastState.Remove(id);
+            return true;
         }
 
         private static string PathOf(Transform? t)

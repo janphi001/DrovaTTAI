@@ -88,7 +88,7 @@ namespace DrovaVoice
             {
                 AudioManager.ReplaceDialogueAudioConnector(new VoiceConnector(_voice));
                 _connectorInstalled = true;
-                if (_voice.Diagnostics) _probe = new StaleAudioProbe(LoggerInstance);
+                _probe = new StaleAudioProbe(LoggerInstance, _voice.Diagnostics);
                 ChoiceHook.Service = _voice;
                 LoggerInstance.Msg("Audio-Connector der Modding API ersetzt.");
             }
