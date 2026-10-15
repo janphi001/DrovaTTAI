@@ -13,6 +13,7 @@ KI-Stimmen für das Spiel **Drova – Forsaken Kin**. Ein Python-Generator (`gen
 | **Plan 5 Casting und Vollauf** | **Code fertig, Vollauf bei Fish durch** (Branch `plan-5-casting` auf `plan-4-playback`; 471 pytest grün; alle 245 benannten Sprecher besetzt und vertont, `report --by-speaker`: Lücken 0; Notiz `docs/decisions/2026-10-casting-vollauf.md`). Stichprobe im Spiel vom Nutzer abgenommen (2026-10-15) |
 | Namensvarianten | neutral, siehe docs/superpowers/specs/2026-10-15-namensvarianten-design.md; Code fertig, nach `main` gemergt und gepusht (Branch `plan-6-namensvarianten`); 94 neutrale Zeilen bei Fish erzeugt, installiert (Index 11.507 Einträge) und Mod gebaut (2026-10-15); Hörtest im Spiel steht aus. Die 166 dabei versehentlich miterzeugten Bark-Zeilen wurden in Plan 7 wiederverwendet |
 | **Plan 7 Barks und Stimmenpool** | Code, Doku und Bark-Vertonung fertig, im Spiel abgenommen (Stimmen nach Geschlecht stimmig, Entfernungsregelung 15–120 „viel besser“); Branch `plan-7-barks`, nach `main` gemergt und gepusht. Spec `docs/superpowers/specs/2026-10-15-barks-design.md`, Plan `docs/superpowers/plans/2026-10-15-plan-7-barks.md`. Die 205 generischen Dialogzeilen (Pool) sind ebenfalls vertont (1.230 Clips, 2026-10-15); im Spiel noch nicht gehört |
+| **Plan 8 Regler im Optionsmenü** | Panel „Drova Voice“ im Optionsmenü des Spiels (Schalter, Dialog/Spieler/Barks 0–200 %, Bark-Reichweite), wirkt ohne Neustart; Branch `plan-8-optionsmenue`, Spiel-Abnahme siehe Stand unten. Spec `docs/superpowers/specs/2026-10-15-optionsmenue-design.md`, Plan `docs/superpowers/plans/2026-10-15-plan-8-optionsmenue.md`; Verhalten: `docs/playback.md` (Optionsmenü) |
 | Merge/Push der Branches | erledigt (2026-10-15): Pläne 1 bis 7 sind in `main` gemergt, `main` = `origin/main`; die Plan-Branches bestehen lokal weiter |
 | Tests | 192 xUnit (Core), 496 pytest (Generator), alle grün |
 
@@ -33,7 +34,7 @@ KI-Stimmen für das Spiel **Drova – Forsaken Kin**. Ein Python-Generator (`gen
 ## Entscheidungen, die man nicht wieder aufrollen soll
 - **Engine:** Fish Audio Cloud; Kitten nur lokale Rückfallebene (`docs/decisions/2026-10-tts-engine.md`). Texte gehen an Fish: **nur nach ausdrücklichem Ja des Nutzers**. Kosten/Tarif für den Vollauf ungeklärt (~13.000 Zeilen).
 - **Spielerauswahl bleibt stumm** wie im Original (Spiel hat `saySelection` aus): Der Generator überspringt Antwortoptionen (`player_choice`, 6.491 Zeilen); nur 119 Aussagen des Spielers werden gesprochen (`docs/decisions/2026-10-player-choices-stumm.md`).
-- **Regler** (Dialog, Spieler 0–200 %) vorerst nur per `UserData/MelonPreferences.cfg`, Wirkung nach Neustart; Menü/Hotkeys später.
+- **Regler:** im Optionsmenü des Spiels (Plan 8); `MelonPreferences.cfg` liefert nur die Startwerte, das Menü gewinnt ab dem ersten Öffnen (`docs/playback.md`).
 - Emotionen: Regeln aus Regieanweisungen + Haiku-Markierung (Subagent schreibt `casting/emotions.jsonl`-Zeilen mit `source: llm`).
 
 ## Fallen (nicht im Code ersichtlich)

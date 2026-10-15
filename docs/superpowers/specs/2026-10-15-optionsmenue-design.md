@@ -16,8 +16,8 @@ Entscheidung des Nutzers (2026-10-15): Umfang „Lautstärken + Barkreichweite�
 ## Entwurf
 ### Core (`DrovaVoice.Core`, ohne Spiel testbar)
 - `VoiceSettings` bleibt unveränderlich. Neu: `VoiceSettings.WithOverrides(MenuValues values, List<string> warnings)` erzeugt einen neuen Schnappschuss; `MenuValues` hält je Wert ein optionales Feld (`Enabled`, `DialogPercent`, `PlayerPercent`, `BarkPercent`, `BarkMinDistance`, `BarkMaxDistance`). Dieselben Grenzen wie `Create` (0 bis 200 %, Min ≥ 0 und Max > Min, sonst Standard 15 bis 120 mit Warnung).
-- `VoiceSettings.Diff(old, new)` liefert, was sich geändert hat: `VolumeChanged` (ein Prozentwert), `RangeChanged`, `EnabledChanged`. Danach entscheidet die Mod, ob der Clip-Cache geleert werden muss.
-- `MenuKeys` (Konstanten): `DrovaVoice.Enabled`, `DrovaVoice.DialogVolume`, `DrovaVoice.PlayerVolume`, `DrovaVoice.BarkVolume`, `DrovaVoice.BarkMinDistance`, `DrovaVoice.BarkMaxDistance` (Schlüssel im Konfigurationsspeicher des Spiels).
+- `VoiceSettings.Diff(old, new)` liefert `SettingsChange` (`Volume`, `Range`, `Enabled`, als Flags). *Umsetzung:* Der Clip-Cache wird nicht geleert, sondern nach `id@prozent` geschlüsselt.
+- `MenuKeys` (Konstanten): `DrovaVoice_Enabled`, `DrovaVoice_DialogVolume`, `DrovaVoice_PlayerVolume`, `DrovaVoice_BarkVolume`, `DrovaVoice_BarkMinDistance`, `DrovaVoice_BarkMaxDistance` (Unterstriche statt Punkten; Schlüssel im Konfigurationsspeicher des Spiels). Reichweite als Ganzzahl-Regler (Meter).
 
 ### Mod
 - `VoiceMenu` (Mod): registriert sich einmal bei `OptionMenuAccess.Instance.OnOptionMenuOpen`/`OnOptionMenuClose`. Bei „offen“ baut sie das Panel (Titel, Hinweis, Schalter, fünf Regler) mit Startwerten aus den aktuellen Einstellungen; bei „geschlossen“ liest sie die Werte aus der Spielkonfiguration (`ConfigAccessor`), bildet `WithOverrides`, tauscht den Schnappschuss im `VoiceService` und wendet die Änderung an.
