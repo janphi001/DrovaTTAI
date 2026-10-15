@@ -1,6 +1,6 @@
 from drova_voice.casting import Casting
 from drova_voice.lines import Line
-from drova_voice.report import build_report, format_report
+from drova_voice.report import build_report, build_speaker_report, format_report, format_speaker_report
 
 CASTING = Casting("leon", {"mira": "lena"})
 
@@ -27,3 +27,17 @@ def test_statuses_follow_the_pipeline_order():
 def test_format_report_lists_categories_and_totals():
     text = format_report(build_report([line("Plh_1"), line("Plh_2", skip="gvar")], CASTING, {}, {}, {}))
     assert "dialog" in text and "2 Zeilen" in text and "übersprungen: gvar: 1" in text and "offen: 1" in text
+
+
+def test_speaker_report_counts_per_speaker_and_lists_gaps():
+    lines = [line("Plh_1"), line("Plh_2"), line("Plh_3", skip="gvar"), line("Plh_4", actor="Fremder"),
+             line("Plh_5", actor="Player", category="player"), line("Plh_6", category="bark")]
+    index = {"T|P|Plh_1": {}}
+    report = build_speaker_report(lines, CASTING, {}, {}, index)
+    assert report["Mira"] == {"installiert": 1, "offen": 1, "übersprungen: gvar": 1}
+    assert report["Fremder"] == {"übersprungen: no_voice": 1}
+    assert report["(Spieler)"] == {"offen": 1}
+    assert "Plh_6" not in str(report) and len(report) == 3
+    text = format_speaker_report(report, CASTING)
+    assert "Mira (lena): 3 Zeilen" in text and "1 installiert" in text and "1 offen" in text
+    assert "Lücken: 2 Zeilen bei 2 Sprechern" in text

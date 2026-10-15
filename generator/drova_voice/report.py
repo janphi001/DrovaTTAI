@@ -58,3 +58,38 @@ def format_report(statuses: Mapping[str, CategoryStatus]) -> str:
         flag = f"; auffällige Dauer: {st.flagged}" if st.flagged else ""
         out.append(f"{category}: {st.total} Zeilen -> " + (", ".join(parts) or "-") + flag)
     return "\n".join(out) or "keine Zeilen"
+
+
+GAP_STATUSES = ("kodiert", "erzeugt", "fehler", "offen")
+
+
+def build_speaker_report(lines: Sequence[Line], casting: Casting, synth_rows: Mapping[str, dict],
+                         encoded: Mapping[str, dict], index_entries: Mapping[str, dict]) -> dict[str, Counter]:
+    """Status je Sprecher; Barks und generische Sprecher gehören nicht zu Plan 5."""
+    result: dict[str, Counter] = {}
+    for line in lines:
+        if line.category == "bark" or line.generic:
+            continue
+        who = "(Spieler)" if line.category == "player" else line.actor
+        result.setdefault(who, Counter())[_status(line, casting, synth_rows, encoded, index_entries)] += 1
+    return result
+
+
+def format_speaker_report(report: Mapping[str, Counter], casting: Casting) -> str:
+    def total(counts: Counter) -> int:
+        return sum(counts.values())
+
+    out = []
+    gap_lines = gap_speakers = 0
+    for who in sorted(report, key=lambda w: (-total(report[w]), w)):
+        counts = report[who]
+        voice = casting.default_player if who == "(Spieler)" else casting.speakers.get(who.lower())
+        parts = [f"{counts[k]} {k}" for k in ORDER if counts[k]]
+        parts += [f"{n} {k}" for k, n in sorted(counts.items()) if k.startswith("übersprungen")]
+        out.append(f"{who} ({voice or 'keine Stimme'}): {total(counts)} Zeilen -> " + ", ".join(parts))
+        gaps = sum(counts[k] for k in GAP_STATUSES)
+        if gaps:
+            gap_lines += gaps
+            gap_speakers += 1
+    out.append(f"Lücken: {gap_lines} Zeilen bei {gap_speakers} Sprechern (nicht installiert, nicht übersprungen)")
+    return "\n".join(out)

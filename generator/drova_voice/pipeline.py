@@ -21,7 +21,7 @@ from drova_voice.jsonl import append_jsonl, latest_by_id, read_jsonl_lenient, wr
 from drova_voice.lines import (Line, build_lines, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
 from drova_voice.preview import write_preview
 from drova_voice.profiles import LOW_CONFIDENCE, Profile, merge_import, prepare_packets, read_profiles, write_profiles
-from drova_voice.report import build_report, format_report
+from drova_voice.report import build_report, build_speaker_report, format_report, format_speaker_report
 from drova_voice.selection import (DEFAULT_BATCH_CHARS, batch_lines, plan_batches, read_batches, sample_lines,
                                    speaker_stats, write_batches)
 from drova_voice.synth import SynthStatus, build_jobs, run_synth
@@ -320,9 +320,12 @@ def _report(cfg: Config, args: argparse.Namespace) -> int:
     entries = {}
     if index_path.is_file():
         entries = json.loads(index_path.read_text(encoding="utf-8-sig")).get("entries", {})
-    statuses = build_report(lines, casting, latest_by_id(read_jsonl_lenient(synth_results_path(cfg))),
-                            latest_by_id(read_jsonl_lenient(encoded_path(cfg))), entries)
-    print(format_report(statuses))
+    synth_rows = latest_by_id(read_jsonl_lenient(synth_results_path(cfg)))
+    encoded = latest_by_id(read_jsonl_lenient(encoded_path(cfg)))
+    if args.by_speaker:
+        print(format_speaker_report(build_speaker_report(lines, casting, synth_rows, encoded, entries), casting))
+        return 0
+    print(format_report(build_report(lines, casting, synth_rows, encoded, entries)))
     return 0
 
 
@@ -455,6 +458,7 @@ def add_parsers(sub) -> None:
     _add_selection(ins, "nur Bäume, in denen dieser NPC spricht (frühere Einträge bleiben erhalten)")
     rp = sub.add_parser("report", help="Status je Kategorie: offen, erzeugt, kodiert, installiert, übersprungen")
     _add_selection(rp)
+    rp.add_argument("--by-speaker", action="store_true", help="Status je Sprecher statt je Kategorie")
     pv = sub.add_parser("preview", help="Hörseite out/preview/index.html (Zeilen mit Emotion und Audio)")
     _add_selection(pv)
     bt = sub.add_parser("batches", help="Etappen für den Vollauf planen (data/batches.json)")

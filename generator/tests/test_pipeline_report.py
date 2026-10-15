@@ -28,3 +28,12 @@ def test_report_after_full_run(pipeline_repo, guarded, capsys):
     assert main(base + ["report"]) == 0
     out = capsys.readouterr().out
     assert "dialog: 4 Zeilen -> installiert: 2" in out and "player: 2 Zeilen -> installiert: 1, übersprungen: player_choice: 1" in out
+
+
+def test_report_by_speaker(pipeline_repo, capsys):
+    base = ["--config", str(pipeline_repo.cfg)]
+    main(base + ["extract"])
+    capsys.readouterr()
+    assert main(base + ["report", "--by-speaker"]) == 0
+    out = capsys.readouterr().out
+    assert "Mira (lena)" in out and "Lücken" in out
