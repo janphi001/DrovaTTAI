@@ -7,6 +7,7 @@
 {"id": "DT_BanditMine_StartDay2|Dialog/BrutusMineDays|Plh_5", "emotion": "stern", "intensity": 0.6, "events": [], "emphasis": ["FEIERN"], "notes": [], "source": "llm"}
 {"id": "DT_BanditMine_StartDay2|Dialog/BrutusMineDays|Plh_59", "emotion": "nervous", "intensity": 0.5, "events": [{"tag": "um", "pos": 0}], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_BanditMine_StartDay2|Dialog/BrutusMineDays|Plh_62", "emotion": "angry", "intensity": 0.6, "events": [], "emphasis": ["ARBEIT"], "notes": [], "source": "llm"}
+{"id": "DT_BanditMine_StartDay3|Dialog/BrutusMineDays|Plh_63#neutral", "emotion": "neutral", "intensity": 0.0, "events": [], "emphasis": [], "notes": ["whisper"], "source": "stage"}
 {"id": "DT_BanditMine_StartDay3|Dialog/BrutusMineDays|Plh_68", "emotion": "angry", "intensity": 0.5, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_BanditMine_StartDay3|Dialog/BrutusMineDays|Plh_73", "emotion": "sad", "intensity": 0.4, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_BanditMine_StartDay3|Dialog/BrutusMineDays|Plh_76", "emotion": "angry", "intensity": 0.6, "events": [], "emphasis": ["Fresse"], "notes": [], "source": "llm"}
@@ -21,6 +22,7 @@
 {"id": "DT_BanditMine_StartDay4|Dialog/BrutusMineDays|Plh_114", "emotion": "neutral", "intensity": 0.0, "events": [], "emphasis": [], "notes": ["whisper"], "source": "stage"}
 {"id": "DT_BanditMine_StartDay4|Dialog/BrutusMineDays|Plh_117", "emotion": "sad", "intensity": 0.4, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_BanditMine_StartDay4|Dialog/BrutusMineDays|Plh_119", "emotion": "excited", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
+{"id": "DT_BanditMine_StartDay4|Dialog/BrutusMineDays|Plh_63#neutral", "emotion": "neutral", "intensity": 0.0, "events": [], "emphasis": [], "notes": ["whisper"], "source": "stage"}
 {"id": "DT_BanditMine_StartDay4|Dialog/BrutusMineDays|Plh_73", "emotion": "sad", "intensity": 0.4, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_BanditMine_StartDay4|Dialog/BrutusMineDays|Plh_90", "emotion": "neutral", "intensity": 0.0, "events": [], "emphasis": [], "notes": ["whisper"], "source": "stage"}
 {"id": "DT_BanditMine_StartDay4|Dialog/BrutusMineDays|Plh_91", "emotion": "angry", "intensity": 0.5, "events": [], "emphasis": [], "notes": [], "source": "llm"}
@@ -1621,6 +1623,7 @@
 {"id": "DT_PreApo_Greet_1_NPC_Piglet_Cay|Dialog/NPC_Piglet_Cay|Plh_55", "emotion": "angry", "intensity": 0.7, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_Greet_1_NPC_Piglet_Cay|Dialog/NPC_Piglet_Cay|Plh_56", "emotion": "angry", "intensity": 0.9, "events": [], "emphasis": ["MEINEM"], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_Greet_1_NPC_Pwyll|Dialog/NPC_Pwyll|Plh_132", "emotion": "joyful", "intensity": 0.5, "events": [], "emphasis": [], "notes": [], "source": "llm"}
+{"id": "DT_PreApo_Greet_1_NPC_Pwyll|Dialog/NPC_Pwyll|Plh_210#neutral", "emotion": "joyful", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_PreApo_Greet_1_NPC_Pwyll|Dialog/NPC_Pwyll|Plh_8", "emotion": "joyful", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_Greet_1_NPC_Reija|Dialog/NPC_Reija|Plh_216", "emotion": "nervous", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_Greet_1_NPC_Reija|Dialog/NPC_Reija|Plh_237", "emotion": "neutral", "intensity": 0.0, "events": [{"tag": "sigh", "pos": 0}], "emphasis": [], "notes": [], "source": "stage"}
@@ -1788,6 +1791,7 @@
 {"id": "DT_PreApo_Intent_1_NPC_Bruna|Dialog/NPC_Bruna|Plh_85", "emotion": "tender", "intensity": 0.4, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_Intent_1_NPC_Bruna|Dialog/NPC_Bruna|Plh_86", "emotion": "sad", "intensity": 0.4, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_Intent_1_NPC_Caspara|Dialog/NPC_Caspara|Plh_67", "emotion": "stern", "intensity": 0.7, "events": [], "emphasis": [], "notes": [], "source": "llm"}
+{"id": "DT_PreApo_Intent_1_NPC_Caspara|Dialog/NPC_Caspara|Plh_70#neutral", "emotion": "contemplative", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_PreApo_Intent_1_NPC_Cengiz|Dialog/NPC_Cengiz|Plh_300", "emotion": "angry", "intensity": 0.5, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_Intent_1_NPC_Cengiz|Dialog/NPC_Cengiz|Plh_301", "emotion": "stern", "intensity": 0.5, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_Intent_1_NPC_Cengiz|Dialog/NPC_Cengiz|Plh_325", "emotion": "angry", "intensity": 0.7, "events": [], "emphasis": ["ARBEITET"], "notes": [], "source": "llm"}
@@ -3751,6 +3755,7 @@
 {"id": "DT_Quest_ExpeditionRuinenlager_NPC_Eugen|Dialog/NPC_Eugen|Plh_201", "emotion": "excited", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_ExpeditionRuinenlager_NPC_Eugen|Dialog/NPC_Eugen|Plh_570", "emotion": "stern", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_ExpeditionRuinenlager_NPC_Farlan|Dialog/NPC_Farlan|Plh_43", "emotion": "joyful", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
+{"id": "DT_Quest_ExpeditionRuinenlager_NPC_Farlan|Dialog/NPC_Farlan|Plh_72#neutral", "emotion": "joyful", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_Quest_ExpeditionRuinenlager_NPC_Farlan|Dialog/NPC_Farlan|Plh_86", "emotion": "joyful", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_Quest_ExpeditionRuinenlager_NPC_Lindon|Dialog/NPC_Lindon|Plh_98", "emotion": "nervous", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_ExpeditionStates_NPC_Eugen|Dialog/NPC_Eugen|Plh_841", "emotion": "nervous", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
@@ -4635,6 +4640,7 @@
 {"id": "DT_Quest_PreExpeditionRuinenlager_NPC_Gera|Dialog/NPC_Gera|Plh_34", "emotion": "nervous", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_PreExpeditionRuinenlager_NPC_Jola|Dialog/NPC_Jola|Plh_165", "emotion": "excited", "intensity": 0.5, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_PreRunestoneVergabe_NPC_Molvina|Dialog/NPC_Molvina|Plh_164", "emotion": "tender", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
+{"id": "DT_Quest_PwyllAndPlayerIntroduce_NPC_Pwyll|Dialog/NPC_Pwyll|Plh_23#neutral", "emotion": "tender", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_Quest_PwyllAndPlayerIntroduce_NPC_Pwyll|Dialog/NPC_Pwyll|Plh_26", "emotion": "tender", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_Quest_QuestBeehives_NPC_Bombus|Dialog/NPC_Bombus|Plh_107", "emotion": "joyful", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_Quest_QuestBeehives_NPC_Bombus|Dialog/NPC_Bombus|Plh_109", "emotion": "nervous", "intensity": 0.5, "events": [], "emphasis": [], "notes": [], "source": "llm"}
@@ -5180,6 +5186,7 @@
 {"id": "DT_Quest_TalkInChapter4_NPC_Pwyll|Dialog/NPC_Pwyll|Plh_203", "emotion": "joyful", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_TalkInChapter4_NPC_Pwyll|Dialog/NPC_Pwyll|Plh_204", "emotion": "tender", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_Quest_TalkInChapter4_NPC_Pwyll|Dialog/NPC_Pwyll|Plh_205", "emotion": "sad", "intensity": 0.5, "events": [], "emphasis": [], "notes": [], "source": "llm"}
+{"id": "DT_Quest_TalkInChapter4_NPC_Pwyll|Dialog/NPC_Pwyll|Plh_209#neutral", "emotion": "joyful", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_Quest_TalkInChapter4_NPC_Pwyll|Dialog/NPC_Pwyll|Plh_214", "emotion": "joyful", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_Quest_TalkToKessiaAboutSecretPlace_NPC_Kessia|Dialog/NPC_Kessia|Plh_15", "emotion": "excited", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_TalkToKessiaAboutSecretPlace_NPC_Kessia|Dialog/NPC_Kessia|Plh_16", "emotion": "angry", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
@@ -5196,6 +5203,7 @@
 {"id": "DT_Quest_TaronsLastPigletEnding_NPC_Taron|Dialog/NPC_Taron|Plh_174", "emotion": "angry", "intensity": 0.8, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_TaronsLastPigletEnding_NPC_Taron|Dialog/NPC_Taron|Plh_177", "emotion": "angry", "intensity": 0.9, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_TaronsLastPigletEnding_NPC_Taron|Dialog/NPC_Taron|Plh_254", "emotion": "tender", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
+{"id": "DT_Quest_TaronsLastPigletEnding_NPC_Taron|Dialog/NPC_Taron|Plh_256#neutral", "emotion": "tender", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_Quest_TaronsLastPigletEnding_NPC_Taron|Dialog/NPC_Taron|Plh_262", "emotion": "surprised", "intensity": 0.7, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_TaronsLastPigletEnding_NPC_Taron|Dialog/NPC_Taron|Plh_263", "emotion": "surprised", "intensity": 0.8, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_TaronsLastPigletEnding_NPC_Taron|Dialog/NPC_Taron|Plh_264", "emotion": "surprised", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}

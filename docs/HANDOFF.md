@@ -11,7 +11,7 @@ KI-Stimmen für das Spiel **Drova – Forsaken Kin**. Ein Python-Generator (`gen
 | Plan 1 Fundament, Plan 2 Fish + Export, Plan 3 Generator | fertig (Branches `plan-1-foundation`, `plan-2-fish-export`, `plan-3-generator`) |
 | **Plan 4 Wiedergabe in der Mod** | **fertig und vom Nutzer abgenommen** (Branch `plan-4-playback`; Notiz `docs/decisions/2026-10-playback-durchstich.md`) |
 | **Plan 5 Casting und Vollauf** | **Code fertig, Vollauf bei Fish durch** (Branch `plan-5-casting` auf `plan-4-playback`; 471 pytest grün; alle 245 benannten Sprecher besetzt und vertont, `report --by-speaker`: Lücken 0; Notiz `docs/decisions/2026-10-casting-vollauf.md`). Stichprobe im Spiel vom Nutzer abgenommen (2026-10-15) |
-| Namensvarianten | neutral, siehe docs/superpowers/specs/2026-10-15-namensvarianten-design.md; Code fertig auf Branch `plan-6-namensvarianten` (neutral, ca. 95 Zeilen); Vollauf bei Fish und Hörtest stehen aus |
+| Namensvarianten | neutral, siehe docs/superpowers/specs/2026-10-15-namensvarianten-design.md; Code fertig auf Branch `plan-6-namensvarianten`; 94 neutrale Zeilen bei Fish erzeugt, installiert (Index 11.507 Einträge) und Mod gebaut (2026-10-15); Hörtest im Spiel steht aus. 166 Bark-Zeilen wurden dabei versehentlich mit erzeugt (WAV im Cache `cache/synth/`, nicht kodiert/installiert; für Barks (M6) wiederverwendbar) |
 | Merge/Push der Branches | erledigt: `main` und `origin/main` stehen auf `plan-5-casting` (gepusht); `plan-6-namensvarianten` ist weder gemergt noch gepusht |
 | Tests | 155 xUnit (Core), 483 pytest (Generator), alle grün |
 
