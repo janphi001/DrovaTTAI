@@ -39,10 +39,10 @@ namespace DrovaVoice.Core
             // Höchstes Gewicht gewinnt (Rendezvous-Hashing): Fehlt einer Zeile eine Variante, behält die Figur
             // ihre Stimme, solange diese da ist, statt dass sich mit der Listenlänge alles verschiebt.
             string best = pool[0];
-            uint bestWeight = Fnv1a(key + "" + best);
+            uint bestWeight = Fnv1a(key + "#" + best);
             for (int i = 1; i < pool.Count; i++)
             {
-                uint weight = Fnv1a(key + "" + pool[i]);
+                uint weight = Fnv1a(key + "#" + pool[i]);
                 if (weight > bestWeight) { best = pool[i]; bestWeight = weight; }
             }
             return best;
