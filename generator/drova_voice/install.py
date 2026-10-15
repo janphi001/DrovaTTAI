@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import filecmp
 import json
 import shutil
 from dataclasses import dataclass, field
@@ -39,8 +40,7 @@ def _load_index(path: Path, language: str) -> dict[str, dict]:
 def _same_file(src: Path, dst: Path) -> bool:
     if not dst.is_file():
         return False
-    a, b = src.stat(), dst.stat()
-    return a.st_size == b.st_size and int(a.st_mtime) == int(b.st_mtime)
+    return filecmp.cmp(src, dst, shallow=False)
 
 
 def install_audio(rows: Sequence[dict], audio_dir: Path, install_dir: Path, language: str,
