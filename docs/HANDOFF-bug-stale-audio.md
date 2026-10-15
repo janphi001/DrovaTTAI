@@ -49,3 +49,6 @@ Kopie: `out/bug-stale-audio-Latest.log` (gitignored; Original wird beim nächste
 ## Ursache gefunden und Fix (2026-10-15, Sonde im Spiel)
 Log: Jeder NPC hat `Dialogue_<Name>/DialogueUIController` mit einer `AudioSource` (`playOnAwake=True`, `loop=False`), die den Clip nach dem Abspielen behält. Henrike spielte um 14:30:42 ihre Zeile von 14:30:00 erneut, nachdem ihre Quelle zwischenzeitlich weg war und wieder auftauchte (Hypothese 0 bestätigt).
 Fix: `StaleAudioProbe` nimmt jetzt (immer, nicht nur mit `Diagnostics`) den Clip von jeder AudioSource ab (`clip = null`), die einen Clip der Mod hält und in zwei Scans (ca. 0,5 s) hintereinander nicht spielt; erfasst auch inaktive Objekte. Mit `Diagnostics` loggt sie `[Sonde] Clip abgenommen`. **Im Spiel noch nicht abgenommen.** Prüfen: weiter normal sprechen (Skip, Fenster schließen, mehrere Zeilen hintereinander), und beim Herumlaufen dürfen keine alten Stimmen mehr kommen. Falls eine Zeile zu früh abgeschnitten oder stumm ist, ist die Wartezeit (2 Scans) zu kurz.
+
+## Abnahme (2026-10-15)
+Der Nutzer hat den Fix im Spiel geprüft: Es klappt, keine alten Stimmen mehr beim Herumlaufen. Bug erledigt.

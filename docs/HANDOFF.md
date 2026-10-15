@@ -47,6 +47,7 @@ KI-Stimmen für das Spiel **Drova – Forsaken Kin**. Ein Python-Generator (`gen
 Alle Befehle in `generator/` (siehe `docs/generator.md`): `extract` (aus `data/export/de/manifest-loaded.json`) → `cast --check --npc X` → `emote --npc X` → `synth --npc X` (Fish, 8 parallel, braucht Key + Ja) → `encode` → `install` → `report`/`preview`. Neue Sprecher: Stimme in `casting/casting.yaml` eintragen (`name: {voice: schlüssel}`).
 
 ## Offene Entscheidungen / nächste Schritte
+0. Bug "alte Dialoge beim Herumlaufen" ist behoben und abgenommen (`docs/HANDOFF-bug-stale-audio.md`).
 1. **Stichprobe im Spiel** (Spiel starten, mit verschiedenen NPCs sprechen; Alte-Frau-, Riesen- und Kinderstimmen besonders), danach Korrekturen in `casting/casting.yaml` und die betroffenen Zeilen neu erzeugen (WAV in `cache/synth/` löschen, `synth --npc X`, `encode`, `install`). Plan 5 ist sonst abgeschlossen.
 2. Danach Mod-Ausbau: Namensvarianten `#arden`/`#neutral` (535 `$GVAR`-Zeilen, bisher übersprungen), Regler im Spiel, Barks (M6, braucht Entfernungslogik), Briefe (M7).
 3. Offene Lücken: 98-%-Lücke im Export (1.181 Zeilen ohne Sprecher; Lösungsansatz in `docs/decisions/2026-10-export-findings.md`), Jero und Adela im Spiel noch nie gehört, Regler-Wirkung (z. B. 150 %) im Spiel nicht geprüft.
