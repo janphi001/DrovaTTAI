@@ -40,6 +40,9 @@ namespace DrovaVoice.Playback
         }
 
         /// <summary>True, wenn die Zeile (oder ihre neutrale Variante) einen eigenen Eintrag hat, also keine Poolstimme gewählt werden muss.</summary>
+        /// <summary>True, wenn die Zeile keinen eigenen Eintrag, aber Poolvarianten hat (generische Figur).</summary>
+        public bool IsPoolLine(string id) => !HasEntry(id) && _index.PoolVariants(id).Count > 0;
+
         public bool HasEntry(string id) => _index.ResolveVariant(id, LineIds.NeutralVariant) is string r && _index.TryGet(r, out _);
 
         public AudioClip? GetClip(string? id, FigureInfo? figure = null)
