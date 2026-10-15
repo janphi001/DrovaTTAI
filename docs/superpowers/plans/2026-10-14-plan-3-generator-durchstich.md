@@ -19,7 +19,7 @@
 - Fish-Schlüssel nur als Umgebungsvariable `FISH_API_KEY`, nie in Dateien, Befehlen im Repo oder Commits.
 - Zeilen-IDs ausschließlich über `drova_voice.ids` bilden (`statement_id`, `choice_id`, `with_variant`, `audio_filename`).
 - Fish-Messwerte (`docs/decisions/2026-10-fish-throughput.md`): 8 parallele Anfragen als Standard, gemessen rund 17 Zeichen Sprechtext pro Sekunde Audio.
-- Commit-Nachrichten enden mit `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` (zweites `-m`).
+- Commit-Nachrichten sind englisch, Imperativ, ohne Claude-Trailer.
 - Arbeitsverzeichnis für Python-Befehle: `generator/`; Aufruf über `.venv/Scripts/python.exe` bzw. `.venv/Scripts/drova-voice`.
 
 ## Review Focus
@@ -570,7 +570,7 @@ Expected: alle Tests grün (vorher 303, jetzt plus die neuen).
 
 ```bash
 git add generator casting/lexicon.yaml
-git commit -m "Add the extract step: speech text per line from the manifest and .loc" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the extract step: speech text per line from the manifest and .loc"
 ```
 
 ---
@@ -801,7 +801,7 @@ Expected: alle grün.
 
 ```bash
 git add generator casting/casting.yaml
-git commit -m "Add the casting step: speaker to voice mapping and cast --check" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the casting step: speaker to voice mapping and cast --check"
 ```
 
 ---
@@ -1003,7 +1003,7 @@ Expected: alle grün.
 
 ```bash
 git add generator casting/emotions.jsonl
-git commit -m "Add the emote step: stage-direction emotions merged with llm and manual rows" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the emote step: stage-direction emotions merged with llm and manual rows"
 ```
 
 ---
@@ -1477,7 +1477,7 @@ Expected: alle grün.
 
 ```bash
 git add generator
-git commit -m "Add the synth step: parallel resumable synthesis with a content-addressed cache" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the synth step: parallel resumable synthesis with a content-addressed cache"
 ```
 
 ---
@@ -1791,7 +1791,7 @@ Expected: alle grün (ffmpeg ist installiert, die `needs_ffmpeg`-Tests laufen).
 
 ```bash
 git add generator
-git commit -m "Add the encode step: trimmed, loudness-normalized OGG per line" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the encode step: trimmed, loudness-normalized OGG per line"
 ```
 
 ---
@@ -2095,7 +2095,7 @@ Expected: alle grün.
 
 ```bash
 git add generator docs/audio-format.md
-git commit -m "Add the install step and define the index.json contract for the mod" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the install step and define the index.json contract for the mod"
 ```
 
 ---
@@ -2292,7 +2292,7 @@ Expected: alle grün.
 
 ```bash
 git add generator
-git commit -m "Add the report step: per-category status from extract to install" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the report step: per-category status from extract to install"
 ```
 
 ---
@@ -2417,7 +2417,7 @@ Expected: alle grün.
 
 ```bash
 git add generator
-git commit -m "Add the preview step: a listening page per NPC" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the preview step: a listening page per NPC"
 ```
 
 ---
@@ -2481,7 +2481,7 @@ Kein Spielertext in der Doku.
 
 ```bash
 git add generator/tests/test_pipeline_e2e.py docs/generator.md
-git commit -m "Add the end-to-end pipeline test and the generator guide" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the end-to-end pipeline test and the generator guide"
 ```
 
 - [ ] **Step 4: Freigabe für den echten Lauf einholen (Hauptsitzung, nicht Subagent)**
@@ -2531,7 +2531,7 @@ Hörseite mit `SendUserFile`/Browser öffnen (`out/preview/index.html`). Der Nut
 
 ```bash
 git add casting docs/decisions/2026-10-adela-durchstich.md
-git commit -m "Record the Adela vertical slice: casting, emotions and listening results" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Record the Adela vertical slice: casting, emotions and listening results"
 ```
 Abschluss: `<Spiel>/Mods/DrovaVoice/Audio/de/index.json` mit 22 Einträgen liegt bereit; Plan 4 (Wiedergabe in der Mod, M3) schreibt der Nutzer mit mir als Nächstes, Grundlage ist `docs/audio-format.md`.
 

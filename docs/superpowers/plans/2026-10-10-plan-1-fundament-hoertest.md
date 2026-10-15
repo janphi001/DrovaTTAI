@@ -22,7 +22,7 @@
 - C#-Mod: `net6.0`, MelonLoader ≥ 0.7.0; `DrovaVoice.Core` ohne Il2Cpp-/Unity-Abhängigkeit.
 - Spielpfad: `D:\Games\Steam\steamapps\common\Drova - Forsaken Kin` (überschreibbar per `DROVA_GAME_DIR` bzw. `config.yaml`).
 - **Downloads/Installationen ins System oder den Spielordner (Modelle, torch, MelonLoader, API) erst nach ausdrücklicher Freigabe des Nutzers** (Dateiname, Quelle, Größe nennen).
-- Jeder Commit endet mit der Zeile `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Jeder Commit ist englisch, Imperativ, ohne Claude-Trailer.
 - Code-Bezeichner Englisch, Nutzer-Meldungen (CLI/Log) Deutsch.
 
 ## Review Focus
@@ -270,7 +270,7 @@ Run: `cp generator/config.example.yaml generator/config.yaml`
 
 ```bash
 git add .gitignore README.md generator/pyproject.toml generator/config.example.yaml generator/drova_voice/__init__.py generator/drova_voice/config.py generator/tests/test_config.py
-git commit -m "Add repo scaffolding and generator config" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add repo scaffolding and generator config"
 ```
 
 ---
@@ -405,7 +405,7 @@ Expected: 8 passed
 
 ```bash
 git add tests/vectors/line_ids.json generator/drova_voice/ids.py generator/tests/test_ids.py
-git commit -m "Add line id scheme with shared test vectors" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add line id scheme with shared test vectors"
 ```
 
 ---
@@ -599,7 +599,7 @@ Expected: `Passed!` (mindestens 4 Tests, die Theory-Fälle können als einer zä
 
 ```bash
 git add mod/Directory.Build.props mod/DrovaVoice.sln mod/DrovaVoice.Core mod/DrovaVoice.Core.Tests
-git commit -m "Add DrovaVoice.Core line ids matching Python vectors" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add DrovaVoice.Core line ids matching Python vectors"
 ```
 
 ---
@@ -779,7 +779,7 @@ Expected: ca. 22.500 Einträge; Fehlerzeilen nahe 0. Jede gemeldete Fehlerzeile 
 
 ```bash
 git add generator/drova_voice/loc.py generator/tests/test_loc.py
-git commit -m "Add .loc parser" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add .loc parser"
 ```
 
 ---
@@ -964,7 +964,7 @@ Expected: 9 passed. Falls `num2words` eine andere Schreibweise liefert (z. B. �
 
 ```bash
 git add generator/drova_voice/speech_text.py generator/tests/test_speech_text.py
-git commit -m "Add speech text normalization" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add speech text normalization"
 ```
 
 ---
@@ -1122,7 +1122,7 @@ Expected: ca. 150 automatisch, ca. 80–110 mit Prüfbedarf. 10 zufällige autom
 
 ```bash
 git add generator/drova_voice/player_name.py generator/tests/test_player_name.py
-git commit -m "Add player name variants" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add player name variants"
 ```
 
 ---
@@ -1332,7 +1332,7 @@ Expected: 11 passed
 
 ```bash
 git add generator/drova_voice/emotions.py generator/tests/test_emotions.py
-git commit -m "Add engine-neutral emotion model and stage direction mapping" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add engine-neutral emotion model and stage direction mapping"
 ```
 
 ---
@@ -1460,7 +1460,7 @@ Expected: 9 passed
 
 ```bash
 git add generator/drova_voice/render.py generator/tests/test_render.py
-git commit -m "Add engine-specific emotion rendering" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add engine-specific emotion rendering"
 ```
 
 ---
@@ -1764,7 +1764,7 @@ Expected: 6 passed
 
 ```bash
 git add generator/drova_voice/engines generator/workers/_common generator/workers/fake generator/tests/test_engine_client.py
-git commit -m "Add engine worker protocol, client and fake worker" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add engine worker protocol, client and fake worker"
 ```
 
 ---
@@ -1964,7 +1964,7 @@ Expected: 5 passed
 
 ```bash
 git add generator/drova_voice/jsonl.py generator/drova_voice/bakeoff.py generator/tests/test_bakeoff_select.py
-git commit -m "Add bake-off sample selection" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add bake-off sample selection"
 ```
 
 ---
@@ -2378,7 +2378,7 @@ Expected: `32 Zeilen → …/data/bakeoff/samples.jsonl` (± einige, falls ein B
 
 ```bash
 git add generator/drova_voice/bakeoff.py generator/drova_voice/cli.py generator/bakeoff_voices.yaml generator/tests/test_bakeoff_run.py generator/tests/test_cli.py
-git commit -m "Add bake-off runner, listening sheet and CLI" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add bake-off runner, listening sheet and CLI"
 ```
 
 ---
@@ -2619,7 +2619,7 @@ Expected: `xtts: OK`; Liste der eingebauten Sprecher. Prüfen, dass „Ana Flore
 
 ```bash
 git add generator/workers/kitten generator/workers/chatterbox generator/workers/xtts generator/bakeoff_voices.yaml
-git commit -m "Add Kitten, Chatterbox and XTTS engine workers" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add Kitten, Chatterbox and XTTS engine workers"
 ```
 
 ---
@@ -2683,7 +2683,7 @@ Getestet: Kitten TTS 2 (German + Klon), Chatterbox Multilingual (Standard + Klon
 
 ```bash
 git add docs/decisions/2026-10-tts-engine.md generator/bakeoff_voices.yaml
-git commit -m "Record TTS engine decision from bake-off" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Record TTS engine decision from bake-off"
 ```
 
 ---
@@ -2754,7 +2754,7 @@ Rückbau: `version.dll`, `MelonLoader/`, `Mods/`, `UserLibs/`, `Plugins/` (falls
 
 ```bash
 git add docs/setup.md
-git commit -m "Document game and mod loader setup" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Document game and mod loader setup"
 ```
 
 ---
@@ -2844,7 +2844,7 @@ Expected: `DrovaVoice 0.1.0 geladen (Core ok: 950774fdbc26dddf.ogg)` – der Has
 
 ```bash
 git add mod/DrovaVoice mod/DrovaVoice.sln
-git commit -m "Add DrovaVoice mod skeleton that loads in game" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add DrovaVoice mod skeleton that loads in game"
 ```
 
 ---
