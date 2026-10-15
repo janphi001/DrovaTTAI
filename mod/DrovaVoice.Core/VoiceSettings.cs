@@ -18,8 +18,8 @@ namespace DrovaVoice.Core
         public int BarkPercent { get; private set; }
         public float BarkMinDistance { get; private set; }
         public float BarkMaxDistance { get; private set; }
-        public const float DefaultBarkMinDistance = 3f;
-        public const float DefaultBarkMaxDistance = 30f;
+        public const float DefaultBarkMinDistance = 15f;
+        public const float DefaultBarkMaxDistance = 120f;
         public string Language { get; private set; } = DefaultLanguage;
         public int CacheMegabytes { get; private set; }
         public bool Diagnostics { get; private set; }
