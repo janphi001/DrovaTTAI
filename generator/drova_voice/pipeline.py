@@ -12,7 +12,7 @@ from drova_voice.assign import assign
 from drova_voice.casting import cast_report, load_casting, tree_conflicts, voice_speakers, write_auto_casting
 from drova_voice.casting_sheet import write_casting_sheet
 from drova_voice.config import Config
-from drova_voice.emote import merge_emotions, read_emotions, write_emotions
+from drova_voice.emote import import_llm_emotions, merge_emotions, prepare_emote_packets, read_emotions, write_emotions
 from drova_voice.encode import run_encode
 from drova_voice.engines.client import EngineClient, cache_env, worker_command
 from drova_voice.fish_voices import load_catalog
@@ -180,9 +180,29 @@ def _emote(cfg: Config, args: argparse.Namespace) -> int:
     if lines is None:
         return 2
     try:
-        merged = merge_emotions(read_emotions(emotions_path(cfg)), lines)
+        existing = read_emotions(emotions_path(cfg))
+        profiles = read_profiles(profiles_path(cfg))
     except ValueError as e:
         return _fail(str(e))
+    if args.prepare:
+        packets = prepare_emote_packets(lines, profiles, args.size)
+        out = cfg.out_dir / "subagent" / "emote"
+        out.mkdir(parents=True, exist_ok=True)
+        for old in out.glob("packet_*.json"):
+            old.unlink()
+        for i, packet in enumerate(packets, start=1):
+            (out / f"packet_{i:03d}.json").write_text(json.dumps(packet, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"{sum(len(p) for p in packets)} Dialogbäume in {len(packets)} Paketen -> {out}")
+        return 0
+    if args.import_files:
+        rows = [row for f in args.import_files for row in read_jsonl_lenient(f)]
+        result = import_llm_emotions(existing, rows, {l.id for l in lines if not l.skip})
+        write_emotions(emotions_path(cfg), result.merged)
+        print(f"{result.imported} LLM-Emotionen übernommen, {result.kept} feste Zeilen behalten -> {emotions_path(cfg)}")
+        for e in result.errors[:20]:
+            print(f"FEHLER {e}", file=sys.stderr)
+        return 1 if result.errors else 0
+    merged = merge_emotions(existing, lines)
     write_emotions(emotions_path(cfg), merged)
     sources = Counter(t.source for t in merged.values())
     print(f"{len(merged)} Emotionen -> {emotions_path(cfg)}; " + ", ".join(f"{s}: {n}" for s, n in sorted(sources.items())))
@@ -445,7 +465,10 @@ def add_parsers(sub) -> None:
     cast.add_argument("--keep", action="store_true", help="mit --propose: bisherige Auto-Zuteilung behalten, nur Neue zuteilen")
     cast.add_argument("--max-speakers", type=int, default=12, help="--check: ab so vielen Sprechern gilt eine Stimme als überbelegt")
     em = sub.add_parser("emote", help="Emotionen aus Regieanweisungen nach casting/emotions.jsonl (llm/manual bleiben)")
-    em.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
+    _add_selection(em)
+    em.add_argument("--prepare", action="store_true", help="Dialogbäume als Pakete für Subagents nach out/subagent/emote schreiben")
+    em.add_argument("--size", type=int, default=20, help="Dialogbäume je Paket (Standard 20)")
+    em.add_argument("--import", dest="import_files", nargs="+", type=Path, metavar="DATEI", help="JSONL-Ergebnisse der Subagents einlesen")
     sy = sub.add_parser("synth", help="Sprache erzeugen (Cache unter cache/synth, wiederaufnehmbar)")
     sy.add_argument("--engine", default="fish")
     sy.add_argument("--workers", type=int, default=8, help="parallele Anfragen (Standard 8, gemessen ohne 429 bis 16)")
