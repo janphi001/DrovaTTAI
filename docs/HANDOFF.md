@@ -33,7 +33,7 @@ KI-Stimmen für das Spiel **Drova – Forsaken Kin**. Ein Python-Generator (`gen
 ## Fallen (nicht im Code ersichtlich)
 - **Export nur im Hauptmenü, Fenster vorn; danach Spiel beenden.** Ein Export im Hauptmenü macht die Vertonung der Sitzung wirkungslos: `AudioManager` der Modding API scheitert dort dauerhaft (`WorldEventSystemManager.Instance` ist null). Darum ersetzt die Mod den Connector erst in der Welt (`TryInstallConnector`).
 - Die API ruft `OnWorldDialogueStatement` nur bei `statement.audio == null`; der Standardconnector lädt alle Clips eines Baums beim Baumladen und blockiert den Hauptthread (darum eigener Connector mit Laden bei Bedarf). `DefaultAudioHandler` spielt nichts ab, das Spiel spielt `statement.audio`.
-- Mod bauen (`dotnet build mod/DrovaVoice -c Release`) **kopiert in den Spielordner** (Spiel muss geschlossen sein).
+- Mod ins Spiel kopieren: `dotnet build mod/DrovaVoice -c Release -p:DeployToGame=true` (Spiel muss geschlossen sein). Ein Build ohne `-p:DeployToGame=true` lässt den Spielordner unverändert.
 - Werkzeug-Eigenheit: In Python-Heredocs und mit dem Write-Werkzeug werden `\\`/`\n`-Folgen verändert; für Strings mit Rückstrich das Edit-Werkzeug nutzen. Pfadlisten, die Python unter Windows schreibt, haben `\r\n` (vor `rm`/Schleifen `tr -d '\r'`).
 - Zum Lesen von Il2Cpp-/API-Typen diente ein Mono.Cecil-Wegwerfwerkzeug (nutzt `MelonLoader/net6/Mono.Cecil.dll`); liegt nur im Scratchpad der Sitzung, in 5 Minuten neu gebaut.
 

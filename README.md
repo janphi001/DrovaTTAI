@@ -57,10 +57,10 @@ Mehr dazu und der Rückbau: `docs/setup.md`.
 
 ### 3. Mod bauen
 
-Das Spiel muss dabei **geschlossen** sein, denn der Build kopiert die Mod direkt in den Spielordner.
+Das Spiel muss dabei **geschlossen** sein. Der Build kopiert die Mod nur in den Spielordner, wenn `DeployToGame` gesetzt ist. Ohne die Eigenschaft wird nur kompiliert.
 
 ```bash
-dotnet build mod/DrovaVoice/DrovaVoice.csproj -c Release
+dotnet build mod/DrovaVoice/DrovaVoice.csproj -c Release -p:DeployToGame=true
 ```
 
 Liegt das Spiel nicht unter dem Standardpfad, setze vorher die Umgebungsvariable `DROVA_GAME_DIR` auf den Spielordner.

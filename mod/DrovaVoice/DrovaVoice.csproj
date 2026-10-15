@@ -33,7 +33,7 @@
       <Private>false</Private>
     </Reference>
   </ItemGroup>
-  <Target Name="DeployToGame" AfterTargets="Build" Condition="Exists('$(DrovaGameDir)\Mods')">
+  <Target Name="DeployToGame" AfterTargets="Build" Condition="'$(DeployToGame)' == 'true' And Exists('$(DrovaGameDir)\Mods')">
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(DrovaGameDir)\Mods" />
     <Copy SourceFiles="$(TargetDir)DrovaVoice.Core.dll" DestinationFolder="$(DrovaGameDir)\UserLibs" />
   </Target>

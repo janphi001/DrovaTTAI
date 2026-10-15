@@ -15,3 +15,5 @@ jobs:
         run: python3 tools/checks/commit_messages.py
       - name: Game dialogue
         run: python3 tools/checks/no_game_dialogue.py
+      - name: Mod deploy
+        run: python3 tools/checks/no_deploy_on_build.py
