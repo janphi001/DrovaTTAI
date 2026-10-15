@@ -7,7 +7,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Callable
 
-from drova_voice.casting import cast_report, load_casting
+from drova_voice.assign import assign
+from drova_voice.casting import cast_report, load_casting, tree_conflicts, voice_speakers, write_auto_casting
 from drova_voice.config import Config
 from drova_voice.emote import merge_emotions, read_emotions, write_emotions
 from drova_voice.encode import run_encode
@@ -94,6 +95,8 @@ def _load_casting(cfg: Config):
 
 
 def _cast(cfg: Config, args: argparse.Namespace) -> int:
+    if args.propose:
+        return _cast_propose(cfg, args)
     lines = _selected(cfg, args)
     if lines is None:
         return 2
@@ -104,7 +107,45 @@ def _cast(cfg: Config, args: argparse.Namespace) -> int:
     report = cast_report(lines, casting)
     print("Stimmen (Zeilen): " + (", ".join(f"{v}: {n}" for v, n in sorted(report.usage.items())) or "keine"))
     print("Sprecher ohne Stimme: " + (", ".join(f"{a}: {n}" for a, n in sorted(report.missing.items())) or "keine"))
+    crowded = {v: sorted(who) for v, who in voice_speakers(lines, casting).items() if len(who) > args.max_speakers}
+    if crowded:
+        print("Überbelegt (mehr als %d Sprecher): " % args.max_speakers
+              + "; ".join(f"{v}: {len(who)}" for v, who in sorted(crowded.items())))
+    conflicts = tree_conflicts(lines, casting)
+    if conflicts:
+        print(f"Gleiche Stimme im selben Baum: {len(conflicts)} Fälle")
+        for tree, voice, who in conflicts[:10]:
+            print(f"  {tree}: {voice} ({', '.join(who)})")
     return 1 if report.missing else 0
+
+
+def _cast_propose(cfg: Config, args: argparse.Namespace) -> int:
+    path = lines_path(cfg)
+    if not path.is_file():
+        return _fail(f"{path} fehlt (zuerst `drova-voice extract` ausführen)")
+    lines = read_lines(path)
+    try:
+        catalog = load_catalog(cfg.casting_dir / "fish_voices.yaml")
+        manual = load_casting(cfg.casting_dir / "casting.yaml", catalog.known())
+        merged = load_casting(cfg.casting_dir / "casting.yaml", catalog.known(), auto_casting_path(cfg))
+        profiles = read_profiles(profiles_path(cfg))
+    except (OSError, ValueError) as e:
+        return _fail(str(e))
+    stats = speaker_stats(lines)
+    kept = {n: v for n, v in merged.speakers.items() if n not in manual.speakers} if args.keep else {}
+    result = assign(stats, profiles, catalog.candidates(), {**kept, **manual.speakers})
+    write_auto_casting(auto_casting_path(cfg), {**kept, **result.voices})
+    print(f"{len(result.voices)} Sprecher neu zugeteilt, {len(kept)} behalten, {len(manual.speakers)} von Hand besetzt "
+          f"-> {auto_casting_path(cfg)}")
+    display = {s.name: s.display for s in stats}
+    if result.open:
+        print("Offen (kein Steckbrief): " + ", ".join(display[n] for n in result.open))
+    for name, why in sorted(result.emergency.items()):
+        print(f"Notbesetzung {display[name]}: {why}")
+    speakers_by_voice = Counter({**Counter(kept.values()), **Counter(manual.speakers.values())})
+    speakers_by_voice.update(result.voices.values())
+    print("Stimmen (Sprecher): " + ", ".join(f"{v}: {n}" for v, n in sorted(speakers_by_voice.items())))
+    return 1 if result.open else 0
 
 
 def emotions_path(cfg: Config) -> Path:
@@ -355,9 +396,12 @@ def _add_selection(parser, npc_help: str = "nur Bäume, in denen dieser NPC spri
 def add_parsers(sub) -> None:
     ex = sub.add_parser("extract", help="Manifest + .loc -> data/lines.jsonl (Sprechtext)")
     ex.add_argument("--manifest", type=Path, help="Standard: data/export/<Sprache>/manifest.json")
-    cast = sub.add_parser("cast", help="Prüft, ob jeder Sprecher eine Stimme hat (casting/casting.yaml)")
+    cast = sub.add_parser("cast", help="Besetzung prüfen (--check) oder aus Steckbriefen vorschlagen (--propose)")
     cast.add_argument("--check", action="store_true", help="nur prüfen (Standard und einzige Betriebsart in Plan 3)")
     cast.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
+    cast.add_argument("--propose", action="store_true", help="Stimmen aus den Steckbriefen zuteilen (casting/casting_auto.yaml)")
+    cast.add_argument("--keep", action="store_true", help="mit --propose: bisherige Auto-Zuteilung behalten, nur Neue zuteilen")
+    cast.add_argument("--max-speakers", type=int, default=12, help="--check: ab so vielen Sprechern gilt eine Stimme als überbelegt")
     em = sub.add_parser("emote", help="Emotionen aus Regieanweisungen nach casting/emotions.jsonl (llm/manual bleiben)")
     em.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
     sy = sub.add_parser("synth", help="Sprache erzeugen (Cache unter cache/synth, wiederaufnehmbar)")
