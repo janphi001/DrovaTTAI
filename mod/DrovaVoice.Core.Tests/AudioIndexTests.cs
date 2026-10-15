@@ -30,6 +30,16 @@ namespace DrovaVoice.Core.Tests
         }
 
         [Fact]
+        public void BarkFolderGetsTheBarkCategory()
+        {
+            const string json = @"{""version"":1,""language"":""de"",""entries"":{
+              ""DT_W|Dialog/W|Plh_1"": {""file"": ""bark/0123456789abcdef.ogg"", ""duration"": 1.0}}}";
+            var index = AudioIndex.Parse(json, "de");
+            Assert.True(index.TryGet("DT_W|Dialog/W|Plh_1", out var e));
+            Assert.Equal(VoiceCategory.Bark, e.Category);
+        }
+
+        [Fact]
         public void UnknownEmptyAndNullIdsAreMisses()
         {
             var index = AudioIndex.Parse(Good, "de");
@@ -107,7 +117,7 @@ namespace DrovaVoice.Core.Tests
         [Theory]
         [InlineData("player/default/x.ogg", VoiceCategory.Player)]
         [InlineData("dialog/x.ogg", VoiceCategory.Dialog)]
-        [InlineData("bark/x.ogg", VoiceCategory.Dialog)]
+        [InlineData("bark/x.ogg", VoiceCategory.Bark)]
         public void CategoryComesFromFolder(string file, VoiceCategory expected) =>
             Assert.Equal(expected, AudioIndex.CategoryOf(file));
     

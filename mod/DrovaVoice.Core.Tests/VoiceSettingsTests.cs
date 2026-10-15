@@ -21,6 +21,18 @@ namespace DrovaVoice.Core.Tests
             Assert.Empty(w);
         }
 
+        [Fact]
+        public void BarkPercentDefaultsTo100AndIsClamped()
+        {
+            var w = new List<string>();
+            Assert.Equal(100, VoiceSettings.Create(true, 100, 100, "de", 64, false, w).BarkPercent);
+            var s = VoiceSettings.Create(true, 100, 100, "de", 64, false, w, barkPercent: 250);
+            Assert.Equal(200, s.BarkPercent);
+            Assert.Contains("BarkVolume", w[0]);
+            Assert.Equal(200, s.PercentFor(VoiceCategory.Bark));
+            Assert.Equal(100, s.PercentFor(VoiceCategory.Dialog));
+        }
+
         [Theory]
         [InlineData(-1, 0)]
         [InlineData(250, 200)]

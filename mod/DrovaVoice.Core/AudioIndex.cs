@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace DrovaVoice.Core
 {
-    public enum VoiceCategory { Dialog, Player }
+    public enum VoiceCategory { Dialog, Player, Bark }
 
     public sealed record IndexEntry(string File, double Duration, VoiceCategory Category);
 
@@ -122,7 +122,9 @@ namespace DrovaVoice.Core
         }
 
         public static VoiceCategory CategoryOf(string file) =>
-            file.StartsWith("player/", StringComparison.Ordinal) ? VoiceCategory.Player : VoiceCategory.Dialog;
+            file.StartsWith("player/", StringComparison.Ordinal) ? VoiceCategory.Player
+            : file.StartsWith("bark/", StringComparison.Ordinal) ? VoiceCategory.Bark
+            : VoiceCategory.Dialog;
 
         /// <summary>Relativ, mit '/', ohne '..', ohne Laufwerk, ohne Rückwärtsstrich.</summary>
         public static bool IsSafeRelativePath(string file)

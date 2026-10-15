@@ -43,6 +43,7 @@ namespace DrovaVoice
             var enabled = category.CreateEntry("Enabled", true, description: "Vertonung an/aus");
             var dialogVolume = category.CreateEntry("DialogVolume", 100, description: "Lautstärke NPC-Stimmen in Prozent (0-200, über 100 = Verstärkung)");
             var playerVolume = category.CreateEntry("PlayerVolume", 100, description: "Lautstärke Spielerzeilen in Prozent (0-200, über 100 = Verstärkung)");
+            var barkVolume = category.CreateEntry("BarkVolume", 100, description: "Lautstärke Welt-Kommentare in Prozent (0-200, über 100 = Verstärkung)");
             var audioLanguage = category.CreateEntry("AudioLanguage", "de", description: "Unterordner unter Mods/DrovaVoice/Audio");
             var cacheMb = category.CreateEntry("CacheMB", 64, description: "Obergrenze für geladene Clips in MB (8-512)");
             var diagnostics = category.CreateEntry("Diagnostics", false, description: "Jede Zeile einmal loggen (geladen/ohne Eintrag)");
@@ -51,7 +52,7 @@ namespace DrovaVoice
             LoggerInstance.Msg($"DrovaVoice {Info.Version} geladen (Core ok: {probe}). Export: Datei export.trigger in {ModDir} anlegen oder F9 drücken.");
 
             var warnings = new List<string>();
-            var settings = VoiceSettings.Create(enabled.Value, dialogVolume.Value, playerVolume.Value, audioLanguage.Value, cacheMb.Value, diagnostics.Value, warnings);
+            var settings = VoiceSettings.Create(enabled.Value, dialogVolume.Value, playerVolume.Value, audioLanguage.Value, cacheMb.Value, diagnostics.Value, warnings, barkVolume.Value);
             foreach (string w in warnings) LoggerInstance.Warning(w);
             _voice = CreateVoice(settings);   // ChoiceHook.Service folgt erst, wenn der Connector ersetzt ist
         }
@@ -65,7 +66,7 @@ namespace DrovaVoice
             {
                 if (!File.Exists(indexPath)) { LoggerInstance.Warning($"Kein index.json unter {indexPath}; Vertonung bleibt aus."); return null; }
                 var index = AudioIndex.Parse(File.ReadAllText(indexPath), settings.Language);
-                LoggerInstance.Msg($"Index: {index.Count} Zeilen ({index.Skipped} übersprungen), Dialog {settings.DialogPercent} %, Spieler {settings.PlayerPercent} %, Cache {settings.CacheMegabytes} MB.");
+                LoggerInstance.Msg($"Index: {index.Count} Zeilen ({index.Skipped} übersprungen), Dialog {settings.DialogPercent} %, Spieler {settings.PlayerPercent} %, Barks {settings.BarkPercent} %, Cache {settings.CacheMegabytes} MB.");
                 return new VoiceService(index, root, settings, LoggerInstance);
             }
             catch (Exception e)

@@ -15,15 +15,21 @@ namespace DrovaVoice.Core
         public bool Enabled { get; private set; }
         public int DialogPercent { get; private set; }
         public int PlayerPercent { get; private set; }
+        public int BarkPercent { get; private set; }
         public string Language { get; private set; } = DefaultLanguage;
         public int CacheMegabytes { get; private set; }
         public bool Diagnostics { get; private set; }
         public long CacheBytes => CacheMegabytes * 1024L * 1024L;
 
-        public int PercentFor(VoiceCategory category) => category == VoiceCategory.Player ? PlayerPercent : DialogPercent;
+        public int PercentFor(VoiceCategory category) => category switch
+        {
+            VoiceCategory.Player => PlayerPercent,
+            VoiceCategory.Bark => BarkPercent,
+            _ => DialogPercent,
+        };
 
         public static VoiceSettings Create(bool enabled, int dialogPercent, int playerPercent, string? language,
-                                           int cacheMegabytes, bool diagnostics, List<string> warnings)
+                                           int cacheMegabytes, bool diagnostics, List<string> warnings, int barkPercent = 100)
         {
             return new VoiceSettings
             {
@@ -33,6 +39,7 @@ namespace DrovaVoice.Core
                 Language = CleanLanguage(language, warnings),
                 CacheMegabytes = ClampCache(cacheMegabytes, warnings),
                 Diagnostics = diagnostics,
+                BarkPercent = ClampPercent("BarkVolume", barkPercent, warnings),
             };
         }
 
