@@ -41,7 +41,7 @@ KI-Stimmen für das Spiel **Drova – Forsaken Kin**. Ein Python-Generator (`gen
 - **Keine echten Drova-Dialogtexte ins Git** (Tests mit erfundenem Text); Spieltexte nur nach Ja an Dienste.
 - **Fish-Key (`FISH_API_KEY`) nie speichern**: Er kommt vom Nutzer im Chat und wird nur als Umgebungsvariable im Einzelbefehl benutzt. Er stand mehrfach im Chat → der Nutzer soll ihn bei Fish zurücksetzen.
 - Gut abgegrenzte Aufgaben dürfen Haiku-Subagents erledigen; für Reviews mag der Nutzer lesende Opus-Subagents. Hörtests nimmt der Nutzer selbst ab.
-- Commits englisch, Imperativ, mit `Co-Authored-By`-Zeile; nichts pushen oder mergen ohne Nachfrage.
+- Commits englisch, Imperativ, **ohne** `Co-Authored-By`- oder sonstige Claude-Zeile (Nutzer will nicht als Mitautor stehen); nichts pushen oder mergen ohne Nachfrage.
 
 ## So macht man weiter (Generator)
 Alle Befehle in `generator/` (siehe `docs/generator.md`): `extract` (aus `data/export/de/manifest-loaded.json`) → `cast --check --npc X` → `emote --npc X` → `synth --npc X` (Fish, 8 parallel, braucht Key + Ja) → `encode` → `install` → `report`/`preview`. Neue Sprecher: Stimme in `casting/casting.yaml` eintragen (`name: {voice: schlüssel}`).
