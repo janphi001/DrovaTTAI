@@ -9,3 +9,7 @@ speakers:
   femke: {voice: schales_7ef3ea}   # Femke ist ein Mann (Nutzer, 2026-10-15); jung, freundlich, vorläufig
   gerion: {voice: lukas}
   gilwar: {voice: jonas}
+  # Korrekturen nach der Hörstufe (Nutzer, 2026-10-15)
+  jola: {voice: emma}
+  meluna: {voice: valentina}
+  reija: {voice: lebhafte_junge_frau_37bab8}
