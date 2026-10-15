@@ -31,6 +31,7 @@ namespace DrovaVoice
         private bool _connectorFailed;
         private StaleAudioProbe? _probe;
         private BarkDistance? _barkDistance;
+        private VoiceMenu? _menu;
 
         private string ModDir => Path.Combine(MelonEnvironment.ModsDirectory, "DrovaVoice");
         private string TriggerPath => Path.Combine(ModDir, "export.trigger");
@@ -97,6 +98,9 @@ namespace DrovaVoice
                 _probe = new StaleAudioProbe(LoggerInstance, _voice.Diagnostics);
                 _barkDistance = new BarkDistance(_voice.BarkMinDistance, _voice.BarkMaxDistance, LoggerInstance, _voice.Diagnostics);
                 _voice.BarkDistance = _barkDistance;
+                _menu = new VoiceMenu(_voice, LoggerInstance);
+                _menu.Register();
+                try { _menu.LoadFromConfig(); } catch (Exception) { /* Konfiguration noch nicht bereit: Datei-Einstellungen gelten */ }
                 ChoiceHook.Service = _voice;
                 LoggerInstance.Msg("Audio-Connector der Modding API ersetzt.");
             }
