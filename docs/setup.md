@@ -5,7 +5,7 @@ Getestet mit: Drova: Forsaken Kin (Steam, Stand 2026-10), Unity 2022.3.45f1, Mel
 1. `MelonLoader.x64.zip` (v0.7.3) in den Spielordner entpacken.
 2. `Modding_API.zip` (release-0.5.4) in den Spielordner entpacken (`Mods/`, `UserLibs/`).
 3. Spiel einmal bis ins Hauptmenü starten (erzeugt `MelonLoader/Il2CppAssemblies`), beenden.
-4. Mod bauen: `dotnet build mod/DrovaVoice/DrovaVoice.csproj -c Release` (kopiert nach `Mods/` und `UserLibs/`).
+4. Mod bauen und ins Spiel kopieren: `dotnet build mod/DrovaVoice/DrovaVoice.csproj -c Release -p:DeployToGame=true` (kopiert nach `Mods/` und `UserLibs/`). Ohne `-p:DeployToGame=true` wird nur kompiliert.
    Anderer Spielpfad: Umgebungsvariable `DROVA_GAME_DIR` setzen.
 
 Rückbau: `version.dll`, `MelonLoader/`, `Mods/`, `UserLibs/`, `Plugins/` (falls angelegt) und `UserData/` aus dem Spielordner löschen.

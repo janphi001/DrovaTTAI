@@ -20,7 +20,7 @@ def test_handshake_and_synth(tmp_path, guarded):
     out = tmp_path / "a.wav"
     with guarded(lambda: EngineClient(FAKE)) as client:
         assert (client.engine, client.model) == ("fake", "sine-1")
-        resp = guarded(lambda: client.synth(SynthRequest(id="1", text="Grüß dich, Wanderer.", out_path=str(out))))
+        resp = guarded(lambda: client.synth(SynthRequest(id="1", text="Invented Kappa line.", out_path=str(out))))
     assert resp.ok and resp.id == "1"
     assert resp.duration == pytest.approx(1.0, abs=0.01)
     with wave.open(str(out)) as w:

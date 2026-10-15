@@ -1,0 +1,23 @@
+name: checks
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Commit messages
+        run: python3 tools/checks/commit_messages.py
+      - name: Game dialogue
+        run: python3 tools/checks/no_game_dialogue.py
+      - name: Mod deploy
+        run: python3 tools/checks/no_deploy_on_build.py
+      - name: Player choices
+        run: python3 tools/checks/player_choice_silent.py
+      - name: Fish key
+        run: python3 tools/checks/fish_key.py

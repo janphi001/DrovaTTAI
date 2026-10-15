@@ -34,7 +34,7 @@ Kopie: `out/bug-stale-audio-Latest.log` (gitignored; Original wird beim nächste
 4. **Entscheiden:**
    - *Schnell, ohne Mod-Änderung:* die verdächtige Baumart aus dem Index nehmen. Der Generator überspringt Gründe über `skip` in `drova_voice/lines.py` (z. B. neuer Grund für `Greet`/`Intent`/Welt-Bäume) oder man löscht die IDs aus `Mods/DrovaVoice/Audio/de/index.json` (`install` mit `drop_ids`). Kosten: diese Zeilen sind dann stumm.
    - *Sauber, Mod-Änderung:* Clip nur setzen, wenn der Knoten wirklich im Gesprächsfenster läuft, und `statement.audio` nach dem Gespräch wieder auf null setzen (und laufende AudioSources stoppen), damit der Connector bei der nächsten Ausführung neu entscheiden kann.
-5. Nach jeder Mod-Änderung: `dotnet build mod/DrovaVoice -c Release` (**kopiert in den Spielordner, Spiel muss geschlossen sein**), Nutzer testet im Spiel (er nimmt Hörtests selbst ab).
+5. Nach jeder Mod-Änderung: `dotnet build mod/DrovaVoice -c Release -p:DeployToGame=true` (**kopiert in den Spielordner, Spiel muss geschlossen sein**), Nutzer testet im Spiel (er nimmt Hörtests selbst ab). Ohne `-p:DeployToGame=true` wird nur kompiliert.
 
 ## Stand des Repos
 - Branch `plan-5-casting` (auf `plan-4-playback`), **nichts gepusht, nichts gemerged**. Mod-Code liegt in `mod/DrovaVoice` und `mod/DrovaVoice.Core` (xUnit 151 Tests). Generator-Tests: 471 pytest (`cd generator && .venv/Scripts/python -m pytest -q`).

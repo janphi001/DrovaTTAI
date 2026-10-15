@@ -19,7 +19,7 @@
 - Einstellungen: `Enabled` (Standard `true`), `DialogVolume` 100 (0–200), `PlayerVolume` 100 (0–200), `AudioLanguage` `de`, `CacheMB` 64 (8–512), `Diagnostics` `false` (Spec §6; `Diagnostics` ist neu, siehe Task 8).
 - **`AudioManager` der API erst anfassen, wenn `WorldEventSystemManager.Instance != null`** (siehe Plan-Befund unten), sonst bleibt die Klasse die ganze Sitzung unbrauchbar.
 - Keine echten Drova-Texte ins Git (Tests mit erfundenen IDs und Pfaden). Keine Downloads ohne Rückfrage; alles auf Laufwerk D:.
-- Antworten und Doku auf Deutsch; Commit-Nachrichten englisch, Imperativ, wie im Repo (`Add …`, `Fix …`), mit der vorgegebenen `Co-Authored-By`-Zeile.
+- Antworten und Doku auf Deutsch; Commit-Nachrichten englisch, Imperativ, wie im Repo (`Add …`, `Fix …`), ohne Claude-Trailer.
 - Baut die Mod, kopiert das Ziel `DeployToGame` die DLLs in den Spielordner. Dafür muss das Spiel geschlossen sein.
 
 ## Plan-Befund (aus der API-IL, nicht in der Spec)

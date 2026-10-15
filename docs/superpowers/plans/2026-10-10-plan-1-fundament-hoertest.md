@@ -22,7 +22,7 @@
 - C#-Mod: `net6.0`, MelonLoader ≥ 0.7.0; `DrovaVoice.Core` ohne Il2Cpp-/Unity-Abhängigkeit.
 - Spielpfad: `D:\Games\Steam\steamapps\common\Drova - Forsaken Kin` (überschreibbar per `DROVA_GAME_DIR` bzw. `config.yaml`).
 - **Downloads/Installationen ins System oder den Spielordner (Modelle, torch, MelonLoader, API) erst nach ausdrücklicher Freigabe des Nutzers** (Dateiname, Quelle, Größe nennen).
-- Jeder Commit endet mit der Zeile `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Jeder Commit ist englisch, Imperativ, ohne Claude-Trailer.
 - Code-Bezeichner Englisch, Nutzer-Meldungen (CLI/Log) Deutsch.
 
 ## Review Focus
@@ -270,7 +270,7 @@ Run: `cp generator/config.example.yaml generator/config.yaml`
 
 ```bash
 git add .gitignore README.md generator/pyproject.toml generator/config.example.yaml generator/drova_voice/__init__.py generator/drova_voice/config.py generator/tests/test_config.py
-git commit -m "Add repo scaffolding and generator config" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add repo scaffolding and generator config"
 ```
 
 ---
@@ -405,7 +405,7 @@ Expected: 8 passed
 
 ```bash
 git add tests/vectors/line_ids.json generator/drova_voice/ids.py generator/tests/test_ids.py
-git commit -m "Add line id scheme with shared test vectors" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add line id scheme with shared test vectors"
 ```
 
 ---
@@ -599,7 +599,7 @@ Expected: `Passed!` (mindestens 4 Tests, die Theory-Fälle können als einer zä
 
 ```bash
 git add mod/Directory.Build.props mod/DrovaVoice.sln mod/DrovaVoice.Core mod/DrovaVoice.Core.Tests
-git commit -m "Add DrovaVoice.Core line ids matching Python vectors" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add DrovaVoice.Core line ids matching Python vectors"
 ```
 
 ---
@@ -632,22 +632,22 @@ def test_single_line_entries_with_blank_lines():
 
 def test_crlf_and_bom(tmp_path):
     f = tmp_path / "NPC_X_de.loc"
-    f.write_bytes("\ufeffPlh_1 { Grüß dich. }\r\n\r\nPlh_2 { Na? }\r\n".encode("utf-8"))
+    f.write_bytes("\ufeffPlh_1 { Hallo Kappa. }\r\n\r\nPlh_2 { Na? }\r\n".encode("utf-8"))
     res = read_loc_file(f)
-    assert [(e.key, e.text) for e in res.entries] == [("Plh_1", "Grüß dich."), ("Plh_2", "Na?")]
+    assert [(e.key, e.text) for e in res.entries] == [("Plh_1", "Hallo Kappa."), ("Plh_2", "Na?")]
 
 
 def test_key_with_spaces_and_braces_in_text():
-    res = parse_loc("Test Item_name { Testgegenstand {selten} }\n")
+    res = parse_loc("Test Item_name { Ersatzteil {selten} Omega }\n")
     assert res.entries[0].key == "Test Item_name"
-    assert res.entries[0].text == "Testgegenstand {selten}"
+    assert res.entries[0].text == "Ersatzteil {selten} Omega"
 
 
 def test_multiline_entry():
-    content = "Letter_1 { Liebe Mara,\nich komme bald.\nDein Jero }\n\nPlh_2 { Ok. }\n"
+    content = "Letter_1 { Liebe Mu,\nich komme bald Sigma.\nDein Rho }\n\nPlh_2 { Ok. }\n"
     res = parse_loc(content)
     assert res.entries[0].key == "Letter_1"
-    assert res.entries[0].text == "Liebe Mara,\nich komme bald.\nDein Jero"
+    assert res.entries[0].text == "Liebe Mu,\nich komme bald Sigma.\nDein Rho"
     assert res.entries[1].key == "Plh_2"
     assert res.entries[1].line == 5
 
@@ -779,7 +779,7 @@ Expected: ca. 22.500 Einträge; Fehlerzeilen nahe 0. Jede gemeldete Fehlerzeile 
 
 ```bash
 git add generator/drova_voice/loc.py generator/tests/test_loc.py
-git commit -m "Add .loc parser" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add .loc parser"
 ```
 
 ---
@@ -964,7 +964,7 @@ Expected: 9 passed. Falls `num2words` eine andere Schreibweise liefert (z. B. �
 
 ```bash
 git add generator/drova_voice/speech_text.py generator/tests/test_speech_text.py
-git commit -m "Add speech text normalization" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add speech text normalization"
 ```
 
 ---
@@ -1122,7 +1122,7 @@ Expected: ca. 150 automatisch, ca. 80–110 mit Prüfbedarf. 10 zufällige autom
 
 ```bash
 git add generator/drova_voice/player_name.py generator/tests/test_player_name.py
-git commit -m "Add player name variants" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add player name variants"
 ```
 
 ---
@@ -1332,7 +1332,7 @@ Expected: 11 passed
 
 ```bash
 git add generator/drova_voice/emotions.py generator/tests/test_emotions.py
-git commit -m "Add engine-neutral emotion model and stage direction mapping" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add engine-neutral emotion model and stage direction mapping"
 ```
 
 ---
@@ -1460,7 +1460,7 @@ Expected: 9 passed
 
 ```bash
 git add generator/drova_voice/render.py generator/tests/test_render.py
-git commit -m "Add engine-specific emotion rendering" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add engine-specific emotion rendering"
 ```
 
 ---
@@ -1589,7 +1589,7 @@ def test_handshake_and_synth(tmp_path):
     out = tmp_path / "a.wav"
     with EngineClient(FAKE) as client:
         assert (client.engine, client.model) == ("fake", "sine-1")
-        resp = client.synth(SynthRequest(id="1", text="Grüß dich, Wanderer.", out_path=str(out)))
+        resp = client.synth(SynthRequest(id="1", text="Hallo, Wanderer Kappa.", out_path=str(out)))
     assert resp.ok and resp.id == "1"
     assert resp.duration == pytest.approx(1.0, abs=0.01)
     with wave.open(str(out)) as w:
@@ -1764,7 +1764,7 @@ Expected: 6 passed
 
 ```bash
 git add generator/drova_voice/engines generator/workers/_common generator/workers/fake generator/tests/test_engine_client.py
-git commit -m "Add engine worker protocol, client and fake worker" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add engine worker protocol, client and fake worker"
 ```
 
 ---
@@ -1792,7 +1792,7 @@ LOC = "\n\n".join([
     "Plh_3 { *seufzt* Na gut, dann eben. }",
     f"Plh_4 {{ Danke, {NAME_TOKEN}. Bis bald. }}",
     "Plh_5 { Heute sind $GVAR:QuestVars_Beispiel_Config.Preis$ Münzen. }",
-    "Plh_6 { Wem gehört dieser Hof eigentlich? }",
+    "Plh_6 { Wem gehört diese Kiste Kappa? }",
     "Plh_7 { Verschwinde sofort von hier! }",
     "Plh_8 { Ich habe heute viel zu tun gehabt. }",
     "Plh_9 { *grinst* }",
@@ -1964,7 +1964,7 @@ Expected: 5 passed
 
 ```bash
 git add generator/drova_voice/jsonl.py generator/drova_voice/bakeoff.py generator/tests/test_bakeoff_select.py
-git commit -m "Add bake-off sample selection" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add bake-off sample selection"
 ```
 
 ---
@@ -2072,7 +2072,7 @@ def test_bakeoff_select_and_run_with_fake_engine(tmp_path):
     game = tmp_path / "game"
     dialog = game / "Drova_Data" / "StreamingAssets" / "Localization" / "de" / "Dialog"
     dialog.mkdir(parents=True)
-    (dialog / "NPC_A_de.loc").write_text("Plh_1 { Wem gehört dieser Hof eigentlich? }\n", encoding="utf-8")
+    (dialog / "NPC_A_de.loc").write_text("Plh_1 { Wem gehört diese Kiste Kappa? }\n", encoding="utf-8")
     cfg = gen / "config.yaml"
     cfg.write_text(f'game_dir: "{game.as_posix()}"\n', encoding="utf-8")
     voices = gen / "voices.yaml"
@@ -2378,7 +2378,7 @@ Expected: `32 Zeilen → …/data/bakeoff/samples.jsonl` (± einige, falls ein B
 
 ```bash
 git add generator/drova_voice/bakeoff.py generator/drova_voice/cli.py generator/bakeoff_voices.yaml generator/tests/test_bakeoff_run.py generator/tests/test_cli.py
-git commit -m "Add bake-off runner, listening sheet and CLI" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add bake-off runner, listening sheet and CLI"
 ```
 
 ---
@@ -2619,7 +2619,7 @@ Expected: `xtts: OK`; Liste der eingebauten Sprecher. Prüfen, dass „Ana Flore
 
 ```bash
 git add generator/workers/kitten generator/workers/chatterbox generator/workers/xtts generator/bakeoff_voices.yaml
-git commit -m "Add Kitten, Chatterbox and XTTS engine workers" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add Kitten, Chatterbox and XTTS engine workers"
 ```
 
 ---
@@ -2683,7 +2683,7 @@ Getestet: Kitten TTS 2 (German + Klon), Chatterbox Multilingual (Standard + Klon
 
 ```bash
 git add docs/decisions/2026-10-tts-engine.md generator/bakeoff_voices.yaml
-git commit -m "Record TTS engine decision from bake-off" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Record TTS engine decision from bake-off"
 ```
 
 ---
@@ -2754,7 +2754,7 @@ Rückbau: `version.dll`, `MelonLoader/`, `Mods/`, `UserLibs/`, `Plugins/` (falls
 
 ```bash
 git add docs/setup.md
-git commit -m "Document game and mod loader setup" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Document game and mod loader setup"
 ```
 
 ---
@@ -2844,7 +2844,7 @@ Expected: `DrovaVoice 0.1.0 geladen (Core ok: 950774fdbc26dddf.ogg)` – der Has
 
 ```bash
 git add mod/DrovaVoice mod/DrovaVoice.sln
-git commit -m "Add DrovaVoice mod skeleton that loads in game" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "Add DrovaVoice mod skeleton that loads in game"
 ```
 
 ---

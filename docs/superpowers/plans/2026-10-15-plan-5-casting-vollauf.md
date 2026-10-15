@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Alle Befehle für den Generator im Ordner `generator/` (Git Bash: `.venv/Scripts/python -m pytest -q`, `.venv/Scripts/drova-voice ...`). Ausgangsstand: 390 Tests grün (pytest), 151 xUnit.
-- Meldungen, Kommentare und Dokumente auf Deutsch; Commits englisch, Imperativ, mit Zeile `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`; nichts pushen oder mergen.
+- Meldungen, Kommentare und Dokumente auf Deutsch; Commits englisch, Imperativ, ohne Claude-Trailer; nichts pushen oder mergen.
 - **Keine echten Drova-Dialogtexte ins Git** (Tests mit erfundenem Text und erfundenen Sprechern). `data/`, `cache/`, `out/` sind per `.gitignore` ausgeschlossen; Eingabedateien für Subagents liegen unter `out/subagent/`.
 - **Spieltexte gehen nur nach ausdrücklichem Ja des Nutzers in der Hauptsitzung an einen Dienst** (Fish, Haiku-Subagents). Je Etappe neu fragen. Der Fish-Key (`FISH_API_KEY`) kommt vom Nutzer im Chat und steht nur als Umgebungsvariable im Einzelbefehl, nie in Dateien.
 - Sprecherschlüssel sind überall `actor.lower()`.
@@ -322,7 +322,7 @@ Expected: PASS.
 
 ```bash
 git add generator/drova_voice/fish_voices.py generator/tests/test_fish_voices.py casting/fish_voices.yaml
-git commit -m "Add the voice catalog with variants, age and type" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the voice catalog with variants, age and type"
 ```
 
 ---
@@ -536,7 +536,7 @@ Expected: alles grün.
 
 ```bash
 git add generator/drova_voice/casting.py generator/drova_voice/pipeline.py generator/tests/test_casting.py
-git commit -m "Load the generated casting file under the hand-kept one" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Load the generated casting file under the hand-kept one"
 ```
 
 ---
@@ -792,7 +792,7 @@ Expected: grün (Rubberband-Tests laufen, wenn ffmpeg den Filter hat).
 
 ```bash
 git add generator/drova_voice/encode.py generator/drova_voice/pipeline.py generator/tests/ffmpeg_marks.py generator/tests/test_encode.py generator/tests/test_pipeline_variants.py
-git commit -m "Apply voice variants while encoding" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Apply voice variants while encoding"
 ```
 
 ---
@@ -1107,7 +1107,7 @@ Expected: grün.
 
 ```bash
 git add generator/drova_voice/selection.py generator/drova_voice/pipeline.py generator/tests/test_selection.py generator/tests/test_pipeline_selection.py
-git commit -m "Add sample and batch selection by speaker" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add sample and batch selection by speaker"
 ```
 
 ---
@@ -1455,7 +1455,7 @@ Expected: grün.
 
 ```bash
 git add generator/drova_voice/profiles.py generator/drova_voice/pipeline.py generator/tests/test_profiles.py generator/tests/test_pipeline_profile.py
-git commit -m "Add speaker profiles with import and subagent packets" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add speaker profiles with import and subagent packets"
 ```
 
 ---
@@ -1800,7 +1800,7 @@ Expected: grün. Falls `test_load_is_spread_over_equal_voices` fehlschlägt, die
 
 ```bash
 git add generator/drova_voice/assign.py generator/drova_voice/pipeline.py generator/tests/test_assign.py generator/tests/test_pipeline_cast_propose.py
-git commit -m "Propose voices from speaker profiles with a deterministic assignment" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Propose voices from speaker profiles with a deterministic assignment"
 ```
 
 ---
@@ -1978,7 +1978,7 @@ Expected: grün.
 
 ```bash
 git add generator/drova_voice/casting_sheet.py generator/drova_voice/pipeline.py generator/tests/test_casting_sheet.py generator/tests/test_pipeline_cast_propose.py
-git commit -m "Add the casting listening sheet" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the casting listening sheet"
 ```
 
 ---
@@ -2230,7 +2230,7 @@ Expected: grün.
 
 ```bash
 git add generator/drova_voice/synth.py generator/drova_voice/pipeline.py generator/tests/test_synth.py generator/tests/test_pipeline_synth.py
-git commit -m "Stop synth cleanly on quota or login errors and record characters sent" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Stop synth cleanly on quota or login errors and record characters sent"
 ```
 
 ---
@@ -2341,7 +2341,7 @@ Expected: grün.
 
 ```bash
 git add generator/drova_voice/report.py generator/drova_voice/pipeline.py generator/tests/test_report.py generator/tests/test_pipeline_report.py
-git commit -m "Report progress per speaker" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Report progress per speaker"
 ```
 
 ---
@@ -2532,7 +2532,7 @@ Expected: grün.
 
 ```bash
 git add generator/drova_voice/emote.py generator/drova_voice/pipeline.py generator/tests/test_emote.py generator/tests/test_pipeline_emote.py
-git commit -m "Prepare subagent packets and import LLM emotions" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Prepare subagent packets and import LLM emotions"
 ```
 
 ---
@@ -2566,7 +2566,7 @@ git commit -m "Prepare subagent packets and import LLM emotions" -m "Co-Authored
 
 ```bash
 git add docs/generator.md
-git commit -m "Document the casting and batch commands" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Document the casting and batch commands"
 ```
 
 ---
@@ -2602,7 +2602,7 @@ Fehlende oder abgelehnte Sprecher (Importfehler) mit einem erneuten Paket (`prof
 
 ```bash
 cd /d/Games/Projekte/DrovaTTAI && git add casting/profiles.jsonl
-git commit -m "Add the LLM speaker profiles reviewed by the user" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the LLM speaker profiles reviewed by the user"
 ```
 
 ### Task 13: Besetzung vorschlagen und anhören
@@ -2633,7 +2633,7 @@ Der Nutzer nimmt die Besetzung ab. Danach nur noch `cast --propose --keep` benut
 
 ```bash
 cd /d/Games/Projekte/DrovaTTAI && git add casting/casting.yaml casting/casting_auto.yaml casting/profiles.jsonl
-git commit -m "Record the user-approved casting" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Record the user-approved casting"
 ```
 
 ### Task 14: Emotionen für alle Zeilen
@@ -2662,7 +2662,7 @@ Importfehler ansehen (unbekannte IDs, ungültige Emotionen) und betroffene Paket
 
 ```bash
 cd /d/Games/Projekte/DrovaTTAI && git add casting/emotions.jsonl
-git commit -m "Add LLM emotions for all dialog trees" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add LLM emotions for all dialog trees"
 ```
 
 ### Task 15: Etappen erzeugen und installieren
@@ -2703,7 +2703,7 @@ Erfolgskriterium: `Lücken: 0 Zeilen` (außer Sprechern ohne Zeilen im Plan-Umfa
 
 ```bash
 cd /d/Games/Projekte/DrovaTTAI && git add docs/decisions/2026-10-casting-vollauf.md docs/HANDOFF.md
-git commit -m "Record the result of the full run and update the handoff" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Record the result of the full run and update the handoff"
 ```
 
 - [ ] **Step 4:** Mit dem Nutzer klären, ob Merge oder PR (`superpowers:finishing-a-development-branch`). Nichts pushen ohne Ja.

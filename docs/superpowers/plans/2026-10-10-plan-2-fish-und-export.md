@@ -20,7 +20,7 @@
 - Der Fish-Schlüssel liegt **nur** in der Umgebungsvariable `FISH_API_KEY`. Er darf in keiner Datei, keinem Log, keiner Fehlermeldung und keinem Commit stehen.
 - Fish-Cues sind englisch und stehen in eckigen Klammern; Kitten bekommt keine Laut-Tags (Spec §15). Fehlermeldungen für den Nutzer sind deutsch.
 - Downloads, Installationen und Daten, die den Rechner verlassen (Fish-Aufrufe mit Spieltext), werden vor der Ausführung einzeln mit dem Nutzer abgestimmt (Spec §13). Änderungen im Spielordner entstehen nur durch den Mod-Build (`Mods/`, `UserLibs/`) und den Exportordner `Mods/DrovaVoice/Export/`.
-- Jeder Commit endet mit `Co-Authored-By: <Modell> <noreply@anthropic.com>`; die Ausgabe von `git log` enthält keine echten Spieltexte.
+- Jeder Commit ist englisch, Imperativ, ohne Claude-Trailer; die Ausgabe von `git log` enthält keine echten Spieltexte.
 
 ## Review Focus
 
@@ -166,7 +166,7 @@ Expected: alle Tests grün (vorher 239, jetzt plus die neuen).
 
 ```bash
 git add generator/drova_voice/render.py generator/tests/test_render.py
-git commit -m "Add the Fish cue renderer" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the Fish cue renderer"
 ```
 
 ---
@@ -444,7 +444,7 @@ Expected: alle grün. Ein Test, der hängt, wird vom Fixture `guarded` nach 20 s
 
 ```bash
 git add generator/workers/fish generator/tests/test_fish_worker.py
-git commit -m "Add the Fish Audio worker" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the Fish Audio worker"
 ```
 
 ---
@@ -638,7 +638,7 @@ Expected: alle grün.
 
 ```bash
 git add casting/fish_voices.yaml generator/drova_voice/fish_voices.py generator/drova_voice/bakeoff.py generator/tests/test_fish_voices.py
-git commit -m "Add the official Fish voice table and resolve voice names" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the official Fish voice table and resolve voice names"
 ```
 
 ---
@@ -696,7 +696,7 @@ Die Datei enthält: Datum, Modell, Anzahl Zeilen, Fehler nach Statuscode, Echtze
 
 ```bash
 git add generator/fish_probe_voices.yaml docs/decisions/2026-10-fish-throughput.md
-git commit -m "Record the Fish throughput and limit measurement" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Record the Fish throughput and limit measurement"
 ```
 
 ---
@@ -863,7 +863,7 @@ Expected: alle Tests grün (12 bisherige plus die neuen).
 
 ```bash
 git add mod/DrovaVoice.Core/LineClassifier.cs mod/DrovaVoice.Core.Tests/LineClassifierTests.cs
-git commit -m "Add line category rules and GVAR detection to the core library" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add line category rules and GVAR detection to the core library"
 ```
 
 ---
@@ -1009,7 +1009,7 @@ Expected: alle grün.
 
 ```bash
 git add mod/DrovaVoice.Core/Manifest.cs mod/DrovaVoice.Core.Tests/ManifestTests.cs
-git commit -m "Add the manifest format to the core library" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the manifest format to the core library"
 ```
 
 ---
@@ -1260,7 +1260,7 @@ Expected: alle grün.
 
 ```bash
 git add generator/drova_voice/export_report.py generator/drova_voice/cli.py generator/tests/test_export_report.py
-git commit -m "Add the export coverage report and fetch command" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the export coverage report and fetch command"
 ```
 
 ---
@@ -1584,7 +1584,7 @@ Expected: `Export fertig: Bäume …` und `Manifest geschrieben: …manifest.jso
 
 ```bash
 git add mod/DrovaVoice
-git commit -m "Add the dialogue exporter with a file trigger" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Add the dialogue exporter with a file trigger"
 ```
 
 ---
@@ -1780,7 +1780,7 @@ und nach einigen Minuten (das Spiel kann währenddessen stehen) im Log nach `Kat
 
 ```bash
 git add mod/DrovaVoice.Core/CatalogReader.cs mod/DrovaVoice.Core.Tests/CatalogReaderTests.cs mod/DrovaVoice
-git commit -m "Load all dialogue trees from the Addressables catalog" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Load all dialogue trees from the Addressables catalog"
 ```
 
 ---
@@ -1883,7 +1883,7 @@ Die Datei beantwortet mit Zahlen und Klassennamen (ohne Spieltexte):
 
 ```bash
 git add mod/DrovaVoice docs/decisions/2026-10-export-findings.md
-git commit -m "Export entity infos and voice maps and record the findings" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Export entity infos and voice maps and record the findings"
 ```
 
 ---
@@ -1932,7 +1932,7 @@ Expected: alle Tests grün; Abdeckung >= 98 %. Die Zahlen (Bäume, Zeilen, Abdec
 
 ```bash
 git add docs/export.md docs/setup.md
-git commit -m "Document the export workflow" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git commit -m "Document the export workflow"
 ```
 
 ---

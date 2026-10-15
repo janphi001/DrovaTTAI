@@ -10,7 +10,7 @@ LOC = "\n\n".join([
     "Plh_3 { *seufzt* Na gut, dann eben. }",
     f"Plh_4 {{ Danke, {NAME_TOKEN}. Bis bald. }}",
     "Plh_5 { Heute sind $GVAR:QuestVars_Beispiel_Config.Preis$ Münzen. }",
-    "Plh_6 { Wem gehört dieser Hof eigentlich? }",
+    "Plh_6 { Wo ist die Kiste Kappa? }",
     "Plh_7 { Verschwinde sofort von hier! }",
     "Plh_8 { Ich habe heute viel zu tun gehabt. }",
     "Plh_9 { *grinst* }",
