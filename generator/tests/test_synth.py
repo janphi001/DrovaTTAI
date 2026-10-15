@@ -10,7 +10,8 @@ from drova_voice.engines.client import EngineError
 from drova_voice.engines.protocol import SynthResponse
 from drova_voice.fish_voices import FishVoice
 from drova_voice.lines import Line
-from drova_voice.synth import (SKIP_NO_VOICE, SynthJob, build_jobs, make_key, plausible, run_synth, wav_duration)
+from drova_voice.synth import (ABORT_AFTER, SKIP_NO_VOICE, SynthJob, SynthStatus, build_jobs, fatal_reason, make_key,
+                               plausible, run_synth, wav_duration)
 
 FISH = {"lena": FishVoice("lena", "a" * 32, "Lena", "f", "de"), "leon": FishVoice("leon", "b" * 32, "Leon", "m", "de")}
 CASTING = Casting("leon", {"mira": "lena"})
@@ -184,3 +185,43 @@ def test_corrupt_cache_file_is_replaced(tmp_path):
     (tmp_path / f"{key}.wav").write_bytes(b"kein WAV")
     (r,) = run_synth([job("a")], "fake", factory([]), tmp_path)
     assert r.ok and r.attempts == 1 and wav_duration(r.wav) == pytest.approx(2.0, abs=0.01)
+
+
+class QuotaClient(StubClient):
+    """Wie StubClient, aber Texte mit 'quota' scheitern wie bei leerem Fish-Guthaben."""
+
+    def synth(self, req):
+        if "quota" in req.text:
+            with self.lock:
+                self.calls.append(req.id)
+            return SynthResponse(req.id, False, error="Fish lehnt die Anfrage ab (HTTP 402): Payment Required")
+        return super().synth(req)
+
+
+def quota_factory(calls):
+    return lambda engine: contextlib.nullcontext(QuotaClient(calls))
+
+
+def test_fatal_reason():
+    assert fatal_reason("Fish lehnt die Anfrage ab (HTTP 402): x") == "Guthaben aufgebraucht"
+    assert fatal_reason("Fish lehnt die Anfrage ab (HTTP 401): x").startswith("Anmeldung")
+    assert fatal_reason("Fish nicht erreichbar nach 5 Versuchen (zuletzt HTTP 429)") == "Ratenlimit erreicht"
+    assert fatal_reason("Fish nicht erreichbar nach 5 Versuchen (zuletzt TimeoutError)") == "Dienst nicht erreichbar"
+    assert fatal_reason("HTTP 500") is None and fatal_reason(None) is None
+
+
+def test_run_synth_aborts_after_repeated_fatal_errors_and_leaves_the_rest_untouched(tmp_path):
+    calls, got, status = [], [], SynthStatus()
+    jobs = [job(f"T|P|{i}", f"quota Nummer {i}.") for i in range(12)]
+    results = run_synth(jobs, "fish", quota_factory(calls), tmp_path, workers=1, on_result=got.append, status=status)
+    assert len(results) == ABORT_AFTER == len(got) and not any(r.ok for r in results)
+    assert status.aborted == "Guthaben aufgebraucht" and status.not_run == 12 - ABORT_AFTER
+    assert {r.id for r in results} == {f"T|P|{i}" for i in range(ABORT_AFTER)}  # für nicht gestartete Aufträge gibt es keine Zeilen
+
+
+def test_a_success_resets_the_fatal_streak(tmp_path):
+    texts = ["quota 1", "quota 2", "quota 3", "quota 4", "gut", "quota 5", "quota 6", "quota 7", "quota 8"]
+    jobs = [job(f"T|P|{i}", t) for i, t in enumerate(texts)]
+    status = SynthStatus()
+    results = run_synth(jobs, "fish", quota_factory([]), tmp_path, workers=1, status=status)
+    assert len(results) == len(texts) and status.aborted is None and status.not_run == 0

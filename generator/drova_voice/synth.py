@@ -29,6 +29,10 @@ MIN_SECONDS = 0.25
 SHORT_EXPECTED_SECONDS = 1.0  # darunter gilt nur die Obergrenze
 SHORT_MAX_SECONDS = 5.0
 MAX_ATTEMPTS = 3
+ABORT_AFTER = 5  # so viele Aufträge in Folge mit Guthaben-/Limit-/Anmeldefehler stoppen den Lauf
+_FATAL = (("HTTP 402", "Guthaben aufgebraucht"), ("HTTP 401", "Anmeldung abgelehnt (API-Schlüssel prüfen)"),
+          ("HTTP 403", "Zugriff verweigert"), ("HTTP 429", "Ratenlimit erreicht"),
+          ("nicht erreichbar", "Dienst nicht erreichbar"))
 
 
 @dataclass(frozen=True)
@@ -53,6 +57,20 @@ class SynthResult:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+
+def fatal_reason(error: str | None) -> str | None:
+    """Grund, wenn der Fehler nach Guthaben, Limit oder Anmeldung aussieht (dann hilft Weitermachen nicht)."""
+    for needle, reason in _FATAL:
+        if needle in (error or ""):
+            return reason
+    return None
+
+
+@dataclass
+class SynthStatus:
+    aborted: str | None = None  # Grund des Abbruchs
+    not_run: int = 0  # Aufträge, die wegen des Abbruchs nicht gestartet wurden
 
 
 def wav_duration(path: str | Path) -> float:
@@ -146,7 +164,8 @@ def _acquire(idle: "queue.Queue", alive: list[int], lock: threading.Lock):
 
 def run_synth(jobs: Sequence[SynthJob], engine: str, client_factory: Callable[[str], ContextManager],
               cache_dir: Path, workers: int = 8,
-              on_result: Callable[[SynthResult], None] | None = None) -> list[SynthResult]:
+              on_result: Callable[[SynthResult], None] | None = None,
+              status: SynthStatus | None = None) -> list[SynthResult]:
     jobs = list(jobs)
     if not jobs:
         return []
@@ -167,6 +186,10 @@ def run_synth(jobs: Sequence[SynthJob], engine: str, client_factory: Callable[[s
         for c in clients:
             idle.put(c)
         alive = [len(clients)]
+        stop = threading.Event()
+        streak = [0]
+        why: list[str | None] = [None]
+        not_run = [0]
 
         def emit(r: SynthResult) -> None:
             with lock:
@@ -174,10 +197,25 @@ def run_synth(jobs: Sequence[SynthJob], engine: str, client_factory: Callable[[s
                 if on_result is not None:
                     on_result(r)
 
+        def note(r: SynthResult) -> None:  # nur echte Anfragen zählen, Cache-Treffer nicht
+            with lock:
+                reason = None if r.ok else fatal_reason(r.error)
+                if reason is None:
+                    streak[0] = 0
+                    return
+                streak[0] += 1
+                if streak[0] >= ABORT_AFTER and not stop.is_set():
+                    stop.set()
+                    why[0] = reason
+
         def work(job: SynthJob) -> None:
             key = keys[job.id]
             r = cache_hit(job, key, cache_dir)  # Cache-Treffer brauchen keinen Worker (auch nicht, wenn alle tot sind)
             if r is None:
+                if stop.is_set():  # abgebrochen: nichts mehr starten, auch keine Fehlerzeile schreiben
+                    with lock:
+                        not_run[0] += 1 + len(followers.get(key, []))
+                    return
                 client = _acquire(idle, alive, lock)
                 if client is None:
                     r = SynthResult(job.id, key, None, None, False, 0, False, "kein Worker mehr verfügbar")
@@ -195,10 +233,13 @@ def run_synth(jobs: Sequence[SynthJob], engine: str, client_factory: Callable[[s
                         idle.put(client)
                     if not r.ok:
                         (Path(cache_dir) / f"{key}.part.wav").unlink(missing_ok=True)
+                note(r)
             emit(r)
             for other in followers.get(key, []):
                 emit(SynthResult(other.id, key, r.wav, r.duration, r.ok, r.attempts, r.flagged, r.error))
 
         with ThreadPoolExecutor(max_workers=len(clients)) as pool:
             list(pool.map(work, first_by_key.values()))
+        if status is not None:
+            status.aborted, status.not_run = why[0], not_run[0]
     return results

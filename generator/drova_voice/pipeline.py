@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 from collections import Counter
+from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
@@ -23,7 +24,7 @@ from drova_voice.profiles import LOW_CONFIDENCE, Profile, merge_import, prepare_
 from drova_voice.report import build_report, format_report
 from drova_voice.selection import (DEFAULT_BATCH_CHARS, batch_lines, plan_batches, read_batches, sample_lines,
                                    speaker_stats, write_batches)
-from drova_voice.synth import build_jobs, run_synth
+from drova_voice.synth import SynthStatus, build_jobs, run_synth
 
 WORKERS_DIR = Path(__file__).resolve().parents[1] / "workers"
 
@@ -192,6 +193,10 @@ def synth_results_path(cfg: Config) -> Path:
     return cfg.data_dir / "synth" / "results.jsonl"
 
 
+def usage_path(cfg: Config) -> Path:
+    return cfg.data_dir / "synth" / "usage.jsonl"
+
+
 def _client_factory(cfg: Config):
     def make(engine: str) -> EngineClient:
         return EngineClient(worker_command(WORKERS_DIR, engine), env=cache_env(cfg.cache_dir))
@@ -210,10 +215,12 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     jobs, skipped = build_jobs(lines, casting, catalog.synth_table(), emotions, args.engine)
     if args.limit:
         jobs = jobs[: args.limit]
+    chars = {j.id: len(j.text) for j in jobs}
     cache_dir = cfg.cache_dir / "synth"
     path = synth_results_path(cfg)
+    status = SynthStatus()
     results = run_synth(jobs, args.engine, _client_factory(cfg), cache_dir, args.workers,
-                        on_result=lambda r: append_jsonl(path, r.to_dict()))
+                        on_result=lambda r: append_jsonl(path, r.to_dict()), status=status)
     done = [r for r in results if r.ok]
     new = [r for r in done if r.attempts > 0]
     failed = [r for r in results if not r.ok]
@@ -222,11 +229,20 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     detail = ", ".join(f"{k}: {n}" for k, n in sorted(reasons.items())) or "keine"
     print(f"{len(done)} erzeugt ({len(done) - len(new)} aus dem Cache, {len(new)} neu erzeugt), {len(failed)} Fehler, "
           f"{len(flagged)} auffällige Dauer; übersprungen: {detail}")
+    unique_new = {r.key: r for r in new}  # gleicher Text + Stimme wird nur einmal gesendet
+    new_chars = sum(chars[r.id] for r in unique_new.values())
+    append_jsonl(usage_path(cfg), {"at": datetime.now().isoformat(timespec="seconds"), "engine": args.engine,
+                                   "lines": len(unique_new), "chars": new_chars})
+    total = sum(row.get("chars", 0) for row in read_jsonl_lenient(usage_path(cfg)) if row.get("engine") == args.engine)
+    print(f"Zeichen neu an {args.engine} gesendet: {new_chars}; insgesamt bisher: {total}")
     for r in failed[:10]:
         print(f"FEHLER {r.id}: {r.error}", file=sys.stderr)
     for r in flagged[:10]:
         print(f"AUFFÄLLIG {r.id}: Dauer {r.duration:.1f} s", file=sys.stderr)
-    return 1 if failed else 0
+    if status.aborted:
+        print(f"ABBRUCH: {status.aborted}; {status.not_run} Aufträge nicht gestartet (später `synth` erneut ausführen, "
+              f"Fertiges kommt aus dem Cache)", file=sys.stderr)
+    return 1 if failed or status.aborted else 0
 
 
 def encoded_path(cfg: Config) -> Path:

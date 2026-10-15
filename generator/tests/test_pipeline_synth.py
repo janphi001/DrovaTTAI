@@ -39,3 +39,13 @@ def test_synth_limit(pipeline_repo, guarded):
     assert guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake", "--limit", "1")) == 0
     rows = read_jsonl_lenient(pipeline_repo.data / "synth" / "results.jsonl")
     assert len(rows) == 1
+
+
+def test_synth_records_the_characters_sent(pipeline_repo, guarded, capsys):
+    run(pipeline_repo, "extract")
+    guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake"))
+    first = capsys.readouterr().out
+    guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake"))
+    rows = read_jsonl_lenient(pipeline_repo.data / "synth" / "usage.jsonl")
+    assert [r["chars"] > 0 for r in rows] == [True, False] and rows[0]["engine"] == "fake"
+    assert "Zeichen neu" in first and f"insgesamt bisher: {rows[0]['chars']}" in first
