@@ -16,6 +16,10 @@ namespace DrovaVoice.Core
         public int DialogPercent { get; private set; }
         public int PlayerPercent { get; private set; }
         public int BarkPercent { get; private set; }
+        public float BarkMinDistance { get; private set; }
+        public float BarkMaxDistance { get; private set; }
+        public const float DefaultBarkMinDistance = 3f;
+        public const float DefaultBarkMaxDistance = 30f;
         public string Language { get; private set; } = DefaultLanguage;
         public int CacheMegabytes { get; private set; }
         public bool Diagnostics { get; private set; }
@@ -29,8 +33,16 @@ namespace DrovaVoice.Core
         };
 
         public static VoiceSettings Create(bool enabled, int dialogPercent, int playerPercent, string? language,
-                                           int cacheMegabytes, bool diagnostics, List<string> warnings, int barkPercent = 100)
+                                           int cacheMegabytes, bool diagnostics, List<string> warnings, int barkPercent = 100,
+                                           float barkMinDistance = DefaultBarkMinDistance, float barkMaxDistance = DefaultBarkMaxDistance)
         {
+            if (barkMinDistance < 0f) barkMinDistance = 0f;
+            if (!(barkMaxDistance > barkMinDistance))
+            {
+                warnings.Add($"BarkMaxDistance = {barkMaxDistance} muss größer als BarkMinDistance ({barkMinDistance}) sein; verwende {DefaultBarkMinDistance}–{DefaultBarkMaxDistance}.");
+                barkMinDistance = DefaultBarkMinDistance;
+                barkMaxDistance = DefaultBarkMaxDistance;
+            }
             return new VoiceSettings
             {
                 Enabled = enabled,
@@ -40,6 +52,8 @@ namespace DrovaVoice.Core
                 CacheMegabytes = ClampCache(cacheMegabytes, warnings),
                 Diagnostics = diagnostics,
                 BarkPercent = ClampPercent("BarkVolume", barkPercent, warnings),
+                BarkMinDistance = barkMinDistance,
+                BarkMaxDistance = barkMaxDistance,
             };
         }
 

@@ -30,6 +30,9 @@ namespace DrovaVoice.Playback
         public bool Diagnostics => _settings.Diagnostics;
 
         public bool ProbeFigures { get; set; }
+        public float BarkMinDistance => _settings.BarkMinDistance;
+        public float BarkMaxDistance => _settings.BarkMaxDistance;
+        public BarkDistance? BarkDistance { get; set; }
 
         public void Probe(string key, string message)
         {

@@ -30,6 +30,7 @@ namespace DrovaVoice
         private bool _connectorInstalled;
         private bool _connectorFailed;
         private StaleAudioProbe? _probe;
+        private BarkDistance? _barkDistance;
 
         private string ModDir => Path.Combine(MelonEnvironment.ModsDirectory, "DrovaVoice");
         private string TriggerPath => Path.Combine(ModDir, "export.trigger");
@@ -45,6 +46,8 @@ namespace DrovaVoice
             var playerVolume = category.CreateEntry("PlayerVolume", 100, description: "Lautstärke Spielerzeilen in Prozent (0-200, über 100 = Verstärkung)");
             var barkVolume = category.CreateEntry("BarkVolume", 100, description: "Lautstärke Welt-Kommentare in Prozent (0-200, über 100 = Verstärkung)");
             var barkProbe = category.CreateEntry("BarkProbe", false, description: "Probe: Figur jeder Aussage loggen (nur für die Entwicklung)");
+            var barkMin = category.CreateEntry("BarkMinDistance", VoiceSettings.DefaultBarkMinDistance, description: "Barks: bis zu diesem Abstand in Weltmetern volle Lautstärke");
+            var barkMax = category.CreateEntry("BarkMaxDistance", VoiceSettings.DefaultBarkMaxDistance, description: "Barks: ab diesem Abstand stumm, dazwischen linear leiser");
             var audioLanguage = category.CreateEntry("AudioLanguage", "de", description: "Unterordner unter Mods/DrovaVoice/Audio");
             var cacheMb = category.CreateEntry("CacheMB", 64, description: "Obergrenze für geladene Clips in MB (8-512)");
             var diagnostics = category.CreateEntry("Diagnostics", false, description: "Jede Zeile einmal loggen (geladen/ohne Eintrag)");
@@ -53,7 +56,7 @@ namespace DrovaVoice
             LoggerInstance.Msg($"DrovaVoice {Info.Version} geladen (Core ok: {probe}). Export: Datei export.trigger in {ModDir} anlegen oder F9 drücken.");
 
             var warnings = new List<string>();
-            var settings = VoiceSettings.Create(enabled.Value, dialogVolume.Value, playerVolume.Value, audioLanguage.Value, cacheMb.Value, diagnostics.Value, warnings, barkVolume.Value);
+            var settings = VoiceSettings.Create(enabled.Value, dialogVolume.Value, playerVolume.Value, audioLanguage.Value, cacheMb.Value, diagnostics.Value, warnings, barkVolume.Value, barkMin.Value, barkMax.Value);
             foreach (string w in warnings) LoggerInstance.Warning(w);
             _voice = CreateVoice(settings);
             if (_voice != null) _voice.ProbeFigures = barkProbe.Value;   // ChoiceHook.Service folgt erst, wenn der Connector ersetzt ist
@@ -92,6 +95,8 @@ namespace DrovaVoice
                 AudioManager.ReplaceDialogueAudioConnector(new VoiceConnector(_voice));
                 _connectorInstalled = true;
                 _probe = new StaleAudioProbe(LoggerInstance, _voice.Diagnostics);
+                _barkDistance = new BarkDistance(_voice.BarkMinDistance, _voice.BarkMaxDistance, LoggerInstance, _voice.Diagnostics);
+                _voice.BarkDistance = _barkDistance;
                 ChoiceHook.Service = _voice;
                 LoggerInstance.Msg("Audio-Connector der Modding API ersetzt.");
             }
@@ -107,6 +112,7 @@ namespace DrovaVoice
             _frame++;
             if (!_connectorInstalled) TryInstallConnector();   // billig: nur ein statischer Null-Test pro Frame bis zur Installation
             _probe?.Update();
+            _barkDistance?.Update();
             bool trigger = false;
             if (_frame % 60 == 0 && ConsumeTrigger(TriggerPath, ref _exportTriggerStuck)) trigger = true;
             if (!trigger && HotkeyPressed()) trigger = true;

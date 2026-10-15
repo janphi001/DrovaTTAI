@@ -33,6 +33,23 @@ namespace DrovaVoice.Core.Tests
             Assert.Equal(100, s.PercentFor(VoiceCategory.Dialog));
         }
 
+        [Fact]
+        public void BarkDistancesHaveDefaultsAndMustBeOrdered()
+        {
+            var w = new List<string>();
+            var s = VoiceSettings.Create(true, 100, 100, "de", 64, false, w);
+            Assert.Equal(3f, s.BarkMinDistance);
+            Assert.Equal(30f, s.BarkMaxDistance);
+            Assert.Empty(w);
+            var bad = VoiceSettings.Create(true, 100, 100, "de", 64, false, w, barkMinDistance: 20f, barkMaxDistance: 10f);
+            Assert.Equal(3f, bad.BarkMinDistance);
+            Assert.Equal(30f, bad.BarkMaxDistance);
+            Assert.Contains("BarkMaxDistance", w[0]);
+            var neg = VoiceSettings.Create(true, 100, 100, "de", 64, false, new List<string>(), barkMinDistance: -4f, barkMaxDistance: 12f);
+            Assert.Equal(0f, neg.BarkMinDistance);
+            Assert.Equal(12f, neg.BarkMaxDistance);
+        }
+
         [Theory]
         [InlineData(-1, 0)]
         [InlineData(250, 200)]

@@ -41,7 +41,11 @@ namespace DrovaVoice.Playback
                             $"[Figur] {id} | zeilenSprecher={statementNode.actorName} | actor={snapshot?.ActorName} | body={snapshot?.BodyType} | voice={snapshot?.VoiceId} | guid={snapshot?.Guid} | entity={snapshot?.EntityKey} | dist={snapshot?.Distance:0.0}");
                 }
                 var clip = _service.GetClip(id, figure);
-                if (clip != null) statement.audio = clip;
+                if (clip != null)
+                {
+                    statement.audio = clip;
+                    if (clip.name != null && clip.name.StartsWith(BarkDistance.BarkClipPrefix, StringComparison.Ordinal)) _service.BarkDistance?.Expect();
+                }
             }
             catch (Exception e) { _service.LogError("OnWorldDialogueStatement", id, e); }
         }
