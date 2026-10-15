@@ -9,6 +9,7 @@ from drova_voice.lines import Line
 from drova_voice.synth import SKIP_NO_VOICE
 
 ORDER = ("installiert", "kodiert", "erzeugt", "fehler", "offen")
+_PRODUCED = frozenset({"installiert", "kodiert", "erzeugt"})
 
 
 @dataclass
@@ -42,9 +43,10 @@ def build_report(lines: Sequence[Line], casting: Casting, synth_rows: Mapping[st
     result: dict[str, CategoryStatus] = {}
     for line in lines:
         status = result.setdefault(line.category, CategoryStatus())
-        status.counts[_status(line, casting, synth_rows, encoded, index_entries)] += 1
+        label = _status(line, casting, synth_rows, encoded, index_entries)
+        status.counts[label] += 1
         row = synth_rows.get(line.id)
-        if row and row.get("ok") and row.get("flagged"):
+        if label in _PRODUCED and row and row.get("ok") and row.get("flagged"):
             status.flagged += 1
     return result
 

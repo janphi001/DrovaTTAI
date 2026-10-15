@@ -43,6 +43,14 @@ def test_speaker_report_counts_per_speaker_and_lists_gaps():
     assert "Lücken: 3 Zeilen bei 3 Sprechern" in text  # Fremder ohne Stimme zählt als Lücke
 
 
+def test_skipped_line_does_not_count_a_stale_flagged_synth_row():
+    lines = [line("Plh_1", skip="gvar_name")]
+    synth = {"T|P|Plh_1": {"ok": True, "flagged": True}}
+    report = build_report(lines, CASTING, synth, {}, {})
+    assert report["dialog"].flagged == 0
+    assert format_report(report) == "dialog: 1 Zeilen -> übersprungen: gvar_name: 1"
+
+
 def test_speaker_without_a_voice_counts_as_a_gap_but_legit_skips_do_not():
     lines = [line("Plh_1", actor="Fremder"), line("Plh_2", actor="Fremder"),
              line("Plh_3", skip="gvar"), line("Plh_4", skip="unspeakable"), line("Plh_5", skip="id_mismatch")]

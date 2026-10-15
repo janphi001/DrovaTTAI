@@ -73,7 +73,7 @@ def load_lexicon(path: Path) -> dict[str, str]:
 
 def _expected_id(row: Mapping) -> str:
     if row.get("nodeType") == "choice":
-        return choice_id(row["tree"], row["locaPath"], row["locaKey"], int(row["choiceIndex"]))
+        return choice_id(row["tree"], row["locaPath"], row["locaKey"], row["choiceIndex"])
     return statement_id(row["tree"], row["locaPath"], row["locaKey"])
 
 

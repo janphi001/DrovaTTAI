@@ -1,4 +1,5 @@
 import json
+import os
 
 from drova_voice.install import install_audio, split_variant
 
@@ -99,3 +100,25 @@ def test_drop_ids_with_a_variant_id_remove_exactly_that_entry(tmp_path):
     install_audio([], audio, target, "de", drop_ids={"T|P|Plh_2#neutral"})
     index = read_index(target)
     assert sorted(index["entries"]) == ["T|P|Plh_1"] and index["variants"] == {}
+
+
+def test_replaced_audio_is_copied_when_size_and_mtime_match(tmp_path):
+    audio, target = tmp_path / "audio", tmp_path / "Audio" / "de"
+    make_audio(audio, "dialog/aaaa.ogg", b"AAAA")
+    install_audio([row("T|P|Plh_1", "dialog/aaaa.ogg")], audio, target, "de")
+    src = audio / "dialog" / "aaaa.ogg"
+    dst = target / "dialog" / "aaaa.ogg"
+    src.write_bytes(b"BBBB")
+    os.utime(src, ns=(dst.stat().st_mtime_ns, dst.stat().st_mtime_ns))
+    install_audio([row("T|P|Plh_1", "dialog/aaaa.ogg")], audio, target, "de")
+    assert dst.read_bytes() == b"BBBB"
+
+
+def test_null_entries_are_rebuilt_instead_of_crashing(tmp_path):
+    audio, target = tmp_path / "audio", tmp_path / "Audio" / "de"
+    audio.mkdir()
+    target.mkdir(parents=True)
+    (target / "index.json").write_text('{"version": 1, "language": "de", "entries": null}\n', encoding="utf-8")
+    result = install_audio([], audio, target, "de")
+    assert (result.copied, result.entries, result.errors) == (0, 0, [])
+    assert read_index(target)["entries"] == {}
