@@ -13,7 +13,8 @@ _N = re.escape(NAME_TOKEN)
 # Artikel und Possessivdeterminierer, die einen Appositiv einleiten ("NAME, der Vogt, ...").
 _DETERMINERS = (
     r"(?:der|die|das|den|dem|des|ein|eine|einen|einem|einer|eines)\b"
-    r"|(?:kein|mein|dein|sein|ihr|unser|eur)\w*"
+    r"|(?:kein|mein|dein|sein|ihr|unser)(?:e|en|em|er|es)?\b"
+    r"|eu(?:er|re|ren|rem|rer|res)\b"
 )
 _RULES: list[tuple[re.Pattern, object]] = [
     # "Danke, NAME." / "Wir gehen zum Wald, NAME ..."
