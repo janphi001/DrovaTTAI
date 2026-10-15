@@ -33,7 +33,7 @@ Dateien sind OGG Vorbis, **48 kHz**, mono, auf −16 LUFS angeglichen, Stille am
 - Schlüssel = volle Zeilen-ID nach Spec §4 (Aussage, Auswahloption mit `|c<index>`, optional `#<variante>`); Bildung wie in `DrovaVoice.Core.LineIds` (Testvektoren `tests/vectors/line_ids.json`).
 - `file` ist relativ zum Sprachordner, mit `/`. `duration` in Sekunden (gerundet auf Millisekunden).
 - `variants` listet je Basis-ID die vorhandenen Varianten; Zeilen ohne Variante stehen nicht darin. Fehlt die gewünschte Variante, gilt die Basis-ID.
-- Zeilen ohne Eintrag bleiben stumm (Untertitel wie im Original). Es gibt keine Einträge für Zeilen mit `$GVAR:` im Text, bis die Namensvarianten gebaut sind.
+- Zeilen ohne Eintrag bleiben stumm (Untertitel wie im Original). Zeilen, deren einziger Platzhalter der Spielername (`$GVAR:EVars_Player.Name$`) ist, haben, wenn sich der Name sauber streichen lässt, nur den Eintrag `<Basis-ID>#neutral` (Text ohne den Namen); die Mod spielt diese Variante bevorzugt. Zeilen mit Quest- oder Geldwerten bleiben stumm. `#arden` wird nicht erzeugt.
 - Der Generator ergänzt den Index bei jedem `install` (frühere Einträge bleiben, solange ihre Datei existiert).
 
 ## Lautstärke
