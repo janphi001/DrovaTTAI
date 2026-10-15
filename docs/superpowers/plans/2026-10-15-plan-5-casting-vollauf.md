@@ -2614,6 +2614,8 @@ cd generator && .venv/Scripts/drova-voice cast --propose && .venv/Scripts/drova-
 ```
 Notbesetzungen, offene Sprecher, Überbelegung und Szenenkonflikte dem Nutzer nennen; Steckbriefe oder `casting.yaml` nachbessern, `cast --propose` wiederholen (ohne `--keep`, solange noch niemand abgenommen hat).
 
+- [ ] **Step 1b: Regel-Emotionen vor den Beispielen (Abschlussreview M1).** `drova-voice emote` lokal ausführen (nur Regieanweisungen, kein Dienst), damit die Beispiele ihren endgültigen Cache-Schlüssel tragen. Zeilen, die später durch Task 14 eine LLM-Emotion bekommen, werden im Vollauf neu erzeugt (höchstens rund 2 % der Beispielzeichen). Wer das vermeiden will, zieht Task 14 vor die Hörstufe. Außerdem: Nach der Abnahme `cast --propose` nur noch ohne `--reset` benutzen (die Auto-Zuteilung bleibt dann stehen); `FISH_MODEL` zwischen den Etappen nicht ändern (jeder Cache-Schlüssel hängt am Modell).
+
 - [ ] **Step 2: Freigabe für die Hörstufe einholen.** Nenne Anzahl der Beispielzeilen (`synth --sample --limit` nicht nötig, ~246 Zeilen, rund 20.000 Zeichen) und dass sie an `api.fish.audio` (Modell `s2.1-pro-free`) gehen. Der Nutzer nennt den Fish-Key im Chat; er steht nur im Einzelbefehl.
 
 - [ ] **Step 3: Beispiele erzeugen** (nach Ja)
