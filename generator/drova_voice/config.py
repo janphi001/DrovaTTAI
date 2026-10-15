@@ -74,8 +74,13 @@ def load_config(path: Path) -> Config:
         repo_root = Path(root_raw)
     else:
         raise ValueError(f"{path}: 'repo_root' muss ein Text sein")
+    language = raw.get("language", "de")
+    if language is None or language == "":
+        language = "de"
+    elif not isinstance(language, str):
+        raise ValueError(f"{path}: 'language' muss ein Text sein")
     return Config(
         game_dir=Path(game_dir),
-        language=str(raw.get("language", "de")),
+        language=language,
         repo_root=repo_root.resolve(),
     )

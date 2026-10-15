@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import filecmp
 import json
 import shutil
 from dataclasses import dataclass, field
@@ -29,18 +30,22 @@ def _load_index(path: Path, language: str) -> dict[str, dict]:
         return {}
     try:
         index = json.loads(path.read_text(encoding="utf-8-sig"))
-        if index.get("version") != INDEX_VERSION or index.get("language") != language:
-            return {}
-        return dict(index.get("entries", {}))
-    except (json.JSONDecodeError, AttributeError, OSError):
-        return {}  # kaputter Index: neu aufbauen, die Dateien bleiben liegen
+    except (json.JSONDecodeError, OSError):
+        return {}
+    if not isinstance(index, dict):
+        return {}
+    if index.get("version") != INDEX_VERSION or index.get("language") != language:
+        return {}
+    raw = index.get("entries", {})
+    if not isinstance(raw, dict):
+        return {}
+    return {i: e for i, e in raw.items() if isinstance(i, str) and isinstance(e, dict)}
 
 
 def _same_file(src: Path, dst: Path) -> bool:
     if not dst.is_file():
         return False
-    a, b = src.stat(), dst.stat()
-    return a.st_size == b.st_size and int(a.st_mtime) == int(b.st_mtime)
+    return filecmp.cmp(src, dst, shallow=False)
 
 
 def install_audio(rows: Sequence[dict], audio_dir: Path, install_dir: Path, language: str,
