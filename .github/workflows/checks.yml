@@ -19,3 +19,5 @@ jobs:
         run: python3 tools/checks/no_deploy_on_build.py
       - name: Player choices
         run: python3 tools/checks/player_choice_silent.py
+      - name: Fish key
+        run: python3 tools/checks/fish_key.py
