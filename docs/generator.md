@@ -26,6 +26,24 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 
 `synth` hat `--engine` (Standard `fish`; `fake` für Tests ohne Netz), `--workers` (Standard 8) und `--limit N` (nur die ersten N Aufträge, zum Ausprobieren).
 
+## Casting und Vollauf (Plan 5)
+
+| Schritt | Befehl | Ergebnis |
+|---|---|---|
+| a | `profile --prepare` | Pakete mit Sprecherauszügen unter `out/subagent/profile/` (enthalten Spieltexte, nie ins Git) |
+| b | `profile --import <Dateien>` | prüft die JSONL-Ergebnisse der Subagents und schreibt `casting/profiles.jsonl` (`manual`-Zeilen bleiben) |
+| c | `profile --set NAME --gender m --age mittel [--type riese] [--note ...]` / `profile` | Steckbrief von Hand setzen / Prüfliste (unsichere Einträge markiert) |
+| d | `cast --propose [--keep]` | `casting/casting_auto.yaml`; `casting.yaml` gewinnt; `--keep` lässt die bisherige Auto-Zuteilung stehen |
+| e | `synth --sample`, `encode --sample`, `cast --listen` | Hörseite `out/casting/index.html`, eine Beispielzeile je Sprecher |
+| f | `emote --prepare`, `emote --import <Dateien>` | LLM-Emotionen für alle Dialogbäume (`stage`- und `manual`-Zeilen bleiben) |
+| g | `batches [--max-chars N]` | Etappen nach Wichtigkeit in `data/batches.json` |
+| h | `synth --batch N`, `encode --batch N`, `install --batch N` | eine Etappe erzeugen; `synth` bricht bei Guthaben-/Limit-/Anmeldefehlern nach 5 Fehlern in Folge sauber ab |
+| i | `report --by-speaker` | Status und Lücken je Sprecher |
+
+`--sample` und `--batch N` gelten für `synth`, `encode`, `install`, `report` und `preview`. Varianten (`voice: alte_frau` in `casting.yaml`) werden mit der Basisstimme erzeugt und beim Kodieren per ffmpeg (`rubberband`) umgeformt. Der Zeichenverbrauch je Lauf steht am Ende der `synth`-Ausgabe und in `data/synth/usage.jsonl`.
+
+`profile --import` und `emote --import` brechen bei einer fehlenden Importdatei ab (Exit 2) und melden unlesbare Zeilen (Exit 1), schreiben aber die gültigen Zeilen.
+
 ## Wo was liegt
 
 - `casting/` gehört ins Git (nur Stimmenschlüssel, Labels, Emotionen): `fish_voices.yaml`, `casting.yaml`, `emotions.jsonl`, `lexicon.yaml`.
@@ -44,5 +62,5 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 - Zeilen mit `$GVAR:` im Text (Spielername, Quest-Werte) werden übersprungen und im Bericht als `gvar` gezählt. Namensvarianten folgen später.
 - Spielerzeilen nutzen eine feste Stimme (`default_player`), keine Stimmsets. Gesprochen werden nur Aussagen des Spielers (119 im Spiel); **Auswahloptionen** (6.491 Zeilen) bleiben stumm wie im Original (Nutzerentscheidung 2026-10-15, Grund `player_choice`).
 - Keine Varianten für generische Sprecher, keine Barks, keine Briefe.
-- Die Stimmenzuordnung in `casting/casting.yaml` ist vorläufig und wird nach dem Hörtest festgelegt.
+- Besetzung: `casting/casting.yaml` (von Hand, gewinnt) über `casting/casting_auto.yaml` (erzeugt).
 - Fish ist eine Cloud-Engine: der Sprechtext geht an `api.fish.audio`. Nur nach ausdrücklichem Ja des Nutzers mit echten Spieltexten benutzen.
