@@ -112,6 +112,13 @@ def test_choice_with_bad_id_reports_the_id_problem_first():
     assert line.skip == SKIP_ID_MISMATCH
 
 
+def test_boolean_choice_index_is_an_id_mismatch():
+    row = mline("Plh_3", nodeType="choice", choiceIndex=True, actorName="Player", category="player",
+                id=choice_id(TREE, PATH, "Plh_3", 1))
+    (line,) = build_lines(manifest(row), {(PATH, "Plh_3"): "Zum Brunnen."})
+    assert line.skip == SKIP_ID_MISMATCH
+
+
 def test_duplicate_ids_keep_the_first():
     lines = build_lines(manifest(mline("Plh_1"), mline("Plh_1", text="Zweite Fassung.")), {})
     assert len(lines) == 1 and lines[0].speech == "Text aus dem Manifest."
