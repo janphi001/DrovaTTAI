@@ -35,3 +35,21 @@ def test_prepare_writes_packets_for_speakers_without_profile(pipeline_repo, caps
     packet = json.loads((pipeline_repo.repo / "out" / "subagent" / "profile" / "packet_001.json").read_text(encoding="utf-8"))
     assert [e["speaker"] for e in packet] == ["mira"]
     assert "1 Sprecher in 1 Paketen" in capsys.readouterr().out
+
+
+def test_import_fails_on_missing_file(pipeline_repo, tmp_path, capsys):
+    run(pipeline_repo, "extract")
+    assert run(pipeline_repo, "profile", "--import", str(tmp_path / "gibt_es_nicht.jsonl")) == 2
+    assert "Importdatei nicht gefunden" in capsys.readouterr().err
+    assert not (pipeline_repo.casting / "profiles.jsonl").exists()
+
+
+def test_import_reports_unreadable_lines_but_keeps_valid_rows(pipeline_repo, tmp_path, capsys):
+    run(pipeline_repo, "extract")
+    incoming = tmp_path / "partial.jsonl"
+    incoming.write_text(json.dumps({"speaker": "mira", "gender": "f", "age": "mittel"}) + "\n"
+                        + '{"speaker": "mira", "gender": "f", "ag', encoding="utf-8")
+    assert run(pipeline_repo, "profile", "--import", str(incoming)) == 1
+    err = capsys.readouterr().err
+    assert "1 unlesbare Zeilen in" in err and "partial.jsonl" in err
+    assert read_profiles(pipeline_repo.casting / "profiles.jsonl")["mira"].source == "llm"

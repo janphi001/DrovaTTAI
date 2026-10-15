@@ -17,7 +17,7 @@ from drova_voice.encode import run_encode
 from drova_voice.engines.client import EngineClient, cache_env, worker_command
 from drova_voice.fish_voices import load_catalog
 from drova_voice.install import install_audio
-from drova_voice.jsonl import append_jsonl, latest_by_id, read_jsonl_lenient, write_jsonl
+from drova_voice.jsonl import append_jsonl, latest_by_id, read_jsonl_counted, read_jsonl_lenient, write_jsonl
 from drova_voice.lines import (Line, build_lines, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
 from drova_voice.preview import write_preview
 from drova_voice.profiles import LOW_CONFIDENCE, Profile, merge_import, prepare_packets, read_profiles, write_profiles
@@ -171,6 +171,29 @@ def _cast_listen(cfg: Config) -> int:
     return 0
 
 
+def _read_import_rows(files: list[Path]) -> tuple[list[dict], list[str]] | None:
+    """Zeilen der Importdateien plus Fehlermeldungen zu unlesbaren Zeilen; None (mit Meldung), wenn eine Datei fehlt."""
+    for f in files:
+        if not Path(f).is_file():
+            _fail(f"Importdatei nicht gefunden: {f}")
+            return None
+    rows: list[dict] = []
+    errors: list[str] = []
+    for f in files:
+        file_rows, skipped = read_jsonl_counted(f)
+        rows.extend(file_rows)
+        if skipped:
+            errors.append(f"{skipped} unlesbare Zeilen in {f} übersprungen")
+    return rows, errors
+
+
+def _print_import_errors(errors: list[str], limit: int = 20) -> None:
+    for e in errors[:limit]:
+        print(f"FEHLER {e}", file=sys.stderr)
+    if len(errors) > limit:
+        print(f"... und {len(errors) - limit} weitere Fehler", file=sys.stderr)
+
+
 def emotions_path(cfg: Config) -> Path:
     return cfg.casting_dir / "emotions.jsonl"
 
@@ -195,13 +218,16 @@ def _emote(cfg: Config, args: argparse.Namespace) -> int:
         print(f"{sum(len(p) for p in packets)} Dialogbäume in {len(packets)} Paketen -> {out}")
         return 0
     if args.import_files:
-        rows = [row for f in args.import_files for row in read_jsonl_lenient(f)]
+        loaded = _read_import_rows(args.import_files)
+        if loaded is None:
+            return 2
+        rows, read_errors = loaded
         result = import_llm_emotions(existing, rows, {l.id for l in lines if not l.skip})
         write_emotions(emotions_path(cfg), result.merged)
         print(f"{result.imported} LLM-Emotionen übernommen, {result.kept} feste Zeilen behalten -> {emotions_path(cfg)}")
-        for e in result.errors[:20]:
-            print(f"FEHLER {e}", file=sys.stderr)
-        return 1 if result.errors else 0
+        errors = read_errors + result.errors
+        _print_import_errors(errors)
+        return 1 if errors else 0
     merged = merge_emotions(existing, lines)
     write_emotions(emotions_path(cfg), merged)
     sources = Counter(t.source for t in merged.values())
@@ -414,12 +440,15 @@ def _profile(cfg: Config, args: argparse.Namespace) -> int:
         print(f"{sum(len(p) for p in packets)} Sprecher in {len(packets)} Paketen -> {out}")
         return 0
     if args.import_files:
-        rows = [row for f in args.import_files for row in read_jsonl_lenient(f)]
-        merged, errors = merge_import(profiles, rows, {s.name for s in speaker_stats(lines)})
+        loaded = _read_import_rows(args.import_files)
+        if loaded is None:
+            return 2
+        rows, read_errors = loaded
+        merged, merge_errors = merge_import(profiles, rows, {s.name for s in speaker_stats(lines)})
         write_profiles(profiles_path(cfg), merged.values())
         print(f"{len(merged)} Steckbriefe ({len(merged) - len(profiles)} neu) -> {profiles_path(cfg)}")
-        for e in errors[:20]:
-            print(f"FEHLER {e}", file=sys.stderr)
+        errors = read_errors + merge_errors
+        _print_import_errors(errors)
         return 1 if errors else 0
     stats = speaker_stats(lines)
     for s in stats:

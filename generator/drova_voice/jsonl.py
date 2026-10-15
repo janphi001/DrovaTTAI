@@ -56,23 +56,33 @@ def append_jsonl(path: Path, row: dict) -> None:
         f.write(data)
 
 
-def read_jsonl_lenient(path: Path) -> list[dict]:
-    """Wie read_jsonl, aber: fehlende Datei -> [], nicht lesbare Zeilen (z. B. abgebrochenes Schreiben, auch mitten in
-    einem Umlaut) werden übersprungen."""
+def read_jsonl_counted(path: Path) -> tuple[list[dict], int]:
+    """Wie read_jsonl_lenient, zählt zusätzlich die nicht leeren Zeilen, die übersprungen wurden (kein gültiges JSON,
+    kein Objekt, nicht lesbar). Fehlende Datei -> ([], 0)."""
     path = Path(path)
     if not path.exists():
-        return []
+        return [], 0
     rows = []
+    skipped = 0
     for raw in path.read_bytes().split(b"\n"):
         if not raw.strip():
             continue
         try:
             row = json.loads(raw.decode("utf-8-sig"))
         except (UnicodeDecodeError, json.JSONDecodeError):
+            skipped += 1
             continue
         if isinstance(row, dict):
             rows.append(row)
-    return rows
+        else:
+            skipped += 1
+    return rows, skipped
+
+
+def read_jsonl_lenient(path: Path) -> list[dict]:
+    """Wie read_jsonl, aber: fehlende Datei -> [], nicht lesbare Zeilen (z. B. abgebrochenes Schreiben, auch mitten in
+    einem Umlaut) werden übersprungen."""
+    return read_jsonl_counted(path)[0]
 
 
 def latest_by_id(rows: Iterable[dict]) -> dict[str, dict]:

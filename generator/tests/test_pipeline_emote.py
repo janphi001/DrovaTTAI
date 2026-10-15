@@ -36,3 +36,23 @@ def test_emote_prepare_and_import(pipeline_repo, tmp_path, capsys):
     assert "gibt|es|nicht" in capsys.readouterr().err
     emotions = read_emotions(pipeline_repo.casting / "emotions.jsonl")
     assert emotions["DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_2"].source == "llm"
+
+
+def test_emote_import_fails_on_missing_file(pipeline_repo, tmp_path, capsys):
+    cfg = str(pipeline_repo.cfg)
+    main(["--config", cfg, "extract"])
+    assert main(["--config", cfg, "emote", "--import", str(tmp_path / "gibt_es_nicht.jsonl")]) == 2
+    assert "Importdatei nicht gefunden" in capsys.readouterr().err
+    assert not (pipeline_repo.casting / "emotions.jsonl").exists()
+
+
+def test_emote_import_reports_unreadable_lines_but_keeps_valid_rows(pipeline_repo, tmp_path, capsys):
+    cfg = str(pipeline_repo.cfg)
+    main(["--config", cfg, "extract"])
+    incoming = tmp_path / "partial.jsonl"
+    incoming.write_text(json.dumps({"id": "DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_2", "emotion": "tender", "intensity": 0.6}) + "\n"
+                        + '{"id": "DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_1", "emotion": "sa', encoding="utf-8")
+    assert main(["--config", cfg, "emote", "--import", str(incoming)]) == 1
+    err = capsys.readouterr().err
+    assert "1 unlesbare Zeilen in" in err and "partial.jsonl" in err
+    assert read_emotions(pipeline_repo.casting / "emotions.jsonl")["DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_2"].source == "llm"
