@@ -9,17 +9,19 @@ KI-Stimmen für das Spiel **Drova – Forsaken Kin**. Ein Python-Generator (`gen
 | Teil | Stand |
 |---|---|
 | Plan 1 Fundament, Plan 2 Fish + Export, Plan 3 Generator | fertig (Branches `plan-1-foundation`, `plan-2-fish-export`, `plan-3-generator`) |
-| **Plan 4 Wiedergabe in der Mod** | **fertig und vom Nutzer abgenommen** (Branch `plan-4-playback`, aktuell; Notiz `docs/decisions/2026-10-playback-durchstich.md`) |
+| **Plan 4 Wiedergabe in der Mod** | **fertig und vom Nutzer abgenommen** (Branch `plan-4-playback`; Notiz `docs/decisions/2026-10-playback-durchstich.md`) |
+| **Plan 5 Casting und Vollauf** | **Code fertig, Vollauf bei Fish durch** (Branch `plan-5-casting` auf `plan-4-playback`; 471 pytest grün; alle 245 benannten Sprecher besetzt und vertont, `report --by-speaker`: Lücken 0; Notiz `docs/decisions/2026-10-casting-vollauf.md`). **Offen:** Stichprobe im Spiel durch den Nutzer |
 | Merge/Push der Branches | **nichts gepusht, nichts nach `main` gemerged**; Entscheidung beim Nutzer (siehe „Offene Entscheidungen“) |
-| Tests | 151 xUnit (Core), 390 pytest (Generator), alle grün |
+| Tests | 151 xUnit (Core), 471 pytest (Generator), alle grün |
 
 ## Stimmen (Frage „wie viele?“)
-- `casting/fish_voices.yaml`: **41 Stimmen** (22 männlich, 19 weiblich; bekannte Altersangaben: 12 jung, 14 mittel, 7 alt) **+ 7 Varianten** (Pitch/Formant/Tempo-Abwandlungen: alte Frau, alte Frau rau, Riese, Zwerg, Schurke hell, Jugendlicher, Knabe). Die Varianten sind nur in der Tabelle, **der Generator-Schritt dafür ist noch nicht gebaut**.
+- `casting/fish_voices.yaml`: **41 Stimmen** (22 männlich, 19 weiblich; bekannte Altersangaben: 12 jung, 14 mittel, 7 alt) **+ 7 Varianten** (Pitch/Formant/Tempo-Abwandlungen: alte Frau, alte Frau rau, Riese, Zwerg, Schurke hell, Jugendlicher, Knabe). Seit Plan 5 setzt `encode` das Rezept (ffmpeg `rubberband`) auf die Basisstimme an; in `casting.yaml` darf `voice:` ein Variantenschlüssel sein.
+- **Besetzung (Plan 5):** 245 Sprecher, `casting/casting_auto.yaml` (erzeugt, `cast --propose`; seither bleibt sie bei Wiederholung stehen, `--reset` verwirft sie) unter `casting/casting.yaml` (von Hand, gewinnt; u. a. die 6 früheren Sprecher, Jola, Meluna, Reija). Steckbriefe: `casting/profiles.jsonl`.
 - Fehlende Typen: echte Kinderstimmen, alte Frauen (nur eine Stimme + Variante), helle Männerstimmen.
-- In `casting/casting.yaml` zugeordnet sind **6 Sprecher**: Adela `melanie`, Jero `german_wisdom_m_3130ae`, Enya `lena`, Femke `schales_7ef3ea` (männlich), Gerion `lukas`, Gilwar `jonas`; `default_player: leon`. Alles vorläufig, der Nutzer entscheidet nach dem Hören. Insgesamt gibt es ~290 Sprecher im Spiel (Plan 5 soll alle besetzen).
+- Ältere Besetzung der 6 Sprecher (Adela `melanie`, Jero `german_wisdom_m_3130ae`, Enya `lena`, Femke `schales_7ef3ea` männlich, Gerion `lukas`, Gilwar `jonas`; `default_player: leon`) steht weiter in `casting.yaml` und gewinnt gegen die Auto-Zuteilung.
 
 ## Was im Spiel hörbar ist
-`Mods/DrovaVoice/Audio/de/index.json` hat **282 Einträge** (Zeilen der 6 besetzten Sprecher ohne Spieler-Auswahloptionen; Dateien OGG 48 kHz mono, −16 LUFS). Der Nutzer hat Enya, Femke, Gerion und Gilwar mit Emotionen gehört: „klingt gut“, Skip stoppt die Stimme, Lautstärke 100 % passt. Adela und Jero hat er im Spiel nie gefunden (Jero ist im Mittelspiel im Ruinenlager).
+`Mods/DrovaVoice/Audio/de/index.json` hat **11.413 Einträge** (alle 245 benannten Sprecher und die Aussagen des Spielers, ohne Auswahloptionen; 506 MB, OGG 48 kHz mono, −16 LUFS). Der Nutzer hat vor dem Vollauf Enya, Femke, Gerion und Gilwar gehört („klingt gut“, Skip stoppt die Stimme, Lautstärke 100 % passt); die Stichprobe im Spiel nach dem Vollauf steht aus.
 
 ## Entscheidungen, die man nicht wieder aufrollen soll
 - **Engine:** Fish Audio Cloud; Kitten nur lokale Rückfallebene (`docs/decisions/2026-10-tts-engine.md`). Texte gehen an Fish: **nur nach ausdrücklichem Ja des Nutzers**. Kosten/Tarif für den Vollauf ungeklärt (~13.000 Zeilen).
@@ -45,7 +47,7 @@ KI-Stimmen für das Spiel **Drova – Forsaken Kin**. Ein Python-Generator (`gen
 Alle Befehle in `generator/` (siehe `docs/generator.md`): `extract` (aus `data/export/de/manifest-loaded.json`) → `cast --check --npc X` → `emote --npc X` → `synth --npc X` (Fish, 8 parallel, braucht Key + Ja) → `encode` → `install` → `report`/`preview`. Neue Sprecher: Stimme in `casting/casting.yaml` eintragen (`name: {voice: schlüssel}`).
 
 ## Offene Entscheidungen / nächste Schritte
-1. **Plan 5 = Casting und Vollauf (M4)** (Empfehlung): alle ~290 Sprecher besetzen (Geschlecht per LLM schätzen, Nutzer korrigiert), Emotionen per Haiku für alle Zeilen, Varianten-Schritt, Kosten klären, dann Vollauf. Ablauf: Skill `superpowers:brainstorming` → Spec → `superpowers:writing-plans`.
+1. **Stichprobe im Spiel** (Spiel starten, mit verschiedenen NPCs sprechen; Alte-Frau-, Riesen- und Kinderstimmen besonders), danach Korrekturen in `casting/casting.yaml` und die betroffenen Zeilen neu erzeugen (WAV in `cache/synth/` löschen, `synth --npc X`, `encode`, `install`). Plan 5 ist sonst abgeschlossen.
 2. Danach Mod-Ausbau: Namensvarianten `#arden`/`#neutral` (535 `$GVAR`-Zeilen, bisher übersprungen), Regler im Spiel, Barks (M6, braucht Entfernungslogik), Briefe (M7).
 3. Offene Lücken: 98-%-Lücke im Export (1.181 Zeilen ohne Sprecher; Lösungsansatz in `docs/decisions/2026-10-export-findings.md`), Jero und Adela im Spiel noch nie gehört, Regler-Wirkung (z. B. 150 %) im Spiel nicht geprüft.
 4. Git: `plan-4-playback` (auf `plan-3-generator` ← `plan-2-fish-export` ← `plan-1-foundation`) mergen oder PR; Historie umschreiben (Gmail-Adresse in ~58 Commits, Skript `.superpowers/rewrite-history.sh`); Lizenz wählen (Empfehlung MIT).
