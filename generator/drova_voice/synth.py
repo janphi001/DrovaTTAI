@@ -17,7 +17,7 @@ from drova_voice.engines.client import EngineError
 from drova_voice.engines.protocol import SynthRequest
 from drova_voice.fish_voices import FishVoice
 from drova_voice.jsonl import replace_with_retry
-from drova_voice.lines import SKIP_UNSPEAKABLE, Line
+from drova_voice.lines import SKIP_UNSPEAKABLE, Line, emotion_id
 from drova_voice.render import render_request
 
 SKIP_NO_VOICE = "no_voice"
@@ -106,7 +106,7 @@ def build_jobs(lines: Sequence[Line], casting: Casting, fish_table: Mapping[str,
             continue
         voice = fish_table[voice_key].id if engine == "fish" else None
         try:
-            text, params = render_request(engine, line.speech, emotions.get(line.id, EmotionTag()))
+            text, params = render_request(engine, line.speech, emotions.get(emotion_id(line), EmotionTag()))
         except ValueError:
             skipped[line.id] = SKIP_UNSPEAKABLE
             continue

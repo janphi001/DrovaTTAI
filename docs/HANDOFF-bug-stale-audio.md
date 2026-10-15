@@ -8,7 +8,7 @@ Die Stimmen funktionieren „soweit ganz gut“. Aber: **Beim normalen Herumlauf
 Das spricht stark für Hypothese 0 (unten): Der Clip einer früheren Zeile bleibt am NPC (an dessen `AudioSource` oder am Knoten) hängen und wird später ohne Gespräch erneut abgespielt.
 
 ## Was neu ist (warum es erst jetzt auftritt)
-Bis Plan 4 waren nur 6 Sprecher (282 Zeilen) im Index. Seit Plan 5 liegen **11.413 Einträge** im Spielordner (`Mods/DrovaVoice/Audio/de/index.json`, 506 MB): alle 245 benannten Sprecher. Darunter viele Bäume, die das Spiel **nicht als Gespräch mit Fenster** ausführt, sondern nebenbei in der Welt (Anzahl sprechbarer, benannter Dialogzeilen im Index nach Baumart): `Quest_` ~5.600, `Greet` ~1.140 (NPC grüßt beim Vorbeigehen), `Intent` ~1.000 (`DT_PreApo_Intent_*`), `Talk` ~260, `Reaction` ~80, `Cutscene` ~60, `WorldDialog*` ~20. Barks (`category: bark`) und generische Sprecher sind **nicht** im Index.
+Bis Plan 4 waren nur 6 Sprecher (282 Zeilen) im Index. Seit Plan 5 liegen **11.413 Einträge** im Spielordner (`Mods/DrovaVoice/Audio/de/index.json`, 506 MB): alle 245 benannten Sprecher. Darunter viele Bäume, die das Spiel **nicht als Gespräch mit Fenster** ausführt, sondern nebenbei in der Welt (Anzahl sprechbarer, benannter Dialogzeilen im Index nach Baumart): `Quest_` ~5.600, `Greet` ~1.140 (NPC grüßt beim Vorbeigehen), `Intent` ~1.000 (`DT_PreApo_Intent_*`), `Talk` ~260, `Reaction` ~80, `Cutscene` ~60, `WorldDialog*` ~20. Barks (`category: bark`) und generische Sprecher sind **nicht** im Index (Stand damals; seit Plan 7 sind Barks im Index).
 
 ## Wie die Wiedergabe funktioniert (relevant für die Fehlersuche)
 Details in `docs/playback.md`. Kurz:
@@ -52,3 +52,6 @@ Fix: `StaleAudioProbe` nimmt jetzt (immer, nicht nur mit `Diagnostics`) den Clip
 
 ## Abnahme (2026-10-15)
 Der Nutzer hat den Fix im Spiel geprüft: Es klappt, keine alten Stimmen mehr beim Herumlaufen. Bug erledigt.
+
+## Nachtrag Plan 7
+Dieselbe Ursache (`statement.audio` bleibt stehen) trat bei geteilten Bark-Aussagen auf: falsche Stimme und keine Entfernungsregelung. Lösung: `BarkDistance.Watch` gibt die Aussage frei, sobald der Clip spielt. Siehe `docs/playback.md` (Abschnitt Barks und Stimmenpool).

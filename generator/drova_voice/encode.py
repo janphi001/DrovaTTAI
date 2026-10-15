@@ -9,7 +9,7 @@ from typing import Mapping, Sequence
 from drova_voice.emotions import EmotionTag
 from drova_voice.ids import audio_filename
 from drova_voice.jsonl import replace_with_retry
-from drova_voice.lines import Line
+from drova_voice.lines import Line, emotion_id
 
 _TRIM = "silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.05"
 LOUDNORM = "loudnorm=I=-16:TP=-1.5:LRA=11"
@@ -99,7 +99,8 @@ def run_encode(lines: Sequence[Line], synth_rows: Mapping[str, dict], emotions: 
         wav = Path(row["wav"] or "")
         if not wav.is_file():
             return None, f"{line.id}: WAV fehlt ({wav})"
-        notes = emotions[line.id].notes if line.id in emotions else []
+        tag = emotion_id(line)
+        notes = emotions[tag].notes if tag in emotions else []
         rel = rel_audio_path(line)
         try:
             duration = encode_one(ffmpeg, ffprobe, wav, Path(audio_dir) / rel, notes, row["key"], (variants or {}).get(line.id))

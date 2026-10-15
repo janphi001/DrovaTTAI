@@ -61,6 +61,13 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 
 - Zeilen mit `$GVAR:` im Text: Ist der Spielername der einzige Platzhalter und lässt er sich streichen (`player_name.py`), wird die Zeile in neutraler Fassung vertont (ID `…#neutral`). Sonst übersprungen und im Bericht gezählt: `gvar_name` (Name steht mitten im Satz), `gvar_value` (Quest- oder Geldwerte, auch zusammen mit dem Namen).
 - Spielerzeilen nutzen eine feste Stimme (`default_player`), keine Stimmsets. Gesprochen werden nur Aussagen des Spielers (119 im Spiel); **Auswahloptionen** (6.491 Zeilen) bleiben stumm wie im Original (Nutzerentscheidung 2026-10-15, Grund `player_choice`).
-- Keine Varianten für generische Sprecher, keine Barks, keine Briefe.
+- Keine Briefe.
+
+## Barks und Stimmenpool (Plan 7)
+- `casting/pools.yaml`: je Geschlecht (`m`, `w`) eine Liste von Stimmenschlüsseln aus `fish_voices.yaml`; die Position ergibt den Tag (`vm1`, `vw2` …). Fehlt die Datei, bleiben generische Sprecher unbesetzt (wie vorher).
+- Jede sprechbare Zeile eines generischen Sprechers wird beim Einlesen (`_selected`) durch eine Zeile je Poolstimme ersetzt (`<ID>#v<g><n>`, Feld `Line.pool`); `Casting.voice_for` ordnet die Stimme zu, Emotionen gelten über die Basis-ID (`emotion_id`). `emote` arbeitet auf den Basiszeilen.
+- `--category dialog|bark|player` filtert `synth`, `encode`, `install`, `report`, `emote`, `preview`. **Ein `synth` ohne `--category` nimmt alle Poolzeilen (generische Dialogzeilen und Barks) mit** und sendet sie an Fish.
+- Barks benannter Sprecher laufen wie normale Zeilen über die Besetzung; Ordner `bark/` ergibt sich aus der Kategorie. `install` baut die Poolvarianten einer Basis-ID jedes Mal neu auf (Pool verkleinert → alte Varianten verschwinden).
+- Stand 2026-10-15: 171 benannte und 152 generische Barks (6 Poolstimmen) vertont und installiert; dazu 205 generische Dialogzeilen (`dialog`, Pool, 1.230 Clips). Index danach: 13.819 Einträge.
 - Besetzung: `casting/casting.yaml` (von Hand, gewinnt) über `casting/casting_auto.yaml` (erzeugt).
 - Fish ist eine Cloud-Engine: der Sprechtext geht an `api.fish.audio`. Nur nach ausdrücklichem Ja des Nutzers mit echten Spieltexten benutzen.

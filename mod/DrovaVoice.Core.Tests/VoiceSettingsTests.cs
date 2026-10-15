@@ -21,6 +21,35 @@ namespace DrovaVoice.Core.Tests
             Assert.Empty(w);
         }
 
+        [Fact]
+        public void BarkPercentDefaultsTo100AndIsClamped()
+        {
+            var w = new List<string>();
+            Assert.Equal(100, VoiceSettings.Create(true, 100, 100, "de", 64, false, w).BarkPercent);
+            var s = VoiceSettings.Create(true, 100, 100, "de", 64, false, w, barkPercent: 250);
+            Assert.Equal(200, s.BarkPercent);
+            Assert.Contains("BarkVolume", w[0]);
+            Assert.Equal(200, s.PercentFor(VoiceCategory.Bark));
+            Assert.Equal(100, s.PercentFor(VoiceCategory.Dialog));
+        }
+
+        [Fact]
+        public void BarkDistancesHaveDefaultsAndMustBeOrdered()
+        {
+            var w = new List<string>();
+            var s = VoiceSettings.Create(true, 100, 100, "de", 64, false, w);
+            Assert.Equal(15f, s.BarkMinDistance);
+            Assert.Equal(120f, s.BarkMaxDistance);
+            Assert.Empty(w);
+            var bad = VoiceSettings.Create(true, 100, 100, "de", 64, false, w, barkMinDistance: 20f, barkMaxDistance: 10f);
+            Assert.Equal(15f, bad.BarkMinDistance);
+            Assert.Equal(120f, bad.BarkMaxDistance);
+            Assert.Contains("BarkMaxDistance", w[0]);
+            var neg = VoiceSettings.Create(true, 100, 100, "de", 64, false, new List<string>(), barkMinDistance: -4f, barkMaxDistance: 12f);
+            Assert.Equal(0f, neg.BarkMinDistance);
+            Assert.Equal(12f, neg.BarkMaxDistance);
+        }
+
         [Theory]
         [InlineData(-1, 0)]
         [InlineData(250, 200)]

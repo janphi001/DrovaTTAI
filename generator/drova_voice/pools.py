@@ -1,0 +1,48 @@
+from __future__ import annotations
+
+from dataclasses import replace
+from pathlib import Path
+from typing import Mapping, Sequence
+
+import yaml
+
+from drova_voice.ids import VARIANT_SEP, with_variant
+from drova_voice.lines import Line
+
+GENDERS = ("m", "w")
+
+
+def load_pools(path: Path, voices: Mapping[str, object]) -> dict[str, str]:
+    """casting/pools.yaml -> {Tag: Stimmenschlüssel}; Tag = v<Geschlecht><Position ab 1>. Fehlt die Datei, ist der Pool leer."""
+    path = Path(path)
+    if not path.is_file():
+        return {}
+    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    pools = raw.get("pools") if isinstance(raw, dict) else None
+    if not isinstance(pools, dict):
+        raise ValueError(f"{path}: 'pools:' mit den Listen m und w fehlt")
+    result: dict[str, str] = {}
+    for gender, keys in pools.items():
+        if str(gender) not in GENDERS:
+            raise ValueError(f"{path}: Unbekanntes Geschlecht '{gender}' (erlaubt: m, w)")
+        for number, key in enumerate(keys or [], start=1):
+            voice = str(key).lower()
+            if voice not in voices:
+                raise ValueError(f"{path}: Unbekannte Stimme '{voice}' im Pool '{gender}' (Schlüssel aus casting/fish_voices.yaml)")
+            result[f"v{gender}{number}"] = voice
+    return result
+
+
+def expand_pool_lines(lines: Sequence[Line], pools: Mapping[str, str]) -> list[Line]:
+    """Ersetzt jede sprechbare Zeile eines generischen Sprechers durch eine Zeile je Poolstimme (`<ID>#v<g><n>`).
+    Benannte, übersprungene und schon variantenhaltige Zeilen bleiben unverändert."""
+    if not pools:
+        return list(lines)
+    out: list[Line] = []
+    for line in lines:
+        if not line.generic or line.skip or line.pool or VARIANT_SEP in line.id:
+            out.append(line)
+            continue
+        for tag in sorted(pools):
+            out.append(replace(line, id=with_variant(line.id, tag), pool=tag))
+    return out
