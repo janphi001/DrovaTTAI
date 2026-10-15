@@ -1,5 +1,5 @@
 from drova_voice.ids import choice_id, statement_id
-from drova_voice.lines import (SKIP_GVAR, SKIP_ID_MISMATCH, SKIP_UNSPEAKABLE, Line, build_lines, load_lexicon,
+from drova_voice.lines import (SKIP_GVAR, SKIP_ID_MISMATCH, SKIP_PLAYER_CHOICE, SKIP_UNSPEAKABLE, Line, build_lines, load_lexicon,
                                load_loc_texts, read_lines, select_npc, write_lines)
 
 TREE, PATH = "DT_Test_NPC_Mira", "Dialog/NPC_Mira"
@@ -53,11 +53,24 @@ def test_id_mismatch_is_skipped():
     assert line.skip == SKIP_ID_MISMATCH and line.speech == ""
 
 
-def test_choice_line_id_uses_the_index():
+def test_choice_line_id_uses_the_index_but_is_not_spoken():
+    # Das Spiel spricht Auswahloptionen nicht (Nutzerentscheidung 2026-10-15): ID und Index bleiben, der Text wird nicht vertont.
     row = mline("Plh_3", nodeType="choice", choiceIndex=2, actorName="Player", category="player",
                 id=choice_id(TREE, PATH, "Plh_3", 2))
     (line,) = build_lines(manifest(row), {(PATH, "Plh_3"): "Zum Brunnen, bitte."})
-    assert line.skip is None and line.choice_index == 2 and line.id.endswith("|c2")
+    assert line.skip == SKIP_PLAYER_CHOICE and line.speech == "" and line.choice_index == 2 and line.id.endswith("|c2")
+
+
+def test_player_statements_are_still_spoken():
+    row = mline("Plh_4", actorName="Player", category="player")
+    (line,) = build_lines(manifest(row), {(PATH, "Plh_4"): "Ich komme von weit her."})
+    assert line.skip is None and line.speech == "Ich komme von weit her."
+
+
+def test_choice_with_bad_id_reports_the_id_problem_first():
+    row = mline("Plh_3", nodeType="choice", choiceIndex=2, actorName="Player", category="player", id="Falsch|Pfad|Plh_3")
+    (line,) = build_lines(manifest(row), {})
+    assert line.skip == SKIP_ID_MISMATCH
 
 
 def test_duplicate_ids_keep_the_first():

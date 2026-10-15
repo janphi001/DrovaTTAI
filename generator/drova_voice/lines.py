@@ -15,6 +15,7 @@ from drova_voice.speech_text import build_speech_text
 SKIP_GVAR = "gvar"
 SKIP_UNSPEAKABLE = "unspeakable"
 SKIP_ID_MISMATCH = "id_mismatch"
+SKIP_PLAYER_CHOICE = "player_choice"  # Auswahloptionen spricht das Spiel nicht; der Spieler bleibt dort stumm
 
 
 @dataclass(frozen=True)
@@ -85,6 +86,8 @@ def build_lines(manifest: Mapping, loc_texts: Mapping[tuple[str, str], str],
         speech, stage, skip = "", (), None
         if not id_ok:
             skip = SKIP_ID_MISMATCH
+        elif row.get("nodeType") == "choice":
+            skip = SKIP_PLAYER_CHOICE
         elif "$GVAR:" in raw:
             skip = SKIP_GVAR
         else:
@@ -103,7 +106,7 @@ def build_lines(manifest: Mapping, loc_texts: Mapping[tuple[str, str], str],
 
 
 def select_npc(lines: Sequence[Line], npc: str) -> list[Line]:
-    """Alle Zeilen der Bäume, in denen der NPC spricht (inklusive Spieler-Auswahloptionen derselben Bäume)."""
+    """Alle Zeilen der Bäume, in denen der NPC spricht (Spieler-Auswahloptionen derselben Bäume sind dabei, werden aber als `player_choice` übersprungen)."""
     wanted = npc.lower()
     trees = {l.tree for l in lines if l.actor.lower() == wanted}
     return [l for l in lines if l.tree in trees]

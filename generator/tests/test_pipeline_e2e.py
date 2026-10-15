@@ -18,7 +18,7 @@ def test_whole_pipeline_with_fake_engine(pipeline_repo, guarded, capsys):
     for step in steps:
         assert guarded(lambda s=step: main(base + s)) == 0, step
     out = capsys.readouterr().out
-    assert "dialog: 4 Zeilen" in out and "installiert: 2" in out and "player: 1 Zeilen" in out
+    assert "dialog: 4 Zeilen" in out and "installiert: 2" in out and "player: 2 Zeilen" in out and "player_choice: 1" in out
     index = json.loads((pipeline_repo.install_dir / "index.json").read_text(encoding="utf-8"))
     assert len(index["entries"]) == 3
     assert (pipeline_repo.repo / "out" / "preview" / "index.html").is_file()

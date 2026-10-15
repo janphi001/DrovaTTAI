@@ -19,7 +19,7 @@ def test_install_after_encode(pipeline_repo, guarded, capsys):
     assert main(base + ["install", "--npc", "Mira"]) == 0
     index = json.loads((pipeline_repo.install_dir / "index.json").read_text(encoding="utf-8"))
     assert sorted(index["entries"]) == ["DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_1", "DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_2",
-                                        "DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_3|c0"]
+                                        "DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_3"]
     assert len(list(pipeline_repo.install_dir.rglob("*.ogg"))) == 3
     assert "3 Einträge" in capsys.readouterr().out
 
@@ -40,4 +40,4 @@ def test_install_drops_entries_of_speakers_that_lost_their_voice(pipeline_repo, 
     (pipeline_repo.casting / "casting.yaml").write_text("default_player: leon\nspeakers: {}\n", encoding="utf-8")
     assert main(base + ["install"]) == 0
     index = json.loads((pipeline_repo.install_dir / "index.json").read_text(encoding="utf-8"))
-    assert sorted(index["entries"]) == ["DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_3|c0"]  # nur noch die Spielerzeile
+    assert sorted(index["entries"]) == ["DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_3"]  # nur noch die Spielerzeile

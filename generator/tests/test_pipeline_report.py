@@ -27,4 +27,4 @@ def test_report_after_full_run(pipeline_repo, guarded, capsys):
     capsys.readouterr()
     assert main(base + ["report"]) == 0
     out = capsys.readouterr().out
-    assert "dialog: 4 Zeilen -> installiert: 2" in out and "player: 1 Zeilen -> installiert: 1" in out
+    assert "dialog: 4 Zeilen -> installiert: 2" in out and "player: 2 Zeilen -> installiert: 1, übersprungen: player_choice: 1" in out

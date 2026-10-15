@@ -108,9 +108,10 @@ def pipeline_repo(tmp_path):
     manifest = {"version": 1, "language": "de", "lines": [
         _manifest_line("Plh_1", 1, "Mira", "dialog"),
         _manifest_line("Plh_2", 2, "Mira", "dialog"),
-        _manifest_line("Plh_3", 3, "Player", "player", "choice", 0),
+        _manifest_line("Plh_3", 3, "Player", "player"),                  # Spieler-Aussage: wird gesprochen (default_player)
         _manifest_line("Plh_4", 4, "Mira", "dialog"),
         _manifest_line("Plh_5", 5, "Mira", "dialog"),
+        _manifest_line("Plh_6", 6, "Player", "player", "choice", 0),     # Auswahloption: wird übersprungen (player_choice)
     ]}
     (export / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
     casting = repo / "casting"

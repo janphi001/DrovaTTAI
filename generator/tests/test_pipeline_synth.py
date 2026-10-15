@@ -12,11 +12,11 @@ def test_synth_fake_engine_writes_results_and_cache(pipeline_repo, guarded, caps
     run(pipeline_repo, "extract")
     assert guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake", "--workers", "2")) == 0
     rows = latest_by_id(read_jsonl_lenient(pipeline_repo.data / "synth" / "results.jsonl"))
-    assert sorted(rows) == [NPC_TREE + "Plh_1", NPC_TREE + "Plh_2", NPC_TREE + "Plh_3|c0"]
+    assert sorted(rows) == [NPC_TREE + "Plh_1", NPC_TREE + "Plh_2", NPC_TREE + "Plh_3"]
     assert all(r["ok"] for r in rows.values())
     assert len(list((pipeline_repo.repo / "cache" / "synth").glob("*.wav"))) == 3
     out = capsys.readouterr().out
-    assert "3 erzeugt" in out and "übersprungen: gvar: 1, unspeakable: 1" in out
+    assert "3 erzeugt" in out and "übersprungen: gvar: 1, player_choice: 1, unspeakable: 1" in out
 
 
 def test_synth_second_run_uses_the_cache(pipeline_repo, guarded, capsys):
