@@ -17,6 +17,7 @@ namespace DrovaVoice.Playback
     /// 2. <b>Entfernung:</b> Spielt ein Bark-Clip (Clipname <c>DrovaVoice/bark/…</c>), regelt die Klasse in jedem Frame
     ///    <c>AudioSource.volume</c> nach <see cref="BarkAttenuation"/> (nah laut, weiter weg leiser, wieder lauter beim Annähern).
     ///    Am Ende wird die ursprüngliche Lautstärke wiederhergestellt, weil dieselbe Quelle später normale Dialoge spielt.
+    ///    Ist die Spielerposition nicht lesbar, wird nichts neu geregelt: Ein laufender Bark behält den zuletzt gesetzten Wert.
     /// </summary>
     internal sealed class BarkDistance
     {
@@ -101,7 +102,7 @@ namespace DrovaVoice.Playback
                     _tracked.RemoveAt(i);
                     continue;
                 }
-                if (!havePlayer) continue;   // Spieler unbekannt: Lautstärke unverändert lassen
+                if (!havePlayer) continue;   // Spieler unbekannt: nicht neu regeln; der Bark behält den zuletzt gesetzten Wert
                 var pos = source.transform.position;
                 float distance = Vector2.Distance(player, new Vector2(pos.x, pos.y));
                 source.volume = t.OriginalVolume * BarkAttenuation.Gain(distance, _min, _max);
@@ -126,7 +127,7 @@ namespace DrovaVoice.Playback
         {
             if (_warnedNoPlayer) return;
             _warnedNoPlayer = true;
-            _log.Warning("Bark-Entfernung: Spielerposition nicht lesbar; Barks bleiben unverändert laut.");
+            _log.Warning("Bark-Entfernung: Spielerposition nicht lesbar; laufende Barks behalten die zuletzt gesetzte Lautstärke.");
         }
     }
 }

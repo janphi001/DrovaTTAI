@@ -173,7 +173,7 @@ Engine-neutrales Format pro Zeilen-ID in `emotions.jsonl`:
 | M7 | Briefe: Hook und Erzählerstimme. Klärt R3 | Brief wird vorgelesen |
 | M8 | Optional: Laufzeit-TTS (Worker im HTTP-Modus) für `runtime`-Variablen und den echten Spielernamen | — |
 
-*Stand 2026-10-15:* M1 bis M4 und M6 sind umgesetzt (Barks: `docs/superpowers/specs/2026-10-15-barks-design.md`). Offen: M5 (weitere Spielerstimm-Sets; es gibt nur `default_player`), M7 (Briefe), M8 (Laufzeit-TTS). Regler im Spiel statt per Datei sind ebenfalls offen.
+*Stand 2026-10-15:* M1 bis M4 und M6 sind umgesetzt (Barks: `docs/superpowers/specs/2026-10-15-barks-design.md`). Offen: M5 (weitere Spielerstimm-Sets; es gibt nur `default_player`), M7 (Briefe), M8 (Laufzeit-TTS). Regler im Spiel statt per Datei sind ebenfalls offen. M5 (Spieler-Stimmsets mit „Auto“) wird kleiner als geplant: Laut `docs/decisions/2026-10-player-choices-stumm.md` bleibt der Spieler bei Auswahloptionen stumm wie im Original, und nur 119 Aussagen des Spielers werden gesprochen; es gibt nur `default_player`.
 
 ## 11. Risiken
 
