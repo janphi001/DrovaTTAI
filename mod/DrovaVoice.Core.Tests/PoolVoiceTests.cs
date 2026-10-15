@@ -76,6 +76,22 @@ namespace DrovaVoice.Core.Tests
         public void MapsBodyTypeToGender(string? body, char? expected) => Assert.Equal(expected, PoolVoice.GenderFromBodyType(body));
 
         [Fact]
+        public void FigureKeepsItsVoiceWhenOtherVariantsAreMissingFromALine()
+        {
+            for (int i = 0; i < 100; i++)
+            {
+                string key = "guid-" + i;
+                string full = PoolVoice.Pick(All, 'm', key, "L1")!;
+                var others = new List<string>();
+                foreach (string t in All) if (t.StartsWith("vm") && t != full) others.Add(t);
+                // eine Zeile, der eine fremde Variante fehlt, liefert dieselbe Stimme
+                var subset = new List<string> { full, others[0] };
+                Assert.Equal(full, PoolVoice.Pick(subset, 'm', key, "L2"));
+                Assert.Equal(full, PoolVoice.Pick(new[] { full }, 'm', key, "L3"));
+            }
+        }
+
+        [Fact]
         public void ResolveReturnsTheBaseIdWhenItHasAnEntryAndOtherwiseThePoolVariant()
         {
             const string json = @"{""version"":1,""language"":""de"",""entries"":{

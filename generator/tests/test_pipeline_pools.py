@@ -71,3 +71,16 @@ def test_second_install_keeps_pool_entries_and_dropping_the_pool_removes_them(pi
     main(base + ["install"])
     index = json.loads((pipeline_repo.install_dir / "index.json").read_text(encoding="utf-8"))
     assert not any(BARK_BASE in i for i in index["entries"])
+
+
+@needs_ffmpeg
+def test_shrinking_the_pool_removes_the_dropped_voice_from_the_index(pipeline_repo, guarded):
+    _add_generic_bark(pipeline_repo)
+    base = ["--config", str(pipeline_repo.cfg)]
+    for step in (["extract"], ["synth", "--engine", "fake", "--workers", "2"], ["encode"], ["install"]):
+        assert guarded(lambda s=step: main(base + s)) == 0, step
+    (pipeline_repo.casting / "pools.yaml").write_text("pools:\n  m: [leon]\n", encoding="utf-8")
+    assert main(base + ["install"]) == 0
+    index = json.loads((pipeline_repo.install_dir / "index.json").read_text(encoding="utf-8"))
+    assert BARK_BASE + "#vm1" in index["entries"] and BARK_BASE + "#vw1" not in index["entries"]
+    assert index["variants"] == {BARK_BASE: ["vm1"]}

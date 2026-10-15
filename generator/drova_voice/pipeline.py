@@ -19,7 +19,7 @@ from drova_voice.fish_voices import load_catalog
 from drova_voice.ids import VARIANT_SEP, with_variant
 from drova_voice.install import install_audio
 from drova_voice.jsonl import append_jsonl, latest_by_id, read_jsonl_counted, read_jsonl_lenient, write_jsonl
-from drova_voice.lines import (Line, build_lines, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
+from drova_voice.lines import (Line, build_lines, emotion_id, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
 from drova_voice.pools import expand_pool_lines, load_pools
 from drova_voice.preview import write_preview
 from drova_voice.profiles import LOW_CONFIDENCE, Profile, merge_import, prepare_packets, read_profiles, write_profiles
@@ -368,6 +368,8 @@ def _install(cfg: Config, args: argparse.Namespace) -> int:
     drop = {l.id for l in lines} - {r["id"] for r in rows}
     # Ein installierter Basis-Eintrag verdrängt eine alte neutrale Variante (die Mod bevorzugt Varianten).
     drop |= {with_variant(l.id, "neutral") for l in lines if not l.skip and VARIANT_SEP not in l.id} - {r["id"] for r in rows}
+    # Poolzeilen: alle Varianten der Basis-ID neu aufbauen, damit Stimmen, die aus dem Pool gefallen sind, verschwinden.
+    drop |= {emotion_id(l) for l in lines if l.pool}
     result = install_audio(rows, audio_dir(cfg), cfg.install_dir, cfg.language, drop_ids=drop)
     result.errors.extend(stale)
     print(f"{result.copied} Dateien kopiert, index.json mit {result.entries} Einträgen -> {cfg.install_dir}")

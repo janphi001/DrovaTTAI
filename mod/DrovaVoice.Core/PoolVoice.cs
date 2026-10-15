@@ -36,7 +36,16 @@ namespace DrovaVoice.Core
                 if (matching.Count > 0) pool = matching;
             }
             string key = string.IsNullOrEmpty(figureKey) ? lineId : figureKey!;
-            return pool[(int)(Fnv1a(key) % (uint)pool.Count)];
+            // Höchstes Gewicht gewinnt (Rendezvous-Hashing): Fehlt einer Zeile eine Variante, behält die Figur
+            // ihre Stimme, solange diese da ist, statt dass sich mit der Listenlänge alles verschiebt.
+            string best = pool[0];
+            uint bestWeight = Fnv1a(key + "" + best);
+            for (int i = 1; i < pool.Count; i++)
+            {
+                uint weight = Fnv1a(key + "" + pool[i]);
+                if (weight > bestWeight) { best = pool[i]; bestWeight = weight; }
+            }
+            return best;
         }
 
         /// <summary>Die ID, die gespielt werden soll: die Basis-ID, wenn sie einen Eintrag hat, sonst die gewählte Poolvariante.</summary>
