@@ -31,7 +31,7 @@ def _load_index(path: Path, language: str) -> dict[str, dict]:
     try:
         index = json.loads(path.read_text(encoding="utf-8-sig"))
     except (json.JSONDecodeError, OSError):
-        return {}  # kaputter Index: neu aufbauen, die Dateien bleiben liegen
+        return {}
     if not isinstance(index, dict):
         return {}
     if index.get("version") != INDEX_VERSION or index.get("language") != language:
