@@ -154,7 +154,9 @@ namespace DrovaVoice.Core.Tests
   ""version"": 1, ""language"": ""de"",
   ""entries"": {
     ""DT_X|Dialog/A|Plh_1#neutral"": {""file"": ""dialog/0123456789abcdef.ogg"", ""duration"": 1.0},
-    ""DT_X|Dialog/A|Plh_2"":         {""file"": ""dialog/fedcba9876543210.ogg"", ""duration"": 2.0}
+    ""DT_X|Dialog/A|Plh_2"":         {""file"": ""dialog/fedcba9876543210.ogg"", ""duration"": 2.0},
+    ""DT_X|Dialog/A|Plh_1|c0#neutral"": {""file"": ""dialog/aaaaaaaaaaaaaaaa.ogg"", ""duration"": 1.5},
+    ""DT_X|Dialog/A|Plh_3#neutral|c0"": {""file"": ""dialog/bbbbbbbbbbbbbbbb.ogg"", ""duration"": 1.5}
   },
   ""variants"": {""DT_X|Dialog/A|Plh_1"": [""neutral""]}
 }";
@@ -187,7 +189,10 @@ namespace DrovaVoice.Core.Tests
         public void VariantEntriesAreNotCountedAsChoiceFallbacks()
         {
             var index = AudioIndex.Parse(WithNeutral, "de");
+            // Variante hinter dem Auswahlsuffix: scheitert schon an der Ziffernprüfung.
             Assert.False(index.TryGetUniqueChoice("DT_X|Dialog/A|Plh_1", out _, out _));
+            // Variante vor dem Auswahlsuffix: nur der Varianten-Skip hält sie aus der Suche.
+            Assert.False(index.TryGetUniqueChoice("DT_X|Dialog/A|Plh_3#neutral", out _, out _));
         }
     }
 }

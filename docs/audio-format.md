@@ -22,18 +22,18 @@ Dateien sind OGG Vorbis, **48 kHz**, mono, auf −16 LUFS angeglichen, Stille am
   "version": 1,
   "language": "de",
   "entries": {
-    "<treeName>|<locaPath>|<locaKey>":        {"file": "dialog/0123456789abcdef.ogg", "duration": 3.214},
-    "<treeName>|<locaPath>|<locaKey>|c2":      {"file": "player/default/…ogg",          "duration": 1.9},
+    "<treeName>|<locaPath>|<andereKey>":       {"file": "dialog/0123456789abcdef.ogg", "duration": 3.214},
+    "<treeName>|<locaPath>|<andereKey>|c2":    {"file": "player/default/…ogg",          "duration": 1.9},
     "<treeName>|<locaPath>|<locaKey>#neutral": {"file": "dialog/…ogg",                   "duration": 2.0}
   },
-  "variants": {"<treeName>|<locaPath>|<locaKey>": ["arden", "neutral"]}
+  "variants": {"<treeName>|<locaPath>|<locaKey>": ["neutral"]}
 }
 ```
 
 - Schlüssel = volle Zeilen-ID nach Spec §4 (Aussage, Auswahloption mit `|c<index>`, optional `#<variante>`); Bildung wie in `DrovaVoice.Core.LineIds` (Testvektoren `tests/vectors/line_ids.json`).
 - `file` ist relativ zum Sprachordner, mit `/`. `duration` in Sekunden (gerundet auf Millisekunden).
-- `variants` listet je Basis-ID die vorhandenen Varianten; Zeilen ohne Variante stehen nicht darin. Fehlt die gewünschte Variante, gilt die Basis-ID.
-- Zeilen ohne Eintrag bleiben stumm (Untertitel wie im Original). Zeilen, deren einziger Platzhalter der Spielername (`$GVAR:EVars_Player.Name$`) ist, haben, wenn sich der Name sauber streichen lässt, nur den Eintrag `<Basis-ID>#neutral` (Text ohne den Namen); die Mod spielt diese Variante bevorzugt. Zeilen mit Quest- oder Geldwerten bleiben stumm. `#arden` wird nicht erzeugt.
+- `variants` listet je Basis-ID die vorhandenen Varianten; Zeilen ohne Variante stehen nicht darin. Fehlt die gewünschte Variante, gilt die Basis-ID. Eine Basis-ID kann dabei ohne eigenen Eintrag nur über ihre Variante vertont sein (Beispiel oben: `<locaKey>` hat nur `#neutral`).
+- Zeilen ohne Eintrag bleiben stumm (Untertitel wie im Original). Zeilen, deren einziger Platzhalter der Spielername (`$GVAR:EVars_Player.Name$`) ist, haben, wenn sich der Name sauber streichen lässt, nur den Eintrag `<Basis-ID>#neutral` (Text ohne den Namen); die Mod spielt diese Variante bevorzugt. Zeilen, in denen der Name nicht streichbar ist (z. B. mitten im Satz; Grund `gvar_name`), und Zeilen mit Quest- oder Geldwerten (`gvar_value`) bleiben stumm. `#arden` wird nicht erzeugt.
 - Der Generator ergänzt den Index bei jedem `install` (frühere Einträge bleiben, solange ihre Datei existiert).
 
 ## Lautstärke

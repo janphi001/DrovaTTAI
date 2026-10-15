@@ -10,7 +10,7 @@ Die Mod spielt die vom Generator erzeugten Stimmen im Spiel ab. Grundlage: `docs
 4. Bei Auswahlknoten, die die Auswahl sprechen (`saySelection`), lädt ein Harmony-Prefix auf `DS_MultipleChoiceNode.OnExecute` die Clips aller Optionen (ID mit `|c<Index>`), damit die gewählte Option gesprochen wird. Er ist erst aktiv, nachdem der Connector ersetzt wurde. Verschiebt das Spiel die Optionsliste, findet die Mod die Option über ihren Schlüssel.
 5. Geladene Clips bleiben im Cache (Standard 64 MB). Verdrängte Clips werden zerstört und beim nächsten Mal neu geladen; die 8 jüngsten werden nie verdrängt.
 
-Zeilen ohne Eintrag (und Zeilen mit Quest- oder Geldwerten) bleiben stumm, die Untertitel laufen wie im Original.
+Zeilen ohne Eintrag bleiben stumm, die Untertitel laufen wie im Original. Das betrifft auch Zeilen mit Spielernamen mitten im Satz (`gvar_name`) und Zeilen mit Quest- oder Geldwerten (`gvar_value`). Nur wo sich der Spielername streichen lässt, spricht die Mod die neutrale Fassung (`…#neutral`, Untertitel zeigen weiter den Namen).
 
 ## Einstellungen
 
@@ -47,7 +47,7 @@ Die Dateien sind auf −16 LUFS normiert; wie laut das im Verhältnis zu Musik u
 
 1. `Diagnostics = true` setzen, Spiel starten: Log zeigt `Index: 255 Zeilen …`, im Hauptmenü **keine** `TypeInitializationException`.
 2. Spielstand laden: `Audio-Connector der Modding API ersetzt.`
-3. Adela ansprechen: `[Zeile] geladen …`, Stimme hörbar, Untertitel synchron. Zeilen mit Spielernamen sprechen die neutrale Fassung (ohne Namen), Zeilen mit Quest-Werten bleiben stumm.
+3. Adela ansprechen: `[Zeile] geladen …`, Stimme hörbar, Untertitel synchron. Zeilen mit Spielernamen sprechen die neutrale Fassung (ohne Namen), sofern sich der Name streichen lässt. Zeilen mit dem Namen mitten im Satz und Zeilen mit Quest- oder Geldwerten bleiben stumm (Untertitel wie im Original); das ist erwartet und kein Fehler.
 4. Auswahl erscheint: Spielerzeilen laden (`Player`), die gewählte Option wird gesprochen.
 5. Zeile überspringen und Fenster mit Esc schließen: verstummt die Stimme? Läuft das Gespräch danach normal weiter?
 6. Jero (234 Zeilen): keine Ruckler, Cache bleibt unter 64 MB.
@@ -56,7 +56,7 @@ Die Dateien sind auf −16 LUFS normiert; wie laut das im Verhältnis zu Musik u
 ## Bekannte Grenzen
 
 - Der Spieler spricht seine gewählte Antwortoption nicht (wie im Original); der Generator erzeugt dafür keine Dateien (`player_choice`). Der Auswahl-Hook der Mod ist deshalb nur eine Reserve, falls später Optionsdateien im Index stehen.
-- Spielerstimm-Sets fehlen noch. Bei Zeilen mit Spielernamen gilt `…#neutral`, sonst die Basis-ID.
+- Spielerstimm-Sets fehlen noch. Bei Zeilen mit streichbarem Spielernamen gilt `…#neutral`, sonst die Basis-ID; Zeilen mit nicht streichbarem Namen oder Quest-/Geldwerten bleiben stumm.
 - Barks und Briefe haben noch keine Dateien und keine Regler.
 - Keine Regler im Spiel; Werte nur per Datei und Neustart.
 - Das Dekodieren läuft synchron auf dem Hauptthread (Zeilen sind kurz); Hintergrund-Vorladen gibt es erst, wenn die Messung Ruckler zeigt.

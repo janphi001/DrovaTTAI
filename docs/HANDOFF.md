@@ -11,9 +11,9 @@ KI-Stimmen für das Spiel **Drova – Forsaken Kin**. Ein Python-Generator (`gen
 | Plan 1 Fundament, Plan 2 Fish + Export, Plan 3 Generator | fertig (Branches `plan-1-foundation`, `plan-2-fish-export`, `plan-3-generator`) |
 | **Plan 4 Wiedergabe in der Mod** | **fertig und vom Nutzer abgenommen** (Branch `plan-4-playback`; Notiz `docs/decisions/2026-10-playback-durchstich.md`) |
 | **Plan 5 Casting und Vollauf** | **Code fertig, Vollauf bei Fish durch** (Branch `plan-5-casting` auf `plan-4-playback`; 471 pytest grün; alle 245 benannten Sprecher besetzt und vertont, `report --by-speaker`: Lücken 0; Notiz `docs/decisions/2026-10-casting-vollauf.md`). Stichprobe im Spiel vom Nutzer abgenommen (2026-10-15) |
-| Namensvarianten | neutral, siehe docs/superpowers/specs/2026-10-15-namensvarianten-design.md; Stand je nach Task 5 |
-| Merge/Push der Branches | erledigt: `main` und `origin/main` stehen auf `plan-5-casting` (gepusht) |
-| Tests | 151 xUnit (Core), 471 pytest (Generator), alle grün |
+| Namensvarianten | neutral, siehe docs/superpowers/specs/2026-10-15-namensvarianten-design.md; Code fertig auf Branch `plan-6-namensvarianten` (neutral, ca. 95 Zeilen); Vollauf bei Fish und Hörtest stehen aus |
+| Merge/Push der Branches | erledigt: `main` und `origin/main` stehen auf `plan-5-casting` (gepusht); `plan-6-namensvarianten` ist weder gemergt noch gepusht |
+| Tests | 155 xUnit (Core), 483 pytest (Generator), alle grün |
 
 ## Stimmen (Frage „wie viele?“)
 - `casting/fish_voices.yaml`: **41 Stimmen** (22 männlich, 19 weiblich; bekannte Altersangaben: 12 jung, 14 mittel, 7 alt) **+ 7 Varianten** (Pitch/Formant/Tempo-Abwandlungen: alte Frau, alte Frau rau, Riese, Zwerg, Schurke hell, Jugendlicher, Knabe). Seit Plan 5 setzt `encode` das Rezept (ffmpeg `rubberband`) auf die Basisstimme an; in `casting.yaml` darf `voice:` ein Variantenschlüssel sein.
@@ -51,7 +51,7 @@ Alle Befehle in `generator/` (siehe `docs/generator.md`): `extract` (aus `data/e
 0. Bug "alte Dialoge beim Herumlaufen" ist behoben und abgenommen (`docs/HANDOFF-bug-stale-audio.md`).
 1. **Stichprobe im Spiel: erledigt und abgenommen (2026-10-15), keine Korrekturen nötig.** Plan 5 ist damit abgeschlossen. Ursprünglich vorgesehen: (Spiel starten, mit verschiedenen NPCs sprechen; Alte-Frau-, Riesen- und Kinderstimmen besonders), danach Korrekturen in `casting/casting.yaml` und die betroffenen Zeilen neu erzeugen (WAV in `cache/synth/` löschen, `synth --npc X`, `encode`, `install`). Plan 5 ist sonst abgeschlossen.
 2. Danach Mod-Ausbau: Regler im Spiel, Barks (M6, braucht Entfernungslogik), Briefe (M7).
-3. Offene Lücken: 98-%-Lücke im Export (1.181 Zeilen ohne Sprecher; Lösungsansatz in `docs/decisions/2026-10-export-findings.md`), Jero und Adela im Spiel noch nie gehört, Regler-Wirkung (z. B. 150 %) im Spiel nicht geprüft. Namensvarianten: ca. 95 Zeilen (`gvar`) bekommen eine neutrale Fassung; 150 `gvar_name`- und 150 `gvar_value`-Zeilen bleiben stumm.
+3. Offene Lücken: 98-%-Lücke im Export (1.181 Zeilen ohne Sprecher; Lösungsansatz in `docs/decisions/2026-10-export-findings.md`), Jero und Adela im Spiel noch nie gehört, Regler-Wirkung (z. B. 150 %) im Spiel nicht geprüft. Namensvarianten: ca. 95 Namenszeilen werden neutral gesprochen (`…#neutral`); ca. 150 `gvar_name`- und ca. 150 `gvar_value`-Zeilen bleiben stumm.
 4. Git: erledigt (2026-10-15). Historie umgeschrieben (Autor GitHub-noreply), Backup-Branches und `refs/original` gelöscht, `main` = `plan-5-casting` = `origin/main`, gepusht; MIT-Lizenz und README da.
 
 ## Wo steht was

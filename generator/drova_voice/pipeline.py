@@ -16,6 +16,7 @@ from drova_voice.emote import import_llm_emotions, merge_emotions, prepare_emote
 from drova_voice.encode import run_encode
 from drova_voice.engines.client import EngineClient, cache_env, worker_command
 from drova_voice.fish_voices import load_catalog
+from drova_voice.ids import VARIANT_SEP, with_variant
 from drova_voice.install import install_audio
 from drova_voice.jsonl import append_jsonl, latest_by_id, read_jsonl_counted, read_jsonl_lenient, write_jsonl
 from drova_voice.lines import (Line, build_lines, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
@@ -352,6 +353,8 @@ def _install(cfg: Config, args: argparse.Namespace) -> int:
         else:
             rows.append(row)
     drop = {l.id for l in lines} - {r["id"] for r in rows}
+    # Ein installierter Basis-Eintrag verdrängt eine alte neutrale Variante (die Mod bevorzugt Varianten).
+    drop |= {with_variant(l.id, "neutral") for l in lines if not l.skip and VARIANT_SEP not in l.id} - {r["id"] for r in rows}
     result = install_audio(rows, audio_dir(cfg), cfg.install_dir, cfg.language, drop_ids=drop)
     result.errors.extend(stale)
     print(f"{result.copied} Dateien kopiert, index.json mit {result.entries} Einträgen -> {cfg.install_dir}")

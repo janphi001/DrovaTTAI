@@ -40,9 +40,30 @@ def test_neutral_line_is_installed_with_a_variants_block(pipeline_repo, guarded)
 def test_neutral_entry_disappears_when_the_speaker_loses_the_voice(pipeline_repo, guarded):
     _use_name_line(pipeline_repo)
     base = ["--config", str(pipeline_repo.cfg)]
-    for step in (["extract"], ["synth", "--engine", "fake"], ["encode"], ["install"]):
-        guarded(lambda s=step: main(base + s))
+    for step in (["extract"], ["synth", "--engine", "fake", "--workers", "2"], ["encode"], ["install"]):
+        assert guarded(lambda s=step: main(base + s)) == 0, step
+    index_path = pipeline_repo.install_dir / "index.json"
+    assert NEUTRAL_ID in json.loads(index_path.read_text(encoding="utf-8"))["entries"]
     (pipeline_repo.casting / "casting.yaml").write_text("default_player: leon\nspeakers: {}\n", encoding="utf-8")
     assert main(base + ["install"]) == 0
-    index = json.loads((pipeline_repo.install_dir / "index.json").read_text(encoding="utf-8"))
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+    assert NEUTRAL_ID not in index["entries"] and index["variants"] == {}
+
+
+@needs_ffmpeg
+def test_stale_neutral_entry_is_dropped_when_the_name_leaves_the_text(pipeline_repo, guarded):
+    _use_name_line(pipeline_repo)
+    base = ["--config", str(pipeline_repo.cfg)]
+    steps = (["extract"], ["synth", "--engine", "fake", "--workers", "2"], ["encode"], ["install"])
+    for step in steps:
+        assert guarded(lambda s=step: main(base + s)) == 0, step
+    index_path = pipeline_repo.install_dir / "index.json"
+    assert NEUTRAL_ID in json.loads(index_path.read_text(encoding="utf-8"))["entries"]
+    loc = pipeline_repo.game / "Drova_Data" / "StreamingAssets" / "Localization" / "de" / "Dialog" / "NPC_Mira_de.loc"
+    loc.write_text(loc.read_text(encoding="utf-8").replace("Hallo $GVAR:EVars_Player.Name$!", "Das ist ein einfacher Satz."),
+                   encoding="utf-8")
+    for step in steps:
+        assert guarded(lambda s=step: main(base + s)) == 0, step
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+    assert "DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_4" in index["entries"]
     assert NEUTRAL_ID not in index["entries"] and index["variants"] == {}
