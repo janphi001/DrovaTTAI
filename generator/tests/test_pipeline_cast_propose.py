@@ -45,3 +45,10 @@ def test_check_reports_overuse_and_scene_conflicts(pipeline_repo, capsys):
     run(pipeline_repo, "extract")
     assert run(pipeline_repo, "cast", "--check", "--max-speakers", "0") == 0
     assert "Überbelegt" in capsys.readouterr().out
+
+
+def test_listen_writes_the_sheet(pipeline_repo, capsys):
+    run(pipeline_repo, "extract")
+    assert run(pipeline_repo, "cast", "--listen") == 0
+    page = pipeline_repo.repo / "out" / "casting" / "index.html"
+    assert page.is_file() and "Mira" in page.read_text(encoding="utf-8")

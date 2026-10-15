@@ -9,6 +9,7 @@ from typing import Callable
 
 from drova_voice.assign import assign
 from drova_voice.casting import cast_report, load_casting, tree_conflicts, voice_speakers, write_auto_casting
+from drova_voice.casting_sheet import write_casting_sheet
 from drova_voice.config import Config
 from drova_voice.emote import merge_emotions, read_emotions, write_emotions
 from drova_voice.encode import run_encode
@@ -97,6 +98,8 @@ def _load_casting(cfg: Config):
 def _cast(cfg: Config, args: argparse.Namespace) -> int:
     if args.propose:
         return _cast_propose(cfg, args)
+    if args.listen:
+        return _cast_listen(cfg)
     lines = _selected(cfg, args)
     if lines is None:
         return 2
@@ -146,6 +149,25 @@ def _cast_propose(cfg: Config, args: argparse.Namespace) -> int:
     speakers_by_voice.update(result.voices.values())
     print("Stimmen (Sprecher): " + ", ".join(f"{v}: {n}" for v, n in sorted(speakers_by_voice.items())))
     return 1 if result.open else 0
+
+
+def _cast_listen(cfg: Config) -> int:
+    path = lines_path(cfg)
+    if not path.is_file():
+        return _fail(f"{path} fehlt (zuerst `drova-voice extract` ausführen)")
+    lines = read_lines(path)
+    try:
+        catalog, casting = _load_casting(cfg)
+        profiles = read_profiles(profiles_path(cfg))
+    except (OSError, ValueError) as e:
+        return _fail(str(e))
+    samples = {l.actor.lower(): l for l in sample_lines(lines)}
+    encoded = latest_by_id(read_jsonl_lenient(encoded_path(cfg)))
+    page = write_casting_sheet(speaker_stats(lines), casting, catalog.candidates(), profiles, samples, encoded,
+                               audio_dir(cfg), cfg.out_dir / "casting" / "index.html")
+    heard = sum(1 for l in samples.values() if l.id in encoded)
+    print(f"Hörseite: {page} ({heard} von {len(samples)} Beispielen mit Ton)")
+    return 0
 
 
 def emotions_path(cfg: Config) -> Path:
@@ -400,6 +422,7 @@ def add_parsers(sub) -> None:
     cast.add_argument("--check", action="store_true", help="nur prüfen (Standard und einzige Betriebsart in Plan 3)")
     cast.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
     cast.add_argument("--propose", action="store_true", help="Stimmen aus den Steckbriefen zuteilen (casting/casting_auto.yaml)")
+    cast.add_argument("--listen", action="store_true", help="Hörseite out/casting/index.html (nach synth/encode --sample)")
     cast.add_argument("--keep", action="store_true", help="mit --propose: bisherige Auto-Zuteilung behalten, nur Neue zuteilen")
     cast.add_argument("--max-speakers", type=int, default=12, help="--check: ab so vielen Sprechern gilt eine Stimme als überbelegt")
     em = sub.add_parser("emote", help="Emotionen aus Regieanweisungen nach casting/emotions.jsonl (llm/manual bleiben)")
