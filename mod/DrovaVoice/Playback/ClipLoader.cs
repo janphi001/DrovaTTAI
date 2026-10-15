@@ -12,6 +12,7 @@ namespace DrovaVoice.Playback
     internal sealed class ClipLoader
     {
         public const int SlowMilliseconds = 500;
+        public const string ClipNamePrefix = "DrovaVoice/";
         private readonly string _audioRoot;
 
         public ClipLoader(string audioRoot) { _audioRoot = audioRoot; }
@@ -30,7 +31,7 @@ namespace DrovaVoice.Playback
                 if (!OggDecoder.TryDecode(path, out float[] samples, out int channels, out int sampleRate, out error)) return null;
                 Gain.Apply(samples, percent);
                 int frames = samples.Length / channels;
-                clip = AudioClip.Create("DrovaVoice/" + entry.File, frames, channels, sampleRate, false);
+                clip = AudioClip.Create(ClipNamePrefix + entry.File, frames, channels, sampleRate, false);
                 if (clip == null || !clip.SetData(samples, 0))
                 {
                     if (clip != null) UnityEngine.Object.Destroy(clip);

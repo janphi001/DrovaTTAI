@@ -29,6 +29,7 @@ namespace DrovaVoice
         private VoiceService? _voice;
         private bool _connectorInstalled;
         private bool _connectorFailed;
+        private StaleAudioProbe? _probe;
 
         private string ModDir => Path.Combine(MelonEnvironment.ModsDirectory, "DrovaVoice");
         private string TriggerPath => Path.Combine(ModDir, "export.trigger");
@@ -87,6 +88,7 @@ namespace DrovaVoice
             {
                 AudioManager.ReplaceDialogueAudioConnector(new VoiceConnector(_voice));
                 _connectorInstalled = true;
+                if (_voice.Diagnostics) _probe = new StaleAudioProbe(LoggerInstance);
                 ChoiceHook.Service = _voice;
                 LoggerInstance.Msg("Audio-Connector der Modding API ersetzt.");
             }
@@ -101,6 +103,7 @@ namespace DrovaVoice
         {
             _frame++;
             if (!_connectorInstalled) TryInstallConnector();   // billig: nur ein statischer Null-Test pro Frame bis zur Installation
+            _probe?.Update();
             bool trigger = false;
             if (_frame % 60 == 0 && ConsumeTrigger(TriggerPath, ref _exportTriggerStuck)) trigger = true;
             if (!trigger && HotkeyPressed()) trigger = true;
