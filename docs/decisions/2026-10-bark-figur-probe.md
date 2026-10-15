@@ -11,5 +11,9 @@ Probe: `BarkProbe = true`, Waffenwarnung (`CrimeWarning_HoldingWeapon`) und Kamp
 ## Entscheidung
 Figurschlüssel = **GUID**, Geschlecht aus dem Körpertyp (`Strong→m`, `Petite→w`). Das ist der bisherige Standard in `FigureReader.ToInfo`; es ändert sich nichts am Code.
 
+## Neustart-Test (zweiter Lauf, gleicher Spielstand)
+Fünf Figuren kamen in beiden Läufen vor (Bruna, Dalin, Jesko, Wache, Zoltan): **alle GUIDs identisch**, Körpertyp unverändert. Minira (nur Lauf 1) und Gerion (nur Lauf 2) lassen sich nicht vergleichen. Damit ist die GUID als Figurschlüssel über einen Neustart stabil; Ansatz B gilt.
+
 ## Offen
-- **Stabilität der GUID über einen Neustart:** erst mit einem zweiten Lauf (gleicher Spielstand, gleiche Figuren) bestätigt. Fällt sie anders aus, gilt Ansatz A (Stimme nach Zeilen-ID, nur mit Geschlecht).
+- Ob die GUID auch über Spielstände oder neue Spiele stabil ist: nicht geprüft. Läuft sie dort anders, wechselt die Stimme der Figur zwischen Spielständen, bleibt aber im Spielstand gleich.
+- Gerion (benannter Sprecher, `casting.yaml`) taucht als Welt-Sprecher auf: Seine Barks laufen über die Besetzung, nicht über den Pool.
