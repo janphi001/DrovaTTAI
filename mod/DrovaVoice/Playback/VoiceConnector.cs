@@ -31,7 +31,16 @@ namespace DrovaVoice.Playback
                     return;
                 }
                 id = built;
-                var clip = _service.GetClip(id);
+                FigureInfo? figure = null;
+                if (_service.ProbeFigures || !_service.HasEntry(id))
+                {
+                    var snapshot = FigureReader.Read(statementNode);
+                    figure = FigureReader.ToInfo(snapshot);
+                    if (_service.ProbeFigures)
+                        _service.Probe(id + "|" + (snapshot?.Guid ?? "-"),
+                            $"[Figur] {id} | zeilenSprecher={statementNode.actorName} | actor={snapshot?.ActorName} | body={snapshot?.BodyType} | voice={snapshot?.VoiceId} | guid={snapshot?.Guid} | entity={snapshot?.EntityKey} | dist={snapshot?.Distance:0.0}");
+                }
+                var clip = _service.GetClip(id, figure);
                 if (clip != null) statement.audio = clip;
             }
             catch (Exception e) { _service.LogError("OnWorldDialogueStatement", id, e); }

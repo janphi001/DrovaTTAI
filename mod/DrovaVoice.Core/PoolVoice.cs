@@ -39,6 +39,14 @@ namespace DrovaVoice.Core
             return pool[(int)(Fnv1a(key) % (uint)pool.Count)];
         }
 
+        /// <summary>Die ID, die gespielt werden soll: die Basis-ID, wenn sie einen Eintrag hat, sonst die gewählte Poolvariante.</summary>
+        public static string? Resolve(AudioIndex index, string? id, FigureInfo? figure)
+        {
+            if (string.IsNullOrEmpty(id) || index.TryGet(id, out _)) return id;
+            string? tag = Pick(index.PoolVariants(id), figure?.Gender, figure?.Key, id!);
+            return tag == null ? id : LineIds.WithVariant(id!, tag);
+        }
+
         public static char? GenderFromBodyType(string? bodyType) => bodyType switch
         {
             "Strong" => 'm',

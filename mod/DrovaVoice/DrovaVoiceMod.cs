@@ -44,6 +44,7 @@ namespace DrovaVoice
             var dialogVolume = category.CreateEntry("DialogVolume", 100, description: "Lautstärke NPC-Stimmen in Prozent (0-200, über 100 = Verstärkung)");
             var playerVolume = category.CreateEntry("PlayerVolume", 100, description: "Lautstärke Spielerzeilen in Prozent (0-200, über 100 = Verstärkung)");
             var barkVolume = category.CreateEntry("BarkVolume", 100, description: "Lautstärke Welt-Kommentare in Prozent (0-200, über 100 = Verstärkung)");
+            var barkProbe = category.CreateEntry("BarkProbe", false, description: "Probe: Figur jeder Aussage loggen (nur für die Entwicklung)");
             var audioLanguage = category.CreateEntry("AudioLanguage", "de", description: "Unterordner unter Mods/DrovaVoice/Audio");
             var cacheMb = category.CreateEntry("CacheMB", 64, description: "Obergrenze für geladene Clips in MB (8-512)");
             var diagnostics = category.CreateEntry("Diagnostics", false, description: "Jede Zeile einmal loggen (geladen/ohne Eintrag)");
@@ -54,7 +55,8 @@ namespace DrovaVoice
             var warnings = new List<string>();
             var settings = VoiceSettings.Create(enabled.Value, dialogVolume.Value, playerVolume.Value, audioLanguage.Value, cacheMb.Value, diagnostics.Value, warnings, barkVolume.Value);
             foreach (string w in warnings) LoggerInstance.Warning(w);
-            _voice = CreateVoice(settings);   // ChoiceHook.Service folgt erst, wenn der Connector ersetzt ist
+            _voice = CreateVoice(settings);
+            if (_voice != null) _voice.ProbeFigures = barkProbe.Value;   // ChoiceHook.Service folgt erst, wenn der Connector ersetzt ist
         }
 
         private VoiceService? CreateVoice(VoiceSettings settings)

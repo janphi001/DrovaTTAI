@@ -29,9 +29,20 @@ namespace DrovaVoice.Playback
 
         public bool Diagnostics => _settings.Diagnostics;
 
-        public AudioClip? GetClip(string? id)
+        public bool ProbeFigures { get; set; }
+
+        public void Probe(string key, string message)
+        {
+            if (ProbeFigures && _lineLog.ShouldLog("probe|" + key)) _log.Msg(message);
+        }
+
+        /// <summary>True, wenn die Zeile (oder ihre neutrale Variante) einen eigenen Eintrag hat, also keine Poolstimme gewählt werden muss.</summary>
+        public bool HasEntry(string id) => _index.ResolveVariant(id, LineIds.NeutralVariant) is string r && _index.TryGet(r, out _);
+
+        public AudioClip? GetClip(string? id, FigureInfo? figure = null)
         {
             id = _index.ResolveVariant(id, LineIds.NeutralVariant);
+            id = PoolVoice.Resolve(_index, id, figure);
             if (string.IsNullOrEmpty(id)) return null;
             if (!_index.TryGet(id, out var entry))
             {

@@ -74,5 +74,22 @@ namespace DrovaVoice.Core.Tests
         [Theory]
         [InlineData("Strong", 'm')] [InlineData("Petite", 'w')] [InlineData("None", null)] [InlineData(null, null)] [InlineData("", null)]
         public void MapsBodyTypeToGender(string? body, char? expected) => Assert.Equal(expected, PoolVoice.GenderFromBodyType(body));
+
+        [Fact]
+        public void ResolveReturnsTheBaseIdWhenItHasAnEntryAndOtherwiseThePoolVariant()
+        {
+            const string json = @"{""version"":1,""language"":""de"",""entries"":{
+              ""DT_A|P|1"": {""file"": ""bark/aaaaaaaaaaaaaaaa.ogg"", ""duration"": 1.0},
+              ""DT_G|P|1#vm1"": {""file"": ""bark/bbbbbbbbbbbbbbbb.ogg"", ""duration"": 1.0},
+              ""DT_G|P|1#vm2"": {""file"": ""bark/cccccccccccccccc.ogg"", ""duration"": 1.0}}}";
+            var index = AudioIndex.Parse(json, "de");
+            Assert.Equal("DT_A|P|1", PoolVoice.Resolve(index, "DT_A|P|1", new FigureInfo('m', "g")));
+            string a = PoolVoice.Resolve(index, "DT_G|P|1", new FigureInfo('m', "g"))!;
+            Assert.StartsWith("DT_G|P|1#vm", a);
+            Assert.Equal(a, PoolVoice.Resolve(index, "DT_G|P|1", new FigureInfo('m', "g")));
+            Assert.Equal("DT_X|P|9", PoolVoice.Resolve(index, "DT_X|P|9", null));
+            Assert.StartsWith("DT_G|P|1#vm", PoolVoice.Resolve(index, "DT_G|P|1", null)!);
+            Assert.Null(PoolVoice.Resolve(index, null, null));
+        }
     }
 }
