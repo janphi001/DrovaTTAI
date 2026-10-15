@@ -57,6 +57,25 @@ namespace DrovaVoice.Core
             };
         }
 
+        /// <summary>Neuer Schnappschuss: Datei-Einstellungen (this) mit den gesetzten Menüwerten darüber; gleiche Grenzen wie <see cref="Create"/>.</summary>
+        public VoiceSettings WithOverrides(MenuValues values, List<string> warnings)
+        {
+            return Create(values.Enabled ?? Enabled, values.DialogPercent ?? DialogPercent, values.PlayerPercent ?? PlayerPercent,
+                          Language, CacheMegabytes, Diagnostics, warnings, values.BarkPercent ?? BarkPercent,
+                          values.BarkMinDistance ?? BarkMinDistance, values.BarkMaxDistance ?? BarkMaxDistance);
+        }
+
+        public static SettingsChange Diff(VoiceSettings oldSettings, VoiceSettings newSettings)
+        {
+            var change = SettingsChange.None;
+            if (oldSettings.Enabled != newSettings.Enabled) change |= SettingsChange.Enabled;
+            if (oldSettings.DialogPercent != newSettings.DialogPercent || oldSettings.PlayerPercent != newSettings.PlayerPercent
+                || oldSettings.BarkPercent != newSettings.BarkPercent) change |= SettingsChange.Volume;
+            if (oldSettings.BarkMinDistance != newSettings.BarkMinDistance || oldSettings.BarkMaxDistance != newSettings.BarkMaxDistance)
+                change |= SettingsChange.Range;
+            return change;
+        }
+
         private static int ClampPercent(string name, int value, List<string> warnings)
         {
             int clamped = Gain.ClampPercent(value);
