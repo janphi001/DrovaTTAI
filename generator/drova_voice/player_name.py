@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 NAME_TOKEN = "$GVAR:EVars_Player.Name$"
 DEFAULT_NAME = "Arden"
+NAME_VAR = "EVars_Player.Name"
 
 GREETINGS = ("Hallo", "Hey", "Hi", "Na", "Ah", "Oh", "Danke", "Willkommen", "Moin", "Tag", "Servus", "Grüß dich")
 

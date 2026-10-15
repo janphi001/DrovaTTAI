@@ -1,5 +1,5 @@
 from drova_voice.ids import choice_id, statement_id
-from drova_voice.lines import (SKIP_GVAR, SKIP_ID_MISMATCH, SKIP_PLAYER_CHOICE, SKIP_UNSPEAKABLE, Line, build_lines, load_lexicon,
+from drova_voice.lines import (SKIP_GVAR_NAME, SKIP_GVAR_VALUE, SKIP_ID_MISMATCH, SKIP_PLAYER_CHOICE, SKIP_UNSPEAKABLE, Line, build_lines, load_lexicon,
                                load_loc_texts, read_lines, select_npc, write_lines)
 
 TREE, PATH = "DT_Test_NPC_Mira", "Dialog/NPC_Mira"
@@ -38,9 +38,48 @@ def test_lexicon_is_applied():
     assert line.speech == "Willkommen in Sorgrad."
 
 
-def test_gvar_lines_are_skipped_not_spoken():
-    (line,) = build_lines(manifest(mline("Plh_1")), {(PATH, "Plh_1"): "Hallo $GVAR:EVars_Player.Name$!"})
-    assert line.skip == SKIP_GVAR and line.speech == ""
+NAME = "$GVAR:EVars_Player.Name$"
+
+
+def test_name_line_becomes_a_neutral_variant():
+    (line,) = build_lines(manifest(mline("Plh_1")), {(PATH, "Plh_1"): f"Hallo {NAME}!"})
+    assert line.id == statement_id(TREE, PATH, "Plh_1") + "#neutral"
+    assert line.speech == "Hallo!" and line.raw == f"Hallo {NAME}!" and line.skip is None
+
+
+def test_name_line_keeps_stage_directions_in_the_neutral_variant():
+    (line,) = build_lines(manifest(mline("Plh_1")), {(PATH, "Plh_1"): f"*lacht* Hallo {NAME}!"})
+    assert line.speech == "Hallo!" and line.stage[0]["text"] == "lacht" and line.id.endswith("#neutral")
+
+
+def test_name_line_without_neutral_version_is_skipped_as_gvar_name():
+    (line,) = build_lines(manifest(mline("Plh_1")), {(PATH, "Plh_1"): f"Komm mit {NAME} zum Brunnen."})
+    assert line.skip == SKIP_GVAR_NAME and line.speech == "" and line.id == statement_id(TREE, PATH, "Plh_1")
+
+
+def test_name_line_with_only_the_name_is_skipped_as_gvar_name():
+    (line,) = build_lines(manifest(mline("Plh_1")), {(PATH, "Plh_1"): f"*seufzt* {NAME}!"})
+    assert line.skip == SKIP_GVAR_NAME and line.speech == ""
+
+
+def test_name_after_a_comma_is_dropped_in_the_neutral_variant():
+    (line,) = build_lines(manifest(mline("Plh_1")), {(PATH, "Plh_1"): f"*grinst* Danke, {NAME}."})
+    assert line.skip is None and line.speech == "Danke." and line.id.endswith("#neutral")
+
+
+def test_value_placeholder_is_skipped_as_gvar_value():
+    (line,) = build_lines(manifest(mline("Plh_1")), {(PATH, "Plh_1"): "Heute sind $GVAR:QuestVars_Beispiel_Config.Preis$ Münzen."})
+    assert line.skip == SKIP_GVAR_VALUE and line.speech == ""
+
+
+def test_name_together_with_a_value_is_skipped_as_gvar_value():
+    (line,) = build_lines(manifest(mline("Plh_1")), {(PATH, "Plh_1"): f"Hallo {NAME}, das kostet $GVAR:A.B$ Münzen."})
+    assert line.skip == SKIP_GVAR_VALUE and not line.id.endswith("#neutral")
+
+
+def test_neutral_duplicate_ids_still_keep_the_first():
+    lines = build_lines(manifest(mline("Plh_1"), mline("Plh_1", text="Zweite Fassung.")), {(PATH, "Plh_1"): f"Hallo {NAME}!"})
+    assert len(lines) == 1 and lines[0].id.endswith("#neutral")
 
 
 def test_unspeakable_lines_are_skipped():

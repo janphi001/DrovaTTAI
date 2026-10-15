@@ -7,12 +7,15 @@ from typing import Mapping, Sequence
 import yaml
 
 from drova_voice.export_report import loca_path_of
-from drova_voice.ids import choice_id, normalize_loca_path, statement_id
+from drova_voice.ids import choice_id, normalize_loca_path, statement_id, with_variant
 from drova_voice.jsonl import read_jsonl, write_jsonl
 from drova_voice.loc import parse_loc
-from drova_voice.speech_text import build_speech_text
+from drova_voice.player_name import NAME_VAR, make_name_variants
+from drova_voice.speech_text import GVAR_RE, build_speech_text
 
-SKIP_GVAR = "gvar"
+SKIP_GVAR_NAME = "gvar_name"    # nur der Spielername, aber keine neutrale Fassung ohne ihn
+SKIP_GVAR_VALUE = "gvar_value"  # Quest- oder Geldwerte (oder Name zusammen mit Werten): nicht vorab vertonbar
+NEUTRAL = "neutral"
 SKIP_UNSPEAKABLE = "unspeakable"
 SKIP_ID_MISMATCH = "id_mismatch"
 SKIP_PLAYER_CHOICE = "player_choice"  # Auswahloptionen spricht das Spiel nicht; der Spieler bleibt dort stumm
@@ -71,7 +74,7 @@ def _expected_id(row: Mapping) -> str:
 def build_lines(manifest: Mapping, loc_texts: Mapping[tuple[str, str], str],
                 lexicon: Mapping[str, str] | None = None) -> list[Line]:
     seen: set[tuple[str, bool]] = set()
-    out: list[Line] = []
+    out: list[tuple[str, Line]] = []
     for row in manifest.get("lines", []):
         line_id = row["id"]
         try:
@@ -84,25 +87,37 @@ def build_lines(manifest: Mapping, loc_texts: Mapping[tuple[str, str], str],
         path = normalize_loca_path(row["locaPath"])
         raw = loc_texts.get((path, row["locaKey"]), row.get("text") or "")
         speech, stage, skip = "", (), None
+        out_id = line_id
         if not id_ok:
             skip = SKIP_ID_MISMATCH
         elif row.get("nodeType") == "choice":
             skip = SKIP_PLAYER_CHOICE
         elif "$GVAR:" in raw:
-            skip = SKIP_GVAR
+            if set(GVAR_RE.findall(raw)) != {NAME_VAR}:
+                skip = SKIP_GVAR_VALUE
+            else:
+                neutral = make_name_variants(raw).neutral
+                st = build_speech_text(neutral, None, lexicon) if neutral is not None else None
+                if neutral is None:
+                    skip = SKIP_GVAR_NAME
+                elif st.is_speakable:
+                    speech, stage = st.text, tuple({"text": s.text, "pos": s.pos} for s in st.stage)
+                    out_id = with_variant(line_id, NEUTRAL)
+                else:
+                    skip = SKIP_UNSPEAKABLE
         else:
             st = build_speech_text(raw, None, lexicon)
             if st.is_speakable:
                 speech, stage = st.text, tuple({"text": s.text, "pos": s.pos} for s in st.stage)
             else:
                 skip = SKIP_UNSPEAKABLE
-        out.append(Line(
-            id=line_id, tree=row["tree"], loca_path=path, loca_key=row["locaKey"], node_type=row["nodeType"],
+        out.append((line_id, Line(
+            id=out_id, tree=row["tree"], loca_path=path, loca_key=row["locaKey"], node_type=row["nodeType"],
             choice_index=row.get("choiceIndex"), actor=row.get("actorName") or "", category=row.get("category") or "dialog",
             generic=bool(row.get("generic")), raw=raw, speech=speech, stage=stage, skip=skip,
-        ))
-    valid_ids = {l.id for l in out if l.skip != SKIP_ID_MISMATCH}
-    return [l for l in out if not (l.skip == SKIP_ID_MISMATCH and l.id in valid_ids)]  # gültige Zeile geht vor
+        )))
+    valid_ids = {base for base, l in out if l.skip != SKIP_ID_MISMATCH}
+    return [l for base, l in out if not (l.skip == SKIP_ID_MISMATCH and base in valid_ids)]  # gültige Zeile geht vor
 
 
 def select_npc(lines: Sequence[Line], npc: str) -> list[Line]:

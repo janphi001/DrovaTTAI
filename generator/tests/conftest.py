@@ -78,7 +78,7 @@ _LOC_TEXT = (
     "Plh_1 { *seufzt* Der Weg nach Norden ist weit. }\n"
     "Plh_2 { Wohin soll ich dich führen? }\n"
     "Plh_3 { Zum Brunnen, bitte. }\n"
-    "Plh_4 { Hallo $GVAR:EVars_Player.Name$! }\n"
+    "Plh_4 { Heute sind $GVAR:QuestVars_Beispiel_Config.Preis$ Münzen. }\n"
     "Plh_5 { *grinst* }\n"
 )
 

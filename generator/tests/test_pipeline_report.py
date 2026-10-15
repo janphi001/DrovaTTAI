@@ -14,7 +14,7 @@ def test_report_right_after_extract(pipeline_repo, capsys):
     capsys.readouterr()
     assert main(base + ["report"]) == 0
     out = capsys.readouterr().out
-    assert "offen: 2" in out and "übersprungen: gvar: 1" in out and "übersprungen: unspeakable: 1" in out
+    assert "offen: 2" in out and "übersprungen: gvar_value: 1" in out and "übersprungen: unspeakable: 1" in out
 
 
 @needs_ffmpeg

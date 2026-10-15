@@ -16,7 +16,7 @@ def test_synth_fake_engine_writes_results_and_cache(pipeline_repo, guarded, caps
     assert all(r["ok"] for r in rows.values())
     assert len(list((pipeline_repo.repo / "cache" / "synth").glob("*.wav"))) == 3
     out = capsys.readouterr().out
-    assert "3 erzeugt" in out and "übersprungen: gvar: 1, player_choice: 1, unspeakable: 1" in out
+    assert "3 erzeugt" in out and "übersprungen: gvar_value: 1, player_choice: 1, unspeakable: 1" in out
 
 
 def test_synth_second_run_uses_the_cache(pipeline_repo, guarded, capsys):
