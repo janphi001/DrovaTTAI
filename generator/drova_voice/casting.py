@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -9,6 +9,7 @@ import yaml
 
 from drova_voice.jsonl import replace_with_retry
 from drova_voice.lines import Line
+from drova_voice.pools import load_pools
 
 AUTO_HEADER = ("# ERZEUGT von `drova-voice cast --propose`. Nicht von Hand ändern: Korrekturen gehören in\n"
                "# casting/casting.yaml (gewinnt bei Überschneidung).\n")
@@ -19,8 +20,11 @@ class Casting:
     default_player: str
     speakers: dict[str, str]  # Sprechername (klein) -> Stimmen- oder Variantenschlüssel aus fish_voices.yaml
     auto: frozenset[str] = frozenset()  # Sprecher, die nur aus casting_auto.yaml stammen
+    pools: Mapping[str, str] = field(default_factory=dict)  # Poolstimme (vm1 …) -> Stimmenschlüssel
 
     def voice_for(self, line: Line) -> str | None:
+        if line.pool:
+            return self.pools.get(line.pool)
         if line.category == "player":
             return self.default_player
         return self.speakers.get(line.actor.lower())
@@ -54,7 +58,8 @@ def _speakers_from(path: Path, raw: dict, voices: Mapping[str, object]) -> dict[
     return speakers
 
 
-def load_casting(path: Path, voices: Mapping[str, object], auto_path: Path | None = None) -> Casting:
+def load_casting(path: Path, voices: Mapping[str, object], auto_path: Path | None = None,
+                 pools_path: Path | None = None) -> Casting:
     raw = _read_yaml(path)
     default_player = str(raw.get("default_player") or "").lower()
     if default_player not in voices:
@@ -63,7 +68,8 @@ def load_casting(path: Path, voices: Mapping[str, object], auto_path: Path | Non
     auto: dict[str, str] = {}
     if auto_path is not None and Path(auto_path).is_file():
         auto = _speakers_from(auto_path, _read_yaml(auto_path), voices)
-    return Casting(default_player, {**auto, **manual}, frozenset(n for n in auto if n not in manual))
+    pools = load_pools(pools_path, voices) if pools_path is not None else {}
+    return Casting(default_player, {**auto, **manual}, frozenset(n for n in auto if n not in manual), pools)
 
 
 def write_auto_casting(path: Path, assignments: Mapping[str, str]) -> None:

@@ -7,7 +7,7 @@ from typing import Mapping, Sequence
 import yaml
 
 from drova_voice.export_report import loca_path_of
-from drova_voice.ids import choice_id, normalize_loca_path, statement_id, with_variant
+from drova_voice.ids import VARIANT_SEP, choice_id, normalize_loca_path, statement_id, with_variant
 from drova_voice.jsonl import read_jsonl, write_jsonl
 from drova_voice.loc import parse_loc
 from drova_voice.player_name import NAME_VAR, make_name_variants
@@ -36,6 +36,7 @@ class Line:
     speech: str  # Sprechtext, leer bei übersprungenen Zeilen
     stage: tuple[dict, ...] = ()  # [{"text": "seufzt", "pos": 0}], pos = Zeichenindex im Sprechtext
     skip: str | None = None
+    pool: str | None = None  # Poolstimme (vm1, vw2 …) bei erweiterten Zeilen generischer Sprecher
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -43,6 +44,11 @@ class Line:
     @classmethod
     def from_dict(cls, d: dict) -> "Line":
         return cls(**{**d, "stage": tuple(d.get("stage", ()))})
+
+
+def emotion_id(line: Line) -> str:
+    """Schlüssel in casting/emotions.jsonl: Poolzeilen teilen die Emotion ihrer Basiszeile."""
+    return line.id.rpartition(VARIANT_SEP)[0] if line.pool else line.id
 
 
 def load_loc_texts(loc_dir: Path, language: str) -> dict[tuple[str, str], str]:

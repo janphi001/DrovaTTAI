@@ -1,0 +1,5 @@
+# Stimmen für generische Figuren (NPC, Teacher, Druid …). Je Geschlecht eine Liste von Schlüsseln aus fish_voices.yaml;
+# die Position ergibt den Tag (m: vm1, vm2 …; w: vw1, vw2 …). Eine Änderung verlangt neues synth/encode/install.
+pools:
+  m: [jonas, ben_a20517, schales_7ef3ea]
+  w: [emma, catrinja_c5b66a, amira_german_b59d11]
