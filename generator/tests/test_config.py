@@ -55,3 +55,14 @@ def test_repo_root_must_be_a_string(tmp_path, value):
     cfg_file.write_text(f'game_dir: "C:/Game"\nrepo_root: {value}\n', encoding="utf-8")
     with pytest.raises(ValueError, match="repo_root"):
         load_config(cfg_file)
+
+
+def test_null_or_empty_language_stays_de_and_a_number_is_rejected(tmp_path):
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text('game_dir: "/tmp/game"\nlanguage: null\n', encoding="utf-8")
+    assert load_config(cfg_file).language == "de"
+    cfg_file.write_text('game_dir: "/tmp/game"\nlanguage: ""\n', encoding="utf-8")
+    assert load_config(cfg_file).language == "de"
+    cfg_file.write_text('game_dir: "/tmp/game"\nlanguage: 5\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="language"):
+        load_config(cfg_file)
