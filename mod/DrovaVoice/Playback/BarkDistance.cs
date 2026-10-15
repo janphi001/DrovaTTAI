@@ -27,7 +27,7 @@ namespace DrovaVoice.Playback
         private sealed class Tracked { public AudioSource Source = null!; public float OriginalVolume; }
         private sealed class Pending { public DS_Statement Statement = null!; public AudioClip Clip = null!; public int Frames; }
 
-        private readonly float _min, _max;
+        private float _min, _max;
         private readonly MelonLogger.Instance _log;
         private readonly bool _verbose;
         private readonly List<Tracked> _tracked = new List<Tracked>();
@@ -39,6 +39,8 @@ namespace DrovaVoice.Playback
         {
             _min = min; _max = max; _log = log; _verbose = verbose;
         }
+
+        public void SetRange(float min, float max) { _min = min; _max = max; }
 
         /// <summary>Der Connector hat <paramref name="clip"/> an die Aussage gehängt; sie wird freigegeben, sobald er abspielt.</summary>
         public void Watch(DS_Statement statement, AudioClip clip) => _pending.Add(new Pending { Statement = statement, Clip = clip });

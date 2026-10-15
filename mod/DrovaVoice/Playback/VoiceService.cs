@@ -10,7 +10,7 @@ namespace DrovaVoice.Playback
     internal sealed class VoiceService
     {
         private readonly AudioIndex _index;
-        private readonly VoiceSettings _settings;
+        private VoiceSettings _settings;
         private readonly ClipStore _store;
         private readonly ClipLoader _loader;
         private readonly MelonLogger.Instance _log;
@@ -28,6 +28,16 @@ namespace DrovaVoice.Playback
         }
 
         public bool Diagnostics => _settings.Diagnostics;
+        public VoiceSettings Settings => _settings;
+
+        /// <summary>Tauscht die Einstellungen aus (Optionsmenü). Gibt zurück, was sich geändert hat; Clips bleiben im Cache, ihr Schlüssel enthält die Lautstärke.</summary>
+        public SettingsChange Apply(VoiceSettings next)
+        {
+            var change = VoiceSettings.Diff(_settings, next);
+            _settings = next;
+            if ((change & SettingsChange.Range) != 0) BarkDistance?.SetRange(next.BarkMinDistance, next.BarkMaxDistance);
+            return change;
+        }
 
         public bool ProbeFigures { get; set; }
         public float BarkMinDistance => _settings.BarkMinDistance;
@@ -47,6 +57,7 @@ namespace DrovaVoice.Playback
 
         public AudioClip? GetClip(string? id, FigureInfo? figure = null)
         {
+            if (!_settings.Enabled) return null;
             id = _index.ResolveVariant(id, LineIds.NeutralVariant);
             id = PoolVoice.Resolve(_index, id, figure);
             if (string.IsNullOrEmpty(id)) return null;
@@ -55,17 +66,19 @@ namespace DrovaVoice.Playback
                 Diag("miss|" + id, $"[Zeile] ohne Eintrag: {id}");
                 return null;
             }
-            if (_store.TryGet(id!, out var cached)) return cached;
+            int percent = _settings.PercentFor(entry.Category);
+            string cacheKey = id + "@" + percent;   // andere Lautstärke = anderer Schlüssel; alte Clips altern aus dem Cache
+            if (_store.TryGet(cacheKey, out var cached)) return cached;
             if (_failed.Contains(id!)) return null;
 
-            var clip = _loader.Load(entry, _settings.PercentFor(entry.Category), out long bytes, out long elapsedMs, out string? error);
+            var clip = _loader.Load(entry, percent, out long bytes, out long elapsedMs, out string? error);
             if (clip == null)
             {
                 _failed.Add(id!);
                 Problem("fail|" + id, $"Zeile bleibt stumm ({error}): {id}", error: false);
                 return null;
             }
-            _store.Put(id!, clip, bytes);
+            _store.Put(cacheKey, clip, bytes);
             if (elapsedMs > ClipLoader.SlowMilliseconds) Problem("slow|" + id, $"Laden dauerte {elapsedMs} ms (Ruckler möglich): {id}", error: false);
             Diag("hit|" + id, $"[Zeile] geladen: {id} ({entry.File}, {entry.Duration:0.00} s, {entry.Category}, {elapsedMs} ms); Cache {_store.Count} Clips, {_store.TotalBytes / 1024 / 1024} MB");
             return clip;

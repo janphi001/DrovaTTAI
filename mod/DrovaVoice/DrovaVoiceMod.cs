@@ -64,7 +64,7 @@ namespace DrovaVoice
 
         private VoiceService? CreateVoice(VoiceSettings settings)
         {
-            if (!settings.Enabled) { LoggerInstance.Msg("Vertonung ist ausgeschaltet (Enabled=false)."); return null; }
+            if (!settings.Enabled) LoggerInstance.Msg("Vertonung ist ausgeschaltet (Enabled=false); im Optionsmenü wieder einschaltbar.");
             string root = Path.Combine(ModDir, "Audio", settings.Language);
             string indexPath = Path.Combine(root, "index.json");
             try
