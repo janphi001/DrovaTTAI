@@ -12,7 +12,7 @@ from drova_voice.config import Config
 from drova_voice.emote import merge_emotions, read_emotions, write_emotions
 from drova_voice.encode import run_encode
 from drova_voice.engines.client import EngineClient, cache_env, worker_command
-from drova_voice.fish_voices import load_fish_voices
+from drova_voice.fish_voices import load_catalog
 from drova_voice.install import install_audio
 from drova_voice.jsonl import append_jsonl, latest_by_id, read_jsonl_lenient, write_jsonl
 from drova_voice.lines import (Line, build_lines, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
@@ -64,9 +64,13 @@ def _extract(cfg: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def auto_casting_path(cfg: Config) -> Path:
+    return cfg.casting_dir / "casting_auto.yaml"
+
+
 def _load_casting(cfg: Config):
-    voices = load_fish_voices(cfg.casting_dir / "fish_voices.yaml")
-    return voices, load_casting(cfg.casting_dir / "casting.yaml", voices)
+    catalog = load_catalog(cfg.casting_dir / "fish_voices.yaml")
+    return catalog, load_casting(cfg.casting_dir / "casting.yaml", catalog.known(), auto_casting_path(cfg))
 
 
 def _cast(cfg: Config, args: argparse.Namespace) -> int:
@@ -116,11 +120,11 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     if lines is None:
         return 2
     try:
-        voices, casting = _load_casting(cfg)
+        catalog, casting = _load_casting(cfg)
         emotions = read_emotions(emotions_path(cfg))
     except (OSError, ValueError) as e:
         return _fail(str(e))
-    jobs, skipped = build_jobs(lines, casting, voices, emotions, args.engine)
+    jobs, skipped = build_jobs(lines, casting, catalog.synth_table(), emotions, args.engine)
     if args.limit:
         jobs = jobs[: args.limit]
     cache_dir = cfg.cache_dir / "synth"
