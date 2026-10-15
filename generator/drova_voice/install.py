@@ -30,11 +30,16 @@ def _load_index(path: Path, language: str) -> dict[str, dict]:
         return {}
     try:
         index = json.loads(path.read_text(encoding="utf-8-sig"))
-        if index.get("version") != INDEX_VERSION or index.get("language") != language:
-            return {}
-        return dict(index.get("entries", {}))
-    except (json.JSONDecodeError, AttributeError, OSError):
+    except (json.JSONDecodeError, OSError):
         return {}  # kaputter Index: neu aufbauen, die Dateien bleiben liegen
+    if not isinstance(index, dict):
+        return {}
+    if index.get("version") != INDEX_VERSION or index.get("language") != language:
+        return {}
+    raw = index.get("entries", {})
+    if not isinstance(raw, dict):
+        return {}
+    return {i: e for i, e in raw.items() if isinstance(i, str) and isinstance(e, dict)}
 
 
 def _same_file(src: Path, dst: Path) -> bool:
