@@ -4,3 +4,8 @@ default_player: leon      # alle Spielerzeilen (Auswahloptionen); Stimmsets folg
 speakers:
   adela: {voice: melanie}
   jero: {voice: german_wisdom_m_3130ae}   # vorläufig (mittelalt, tief, ruhig, geheimnisvoll); Hörtest entscheidet
+  # Plan 4, Abnahme im Spiel: Figuren in der Nähe des Nutzers; Zuordnung nach Namen geraten (Geschlecht), vorläufig
+  enya: {voice: lena}
+  femke: {voice: emma}
+  gerion: {voice: lukas}
+  gilwar: {voice: jonas}
