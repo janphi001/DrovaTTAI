@@ -33,7 +33,7 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 | a | `profile --prepare` | Pakete mit Sprecherauszügen unter `out/subagent/profile/` (enthalten Spieltexte, nie ins Git) |
 | b | `profile --import <Dateien>` | prüft die JSONL-Ergebnisse der Subagents und schreibt `casting/profiles.jsonl` (`manual`-Zeilen bleiben) |
 | c | `profile --set NAME --gender m --age mittel [--type riese] [--note ...]` / `profile` | Steckbrief von Hand setzen / Prüfliste (unsichere Einträge markiert) |
-| d | `cast --propose [--keep]` | `casting/casting_auto.yaml`; `casting.yaml` gewinnt; `--keep` lässt die bisherige Auto-Zuteilung stehen |
+| d | `cast --propose [--reset]` | `casting/casting_auto.yaml`; `casting.yaml` gewinnt; erste Zuteilung, danach bleibt die Auto-Zuteilung stehen (nur neue Sprecher werden zugeteilt); `--reset` verwirft sie und teilt alles neu zu (`--keep` ist nur noch Synonym des Standards) |
 | e | `synth --sample`, `encode --sample`, `cast --listen` | Hörseite `out/casting/index.html`, eine Beispielzeile je Sprecher |
 | f | `emote --prepare`, `emote --import <Dateien>` | LLM-Emotionen für alle Dialogbäume (`stage`- und `manual`-Zeilen bleiben) |
 | g | `batches [--max-chars N]` | Etappen nach Wichtigkeit in `data/batches.json` |

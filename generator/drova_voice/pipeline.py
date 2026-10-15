@@ -131,14 +131,20 @@ def _cast_propose(cfg: Config, args: argparse.Namespace) -> int:
     try:
         catalog = load_catalog(cfg.casting_dir / "fish_voices.yaml")
         manual = load_casting(cfg.casting_dir / "casting.yaml", catalog.known())
-        merged = load_casting(cfg.casting_dir / "casting.yaml", catalog.known(), auto_casting_path(cfg))
+        keep = auto_casting_path(cfg).is_file() and not args.reset
+        # nur beim Behalten wird die alte Auto-Datei geladen (und geprüft); --reset verwirft sie ungesehen
+        merged = load_casting(cfg.casting_dir / "casting.yaml", catalog.known(), auto_casting_path(cfg)) if keep else None
         profiles = read_profiles(profiles_path(cfg))
     except (OSError, ValueError) as e:
         return _fail(str(e))
     stats = speaker_stats(lines)
-    kept = {n: v for n, v in merged.speakers.items() if n not in manual.speakers} if args.keep else {}
+    kept = {n: v for n, v in merged.speakers.items() if n not in manual.speakers} if keep else {}
     result = assign(stats, profiles, catalog.candidates(), {**kept, **manual.speakers})
     write_auto_casting(auto_casting_path(cfg), {**kept, **result.voices})
+    if keep:
+        print("Bisherige Auto-Zuteilung bleibt (--reset verwirft sie)")
+    else:
+        print("Neu zugeteilt (--reset)" if args.reset else "Neu zugeteilt (erste Zuteilung)")
     print(f"{len(result.voices)} Sprecher neu zugeteilt, {len(kept)} behalten, {len(manual.speakers)} von Hand besetzt "
           f"-> {auto_casting_path(cfg)}")
     display = {s.name: s.display for s in stats}
@@ -491,7 +497,8 @@ def add_parsers(sub) -> None:
     cast.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
     cast.add_argument("--propose", action="store_true", help="Stimmen aus den Steckbriefen zuteilen (casting/casting_auto.yaml)")
     cast.add_argument("--listen", action="store_true", help="Hörseite out/casting/index.html (nach synth/encode --sample)")
-    cast.add_argument("--keep", action="store_true", help="mit --propose: bisherige Auto-Zuteilung behalten, nur Neue zuteilen")
+    cast.add_argument("--keep", action="store_true", help="mit --propose: bisherige Auto-Zuteilung behalten (jetzt Standard, nur noch Synonym)")
+    cast.add_argument("--reset", action="store_true", help="mit --propose: bisherige Auto-Zuteilung verwerfen und alles neu zuteilen")
     cast.add_argument("--max-speakers", type=int, default=12, help="--check: ab so vielen Sprechern gilt eine Stimme als überbelegt")
     em = sub.add_parser("emote", help="Emotionen aus Regieanweisungen nach casting/emotions.jsonl (llm/manual bleiben)")
     _add_selection(em)
