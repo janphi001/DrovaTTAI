@@ -68,6 +68,6 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 - Jede sprechbare Zeile eines generischen Sprechers wird beim Einlesen (`_selected`) durch eine Zeile je Poolstimme ersetzt (`<ID>#v<g><n>`, Feld `Line.pool`); `Casting.voice_for` ordnet die Stimme zu, Emotionen gelten über die Basis-ID (`emotion_id`). `emote` arbeitet auf den Basiszeilen.
 - `--category dialog|bark|player` filtert `synth`, `encode`, `install`, `report`, `emote`, `preview`. **Ein `synth` ohne `--category` nimmt alle Poolzeilen (generische Dialogzeilen und Barks) mit** und sendet sie an Fish.
 - Barks benannter Sprecher laufen wie normale Zeilen über die Besetzung; Ordner `bark/` ergibt sich aus der Kategorie. `install` baut die Poolvarianten einer Basis-ID jedes Mal neu auf (Pool verkleinert → alte Varianten verschwinden).
-- Stand 2026-10-15: 171 benannte und 152 generische Barks (6 Poolstimmen) vertont und installiert; die 205 generischen Dialogzeilen (`dialog`, Pool) stehen noch aus.
+- Stand 2026-10-15: 171 benannte und 152 generische Barks (6 Poolstimmen) vertont und installiert; dazu 205 generische Dialogzeilen (`dialog`, Pool, 1.230 Clips). Index danach: 13.819 Einträge.
 - Besetzung: `casting/casting.yaml` (von Hand, gewinnt) über `casting/casting_auto.yaml` (erzeugt).
 - Fish ist eine Cloud-Engine: der Sprechtext geht an `api.fish.audio`. Nur nach ausdrücklichem Ja des Nutzers mit echten Spieltexten benutzen.
