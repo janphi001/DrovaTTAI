@@ -14,7 +14,7 @@ UNKNOWN_AGE_DISTANCE = 1  # offizielle Stimmen ohne Altersangabe passen mäßig 
 # Kosten (kleiner ist besser)
 W_AGE = 3.0  # je Altersstufe Abstand
 W_TYPE_MATCH = 10.0  # Abzug, wenn der verlangte Typ (Riese, Zwerg, Schurke) passt
-W_TYPE_EXTRA = 8.0  # Aufschlag, wenn eine Typ-Variante für eine gewöhnliche Figur benutzt würde
+W_TYPE_EXTRA = 30.0  # Aufschlag, wenn eine Typ-Variante für eine gewöhnliche Figur benutzt würde
 W_KIND_ONLY = 20.0  # Kinderstimmen nur für Kinder
 W_VARIANT = 2.0  # Basisstimmen vor Varianten
 W_SPEAKER = 1.5  # je Sprecher, der die Stimme schon hat
