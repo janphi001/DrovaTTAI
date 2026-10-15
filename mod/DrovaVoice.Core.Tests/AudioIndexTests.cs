@@ -40,6 +40,21 @@ namespace DrovaVoice.Core.Tests
         }
 
         [Fact]
+        public void ListsOnlyPoolVariantsOfAnId()
+        {
+            const string json = @"{""version"":1,""language"":""de"",""entries"":{
+              ""DT_G|P|1#vw1"": {""file"": ""dialog/aaaaaaaaaaaaaaaa.ogg"", ""duration"": 1.0},
+              ""DT_G|P|1#vm1"": {""file"": ""dialog/bbbbbbbbbbbbbbbb.ogg"", ""duration"": 1.0},
+              ""DT_G|P|1#neutral"": {""file"": ""dialog/cccccccccccccccc.ogg"", ""duration"": 1.0},
+              ""DT_G|P|2"": {""file"": ""dialog/dddddddddddddddd.ogg"", ""duration"": 1.0}}}";
+            var index = AudioIndex.Parse(json, "de");
+            Assert.Equal(new[] { "vm1", "vw1" }, index.PoolVariants("DT_G|P|1"));
+            Assert.Empty(index.PoolVariants("DT_G|P|2"));
+            Assert.Empty(index.PoolVariants(null));
+            Assert.Empty(index.PoolVariants("unbekannt"));
+        }
+
+        [Fact]
         public void UnknownEmptyAndNullIdsAreMisses()
         {
             var index = AudioIndex.Parse(Good, "de");

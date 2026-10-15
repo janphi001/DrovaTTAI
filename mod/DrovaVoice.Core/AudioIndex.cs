@@ -23,12 +23,14 @@ namespace DrovaVoice.Core
         public const int SupportedVersion = 1;
         private readonly Dictionary<string, IndexEntry> _entries;
         private readonly Dictionary<string, List<string>> _choiceIdsByStatement;
+        private readonly Dictionary<string, List<string>> _poolVariants;
 
         private AudioIndex(Dictionary<string, IndexEntry> entries, int skipped)
         {
             _entries = entries;
             Skipped = skipped;
             _choiceIdsByStatement = BuildChoiceLookup(entries.Keys);
+            _poolVariants = BuildPoolLookup(entries.Keys);
         }
 
         public int Count => _entries.Count;
@@ -66,6 +68,27 @@ namespace DrovaVoice.Core
             choiceId = ids[0];
             entry = _entries[choiceId];
             return true;
+        }
+
+        /// <summary>Poolvarianten (vm1, vw2 …) einer Basis-ID, sortiert; leer, wenn es keine gibt.</summary>
+        public IReadOnlyList<string> PoolVariants(string? id) =>
+            !string.IsNullOrEmpty(id) && _poolVariants.TryGetValue(id!, out var list) ? list : Array.Empty<string>();
+
+        private static Dictionary<string, List<string>> BuildPoolLookup(IEnumerable<string> ids)
+        {
+            var map = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            foreach (string id in ids)
+            {
+                int cut = id.LastIndexOf(LineIds.VariantSeparator);
+                if (cut <= 0) continue;
+                string tag = id.Substring(cut + 1);
+                if (!PoolVoice.IsPoolTag(tag)) continue;
+                string baseId = id.Substring(0, cut);
+                if (!map.TryGetValue(baseId, out var list)) map[baseId] = list = new List<string>();
+                list.Add(tag);
+            }
+            foreach (var list in map.Values) list.Sort(StringComparer.Ordinal);
+            return map;
         }
 
         private static Dictionary<string, List<string>> BuildChoiceLookup(IEnumerable<string> ids)
