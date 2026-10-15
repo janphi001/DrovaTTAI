@@ -20,6 +20,7 @@ from drova_voice.ids import VARIANT_SEP, with_variant
 from drova_voice.install import install_audio
 from drova_voice.jsonl import append_jsonl, latest_by_id, read_jsonl_counted, read_jsonl_lenient, write_jsonl
 from drova_voice.lines import (Line, build_lines, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
+from drova_voice.pools import expand_pool_lines, load_pools
 from drova_voice.preview import write_preview
 from drova_voice.profiles import LOW_CONFIDENCE, Profile, merge_import, prepare_packets, read_profiles, write_profiles
 from drova_voice.report import build_report, build_speaker_report, format_report, format_speaker_report
@@ -43,9 +44,10 @@ def batches_path(cfg: Config) -> Path:
     return cfg.data_dir / "batches.json"
 
 
-def _selected(cfg: Config, args: argparse.Namespace) -> list[Line] | None:
+def _selected(cfg: Config, args: argparse.Namespace, expand_pool: bool = True) -> list[Line] | None:
     """Zeilen aus data/lines.jsonl, gefiltert nach --npc (ganze Bäume), --sample (eine Zeile je Sprecher) und
-    --batch N (Etappe); None (mit Meldung), wenn die Auswahl nicht möglich ist."""
+    --batch N (Etappe) und --category; Zeilen generischer Sprecher werden je Poolstimme erweitert (casting/pools.yaml),
+    außer bei `emote` (Emotionen gelten für die Basiszeile). None (mit Meldung), wenn die Auswahl nicht möglich ist."""
     path = lines_path(cfg)
     if not path.is_file():
         _fail(f"{path} fehlt (zuerst `drova-voice extract` ausführen)")
@@ -69,6 +71,16 @@ def _selected(cfg: Config, args: argparse.Namespace) -> list[Line] | None:
             _fail(f"Etappe {batch_n} gibt es nicht (siehe `drova-voice batches`)")
             return None
         lines = batch_lines(lines, chosen[0])
+    category = getattr(args, "category", None)
+    if category:
+        lines = [l for l in lines if l.category == category]
+    if expand_pool:
+        try:
+            pools = load_pools(cfg.casting_dir / "pools.yaml", load_catalog(cfg.casting_dir / "fish_voices.yaml").known())
+        except (OSError, ValueError) as e:
+            _fail(str(e))
+            return None
+        lines = expand_pool_lines(lines, pools)
     return lines
 
 
@@ -94,7 +106,8 @@ def auto_casting_path(cfg: Config) -> Path:
 
 def _load_casting(cfg: Config):
     catalog = load_catalog(cfg.casting_dir / "fish_voices.yaml")
-    return catalog, load_casting(cfg.casting_dir / "casting.yaml", catalog.known(), auto_casting_path(cfg))
+    return catalog, load_casting(cfg.casting_dir / "casting.yaml", catalog.known(), auto_casting_path(cfg),
+                                 cfg.casting_dir / "pools.yaml")
 
 
 def _cast(cfg: Config, args: argparse.Namespace) -> int:
@@ -206,7 +219,7 @@ def emotions_path(cfg: Config) -> Path:
 
 
 def _emote(cfg: Config, args: argparse.Namespace) -> int:
-    lines = _selected(cfg, args)
+    lines = _selected(cfg, args, expand_pool=False)
     if lines is None:
         return 2
     try:
@@ -490,6 +503,7 @@ def _add_selection(parser, npc_help: str = "nur Bäume, in denen dieser NPC spri
     parser.add_argument("--npc", help=npc_help)
     parser.add_argument("--sample", action="store_true", help="nur eine Beispielzeile je Sprecher (Hörstufe)")
     parser.add_argument("--batch", type=int, help="nur die Zeilen dieser Etappe (siehe `batches`)")
+    parser.add_argument("--category", choices=("dialog", "bark", "player"), help="nur Zeilen dieser Kategorie")
 
 
 def add_parsers(sub) -> None:
