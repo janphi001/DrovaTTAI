@@ -22,8 +22,8 @@ Datei: `<Spiel>/UserData/MelonPreferences.cfg`, Abschnitt `[DrovaVoice]` (entste
 | `DialogVolume` | `100` | 0–200 | NPC-Stimmen in Prozent; über 100 wird verstärkt (mit weichem Begrenzer) |
 | `PlayerVolume` | `100` | 0–200 | Spielerzeilen in Prozent |
 | `BarkVolume` | `100` | 0–200 | Welt-Kommentare (Barks) in Prozent |
-| `BarkMinDistance` | `15` | ≥ 0 | Barks: bis zu diesem Abstand zum Spieler (Weltmeter) volle Lautstärke |
-| `BarkMaxDistance` | `120` | > Min | Barks: ab diesem Abstand stumm, dazwischen linear leiser (laufend, auch beim Annähern wieder lauter) |
+| `BarkMinDistance` | `15` | 0–500 | Barks: bis zu diesem Abstand zum Spieler (Weltmeter) volle Lautstärke |
+| `BarkMaxDistance` | `120` | > Min, höchstens 500 | Barks: ab diesem Abstand stumm, dazwischen linear leiser (laufend, auch beim Annähern wieder lauter) |
 | `BarkProbe` | `false` | — | Entwicklung: pro Aussage Figur (Name, Körpertyp, VoiceID, GUID, Abstand) loggen |
 | `AudioLanguage` | `de` | — | Unterordner unter `Mods/DrovaVoice/Audio` |
 | `CacheMB` | `64` | 8–512 | Obergrenze für geladene Clips |
@@ -69,6 +69,7 @@ Die Dateien sind auf −16 LUFS normiert; wie laut das im Verhältnis zu Musik u
 - Die Lautstärke steckt im geladenen Clip (`Gain` beim Dekodieren). Der Clip-Cache ist nach `id@prozent` geschlüsselt, alte Clips altern aus dem Cache. Damit eine neue Lautstärke auch bei schon gehörten Zeilen ankommt, wird **jeder** Clip nach dem Abspielstart wieder von der Aussage genommen (`BarkDistance.Watch`); der Connector läuft dann bei jeder Ausführung neu.
 - Ist die Vertonung im Menü aus (oder `Enabled=false`), ersetzt die Mod den Connector der API trotzdem und liefert keinen Clip; so lässt sie sich ohne Neustart wieder einschalten.
 - Die Texte sind für die Sprachen angemeldet, deren Ordner unter `Drova_Data/StreamingAssets/Localization/` existiert (die API schreibt dort `DrovaVoice_<Sprache>.loc`).
+- Überlappen Min und Max im Menü (Min ≥ Max), bleibt das Min stehen und das Max rückt auf Min + 10 (mit einer Warnung, je Text einmal geloggt). Ein fehlender Menüwert fällt auf den Wert aus `MelonPreferences.cfg` zurück.
 - Scheitert das Panel, loggt die Mod `Optionsmenü …` einmal und läuft mit den Datei-Einstellungen weiter.
 
 ## Barks und Stimmenpool (Plan 7)

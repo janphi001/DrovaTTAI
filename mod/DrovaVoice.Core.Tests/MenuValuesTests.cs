@@ -50,10 +50,10 @@ namespace DrovaVoice.Core.Tests
         }
 
         [Theory]
-        [InlineData(50f, 50f)]
-        [InlineData(60f, 10f)]
         [InlineData(float.NaN, 40f)]
-        public void InvalidRangeFallsBackToTheDefaults(float min, float max)
+        [InlineData(10f, float.NaN)]
+        [InlineData(-3f, float.PositiveInfinity)]
+        public void UnusableRangeFallsBackToTheDefaults(float min, float max)
         {
             var w = new List<string>();
             var s = Baseline().WithOverrides(new MenuValues(BarkMinDistance: min, BarkMaxDistance: max), w);
@@ -81,6 +81,45 @@ namespace DrovaVoice.Core.Tests
             Assert.Equal(SettingsChange.Range, VoiceSettings.Diff(a, a.WithOverrides(new MenuValues(BarkMinDistance: 10f), new List<string>())));
             Assert.Equal(SettingsChange.Enabled | SettingsChange.Volume | SettingsChange.Range,
                 VoiceSettings.Diff(a, a.WithOverrides(new MenuValues(false, 10, null, null, 1f, 50f), new List<string>())));
+        }
+
+        [Fact]
+        public void OverlappingRangeKeepsTheMinAndPushesTheMaxAboveIt()
+        {
+            var w = new List<string>();
+            var s = Baseline().WithOverrides(new MenuValues(BarkMinDistance: 150f, BarkMaxDistance: 100f), w);
+            Assert.Equal(150f, s.BarkMinDistance);
+            Assert.Equal(160f, s.BarkMaxDistance);
+            Assert.Contains(w, m => m.Contains("BarkMaxDistance"));
+        }
+
+        [Fact]
+        public void OverlapAtTheUpperLimitStaysInsideTheLimit()
+        {
+            var s = Baseline().WithOverrides(new MenuValues(BarkMinDistance: 500f, BarkMaxDistance: 100f), new List<string>());
+            Assert.Equal(490f, s.BarkMinDistance);
+            Assert.Equal(500f, s.BarkMaxDistance);
+        }
+
+        [Theory]
+        [InlineData(600f)]
+        [InlineData(float.PositiveInfinity)]
+        public void DistancesAboveTheLimitAreClampedWithAWarning(float max)
+        {
+            var w = new List<string>();
+            var s = VoiceSettings.Create(true, 100, 100, "de", 64, false, w, 100, 15f, max);
+            if (float.IsInfinity(max)) { Assert.Equal(15f, s.BarkMinDistance); Assert.Equal(120f, s.BarkMaxDistance); }
+            else Assert.Equal(VoiceSettings.MaxBarkDistance, s.BarkMaxDistance);
+            Assert.NotEmpty(w);
+        }
+
+        [Fact]
+        public void NegativeMinIsClampedToZeroWithAWarning()
+        {
+            var w = new List<string>();
+            var s = VoiceSettings.Create(true, 100, 100, "de", 64, false, w, 100, -4f, 50f);
+            Assert.Equal(0f, s.BarkMinDistance);
+            Assert.Contains(w, m => m.Contains("BarkMinDistance"));
         }
 
         [Fact]

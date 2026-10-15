@@ -22,6 +22,7 @@ namespace DrovaVoice.Playback
         {
             _index = index;
             _settings = settings;
+            BaseSettings = settings;
             _log = log;
             _store = new ClipStore(settings.CacheBytes);
             _loader = new ClipLoader(audioRoot);
@@ -29,6 +30,8 @@ namespace DrovaVoice.Playback
 
         public bool Diagnostics => _settings.Diagnostics;
         public VoiceSettings Settings => _settings;
+        /// <summary>Einstellungen aus MelonPreferences beim Start (Grundlage für die Menüwerte).</summary>
+        public VoiceSettings BaseSettings { get; }
 
         /// <summary>Tauscht die Einstellungen aus (Optionsmenü). Gibt zurück, was sich geändert hat; Clips bleiben im Cache, ihr Schlüssel enthält die Lautstärke.</summary>
         public SettingsChange Apply(VoiceSettings next)
@@ -80,7 +83,7 @@ namespace DrovaVoice.Playback
             }
             _store.Put(cacheKey, clip, bytes);
             if (elapsedMs > ClipLoader.SlowMilliseconds) Problem("slow|" + id, $"Laden dauerte {elapsedMs} ms (Ruckler möglich): {id}", error: false);
-            Diag("hit|" + id, $"[Zeile] geladen: {id} ({entry.File}, {entry.Duration:0.00} s, {entry.Category}, {elapsedMs} ms); Cache {_store.Count} Clips, {_store.TotalBytes / 1024 / 1024} MB");
+            Diag("hit|" + cacheKey, $"[Zeile] geladen: {id} ({entry.File}, {entry.Duration:0.00} s, {entry.Category}, {percent} %, {elapsedMs} ms); Cache {_store.Count} Clips, {_store.TotalBytes / 1024 / 1024} MB");
             return clip;
         }
 

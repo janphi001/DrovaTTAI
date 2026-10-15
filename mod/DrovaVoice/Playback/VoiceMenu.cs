@@ -69,8 +69,8 @@ namespace DrovaVoice.Playback
                        .CreateSlider(LocalizationAccess.GetLocalizedString(ModName, "dialog"), MenuKeys.DialogVolume, 0, 200, s.DialogPercent)
                        .CreateSlider(LocalizationAccess.GetLocalizedString(ModName, "player"), MenuKeys.PlayerVolume, 0, 200, s.PlayerPercent)
                        .CreateSlider(LocalizationAccess.GetLocalizedString(ModName, "bark"), MenuKeys.BarkVolume, 0, 200, s.BarkPercent)
-                       .CreateSlider(LocalizationAccess.GetLocalizedString(ModName, "barkMin"), MenuKeys.BarkMinDistance, 0, 200, (int)s.BarkMinDistance)
-                       .CreateSlider(LocalizationAccess.GetLocalizedString(ModName, "barkMax"), MenuKeys.BarkMaxDistance, 10, 400, (int)s.BarkMaxDistance)
+                       .CreateSlider(LocalizationAccess.GetLocalizedString(ModName, "barkMin"), MenuKeys.BarkMinDistance, 0, (int)VoiceSettings.MaxBarkDistance, (int)s.BarkMinDistance)
+                       .CreateSlider(LocalizationAccess.GetLocalizedString(ModName, "barkMax"), MenuKeys.BarkMaxDistance, 1, (int)VoiceSettings.MaxBarkDistance, (int)s.BarkMaxDistance)
                        .Build();
             }
             catch (Exception e) { _panelFailed = true; Fail("Panel", e); }
@@ -89,8 +89,8 @@ namespace DrovaVoice.Playback
                 ReadBool(MenuKeys.Enabled), ReadInt(MenuKeys.DialogVolume), ReadInt(MenuKeys.PlayerVolume), ReadInt(MenuKeys.BarkVolume),
                 ReadInt(MenuKeys.BarkMinDistance), ReadInt(MenuKeys.BarkMaxDistance));
             var warnings = new List<string>();
-            var next = _service.Settings.WithOverrides(values, warnings);
-            foreach (string w in warnings) _log.Warning("Optionsmenü: " + w);
+            var next = _service.BaseSettings.WithOverrides(values, warnings);   // Datei-Einstellungen als Grundlage: ein fehlender Schlüssel fällt auf den Dateiwert zurück
+            foreach (string w in warnings) if (_logged.Add("w|" + w)) _log.Warning("Optionsmenü: " + w);   // dieselbe Warnung nur einmal
             var change = _service.Apply(next);
             if (change != SettingsChange.None)
                 _log.Msg($"Optionsmenü: {change}; Dialog {next.DialogPercent} %, Spieler {next.PlayerPercent} %, Barks {next.BarkPercent} %, Reichweite {next.BarkMinDistance}–{next.BarkMaxDistance}, {(next.Enabled ? "an" : "aus")}.");

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace DrovaVoice.Core
@@ -20,6 +21,7 @@ namespace DrovaVoice.Core
         public float BarkMaxDistance { get; private set; }
         public const float DefaultBarkMinDistance = 15f;
         public const float DefaultBarkMaxDistance = 120f;
+        public const float MaxBarkDistance = 500f;
         public string Language { get; private set; } = DefaultLanguage;
         public int CacheMegabytes { get; private set; }
         public bool Diagnostics { get; private set; }
@@ -36,7 +38,18 @@ namespace DrovaVoice.Core
                                            int cacheMegabytes, bool diagnostics, List<string> warnings, int barkPercent = 100,
                                            float barkMinDistance = DefaultBarkMinDistance, float barkMaxDistance = DefaultBarkMaxDistance)
         {
-            if (barkMinDistance < 0f) barkMinDistance = 0f;
+            if (barkMinDistance < 0f)
+            {
+                warnings.Add($"BarkMinDistance = {barkMinDistance} darf nicht negativ sein; verwende 0.");
+                barkMinDistance = 0f;
+            }
+            if (barkMinDistance > MaxBarkDistance || barkMaxDistance > MaxBarkDistance)
+            {
+                bool infinite = float.IsInfinity(barkMinDistance) || float.IsInfinity(barkMaxDistance);
+                warnings.Add($"Bark-Reichweite {barkMinDistance}–{barkMaxDistance} liegt über {MaxBarkDistance}; " + (infinite ? $"verwende {DefaultBarkMinDistance}–{DefaultBarkMaxDistance}." : $"begrenze auf {MaxBarkDistance}."));
+                if (infinite) { barkMinDistance = DefaultBarkMinDistance; barkMaxDistance = DefaultBarkMaxDistance; }
+                else { barkMinDistance = Math.Min(barkMinDistance, MaxBarkDistance); barkMaxDistance = Math.Min(barkMaxDistance, MaxBarkDistance); }
+            }
             if (!(barkMaxDistance > barkMinDistance))
             {
                 warnings.Add($"BarkMaxDistance = {barkMaxDistance} muss größer als BarkMinDistance ({barkMinDistance}) sein; verwende {DefaultBarkMinDistance}–{DefaultBarkMaxDistance}.");
@@ -60,9 +73,17 @@ namespace DrovaVoice.Core
         /// <summary>Neuer Schnappschuss: Datei-Einstellungen (this) mit den gesetzten Menüwerten darüber; gleiche Grenzen wie <see cref="Create"/>.</summary>
         public VoiceSettings WithOverrides(MenuValues values, List<string> warnings)
         {
+            float min = values.BarkMinDistance ?? BarkMinDistance, max = values.BarkMaxDistance ?? BarkMaxDistance;
+            if (!float.IsNaN(min) && !float.IsNaN(max) && !float.IsInfinity(min) && !float.IsInfinity(max) && min >= 0f && !(max > min))
+            {
+                // Menü: Min und Max überlappen. Das Min bleibt, wie eingestellt; das Max rückt knapp darüber (nicht auf die Standardwerte zurück).
+                min = Math.Min(min, MaxBarkDistance - 10f);
+                max = Math.Min(min + 10f, MaxBarkDistance);
+                warnings.Add($"BarkMaxDistance muss größer als BarkMinDistance sein; setze {min}–{max}.");
+            }
             return Create(values.Enabled ?? Enabled, values.DialogPercent ?? DialogPercent, values.PlayerPercent ?? PlayerPercent,
                           Language, CacheMegabytes, Diagnostics, warnings, values.BarkPercent ?? BarkPercent,
-                          values.BarkMinDistance ?? BarkMinDistance, values.BarkMaxDistance ?? BarkMaxDistance);
+                          min, max);
         }
 
         public static SettingsChange Diff(VoiceSettings oldSettings, VoiceSettings newSettings)
