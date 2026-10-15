@@ -162,9 +162,12 @@ def _encode(cfg: Config, args: argparse.Namespace) -> int:
     if not synth_rows:
         return _fail(f"{synth_results_path(cfg)} fehlt oder ist leer (zuerst `drova-voice synth` ausführen)")
     try:
+        catalog, casting = _load_casting(cfg)
         emotions = read_emotions(emotions_path(cfg))
-        rows, errors = run_encode(lines, synth_rows, emotions, audio_dir(cfg), args.workers)
-    except ValueError as e:
+        variants = {l.id: catalog.variants[casting.voice_for(l)] for l in lines
+                    if not l.skip and casting.voice_for(l) in catalog.variants}
+        rows, errors = run_encode(lines, synth_rows, emotions, audio_dir(cfg), args.workers, variants)
+    except (OSError, ValueError) as e:
         return _fail(str(e))
     merged = latest_by_id(read_jsonl_lenient(encoded_path(cfg)))
     merged.update({r["id"]: r for r in rows})

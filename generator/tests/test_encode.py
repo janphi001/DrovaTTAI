@@ -7,9 +7,11 @@ import pytest
 
 from drova_voice.emotions import EmotionTag
 from drova_voice.encode import (build_filter, encode_one, ffmpeg_command, find_tools, probe_duration, rel_audio_path,
-                                run_encode)
+                                require_rubberband, run_encode, variant_filter)
+from drova_voice.fish_voices import FishVariant
 from drova_voice.ids import audio_filename
 from drova_voice.lines import Line
+from ffmpeg_marks import needs_rubberband
 
 needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
                                   reason="ffmpeg/ffprobe nicht installiert")
@@ -111,3 +113,58 @@ def test_run_encode_collects_rows_and_errors(tmp_path):
     assert [r["id"] for r in rows] == ["T|P|Plh_1"] and rows[0]["rel"] == rel_audio_path(lines[0])
     assert (tmp_path / "audio" / rows[0]["rel"]).is_file()
     assert len(errors) == 1 and "Plh_2" in errors[0]  # WAV fehlt; Plh_3 hat gar keine Synth-Zeile und zählt nicht als Fehler
+
+
+def variant(pitch=1.0, formant=2.0, tempo=1.0):
+    return FishVariant("v", "lena", "V", "f", None, None, pitch, formant, tempo)
+
+
+def test_variant_filter_follows_the_recipe():
+    assert variant_filter(variant()) == ("aresample=44100,asetrate=88200,aresample=44100,"
+                                         "rubberband=pitch=0.5:tempo=0.5:formant=preserved")
+
+
+def test_filter_with_variant_starts_with_the_recipe():
+    assert build_filter([], variant()).startswith(variant_filter(variant()) + ",silenceremove")
+    assert build_filter([]) == build_filter([], None)
+
+
+def test_require_rubberband_reports_a_missing_filter(monkeypatch):
+    class Result:
+        stdout = " ... A->A       atempo             Adjust audio tempo.\n"
+
+    monkeypatch.setattr("drova_voice.encode.subprocess.run", lambda *a, **k: Result())
+    with pytest.raises(ValueError, match="rubberband"):
+        require_rubberband("ffmpeg")
+
+
+def test_require_rubberband_accepts_the_filter(monkeypatch):
+    class Result:
+        stdout = " ..C rubberband        A->A       Apply time-stretching and pitch-shifting.\n"
+
+    monkeypatch.setattr("drova_voice.encode.subprocess.run", lambda *a, **k: Result())
+    assert require_rubberband("ffmpeg") is None
+
+
+def test_run_encode_with_a_variant_checks_rubberband_before_anything_else(tmp_path, monkeypatch):
+    def missing(ffmpeg):
+        raise ValueError("ffmpeg ohne rubberband")
+
+    monkeypatch.setattr("drova_voice.encode.find_tools", lambda: ("ffmpeg", "ffprobe"))
+    monkeypatch.setattr("drova_voice.encode.require_rubberband", missing)
+    with pytest.raises(ValueError, match="rubberband"):
+        run_encode([line()], {"T|P|Plh_1": {"id": "T|P|Plh_1", "ok": True, "wav": "x.wav", "key": "k"}}, {}, tmp_path, 1,
+                   {"T|P|Plh_1": variant()})
+
+
+@needs_rubberband
+def test_encode_one_applies_the_variant_and_restamps(tmp_path):
+    ffmpeg, ffprobe = find_tools()
+    wav = tmp_path / "in.wav"
+    sine_wav(wav, seconds=1.0, lead_silence=0.0, rate=44100)
+    dst = tmp_path / "out" / "x.ogg"
+    plain = encode_one(ffmpeg, ffprobe, wav, dst, [], "k")
+    before = dst.stat().st_mtime_ns
+    slow = encode_one(ffmpeg, ffprobe, wav, dst, [], "k", variant(pitch=1.0, formant=1.0, tempo=0.5))
+    assert dst.stat().st_mtime_ns != before  # anderes Rezept -> neu kodiert
+    assert slow > plain * 1.5  # Tempo 0.5 dehnt die Zeit
