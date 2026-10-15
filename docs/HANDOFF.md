@@ -12,6 +12,7 @@ KI-Stimmen für das Spiel **Drova – Forsaken Kin**. Ein Python-Generator (`gen
 | **Plan 4 Wiedergabe in der Mod** | **fertig und vom Nutzer abgenommen** (Branch `plan-4-playback`; Notiz `docs/decisions/2026-10-playback-durchstich.md`) |
 | **Plan 5 Casting und Vollauf** | **Code fertig, Vollauf bei Fish durch** (Branch `plan-5-casting` auf `plan-4-playback`; 471 pytest grün; alle 245 benannten Sprecher besetzt und vertont, `report --by-speaker`: Lücken 0; Notiz `docs/decisions/2026-10-casting-vollauf.md`). Stichprobe im Spiel vom Nutzer abgenommen (2026-10-15) |
 | Namensvarianten | neutral, siehe docs/superpowers/specs/2026-10-15-namensvarianten-design.md; Code fertig auf Branch `plan-6-namensvarianten`; 94 neutrale Zeilen bei Fish erzeugt, installiert (Index 11.507 Einträge) und Mod gebaut (2026-10-15); Hörtest im Spiel steht aus. 166 Bark-Zeilen wurden dabei versehentlich mit erzeugt (WAV im Cache `cache/synth/`, nicht kodiert/installiert; für Barks (M6) wiederverwendbar) |
+| **Plan 7 Barks und Stimmenpool** | Code, Doku und Bark-Vertonung fertig, im Spiel abgenommen (Stimmen nach Geschlecht stimmig, Entfernungsregelung 15–120 „viel besser“); Branch `plan-7-barks` (ungemergt, ungepusht). Spec `docs/superpowers/specs/2026-10-15-barks-design.md`, Plan `docs/superpowers/plans/2026-10-15-plan-7-barks.md`. **Offen:** 205 generische Dialogzeilen (`DT_Dialogue_*` mit Sprecher `NPC`, Pool) bei Fish noch nicht erzeugt (ca. 1.230 Clips, nur nach Ja) |
 | Merge/Push der Branches | erledigt: `main` und `origin/main` stehen auf `plan-5-casting` (gepusht); `plan-6-namensvarianten` ist weder gemergt noch gepusht |
 | Tests | 155 xUnit (Core), 483 pytest (Generator), alle grün |
 
@@ -23,6 +24,11 @@ KI-Stimmen für das Spiel **Drova – Forsaken Kin**. Ein Python-Generator (`gen
 
 ## Was im Spiel hörbar ist
 `Mods/DrovaVoice/Audio/de/index.json` hat **11.413 Einträge** (alle 245 benannten Sprecher und die Aussagen des Spielers, ohne Auswahloptionen; 506 MB, OGG 48 kHz mono, −16 LUFS). Der Nutzer hat vor dem Vollauf Enya, Femke, Gerion und Gilwar gehört („klingt gut“, Skip stoppt die Stimme, Lautstärke 100 % passt); die Stichprobe im Spiel nach dem Vollauf steht aus.
+
+## Barks (Plan 7), Kurzfassung
+- Index: 12.589 Einträge; 1.082 davon unter `bark/` (171 benannte Barks, 152 generische × 6 Poolstimmen). `casting/pools.yaml`: m `jonas, ben_a20517, schales_7ef3ea`, w `emma, catrinja_c5b66a, amira_german_b59d11`.
+- Mod: `FigureReader` (Figur der Aussage), `PoolVoice` (Wahl), `BarkDistance` (Aussage freigeben und Entfernung). **Falle:** `statement.audio` einer geteilten Aussage bleibt stehen → ohne Freigabe spielt jede Figur die Stimme der ersten und der Connector läuft nicht mehr (Befund: `docs/playback.md`, Abschnitt Barks).
+- Probe: `BarkProbe = true` loggt `[Figur]`-Zeilen; Befunde in `docs/decisions/2026-10-bark-figur-probe.md` und `…-bark-entfernung.md`. Ohne `--category` nimmt `synth` auch alle Poolzeilen mit.
 
 ## Entscheidungen, die man nicht wieder aufrollen soll
 - **Engine:** Fish Audio Cloud; Kitten nur lokale Rückfallebene (`docs/decisions/2026-10-tts-engine.md`). Texte gehen an Fish: **nur nach ausdrücklichem Ja des Nutzers**. Kosten/Tarif für den Vollauf ungeklärt (~13.000 Zeilen).
