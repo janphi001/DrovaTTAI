@@ -6,6 +6,6 @@ speakers:
   jero: {voice: german_wisdom_m_3130ae}   # vorläufig (mittelalt, tief, ruhig, geheimnisvoll); Hörtest entscheidet
   # Plan 4, Abnahme im Spiel: Figuren in der Nähe des Nutzers; Zuordnung nach Namen geraten (Geschlecht), vorläufig
   enya: {voice: lena}
-  femke: {voice: emma}
+  femke: {voice: schales_7ef3ea}   # Femke ist ein Mann (Nutzer, 2026-10-15); jung, freundlich, vorläufig
   gerion: {voice: lukas}
   gilwar: {voice: jonas}
