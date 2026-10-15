@@ -21,6 +21,10 @@ Datei: `<Spiel>/UserData/MelonPreferences.cfg`, Abschnitt `[DrovaVoice]` (entste
 | `Enabled` | `true` | — | Vertonung an/aus |
 | `DialogVolume` | `100` | 0–200 | NPC-Stimmen in Prozent; über 100 wird verstärkt (mit weichem Begrenzer) |
 | `PlayerVolume` | `100` | 0–200 | Spielerzeilen in Prozent |
+| `BarkVolume` | `100` | 0–200 | Welt-Kommentare (Barks) in Prozent |
+| `BarkMinDistance` | `15` | ≥ 0 | Barks: bis zu diesem Abstand zum Spieler (Weltmeter) volle Lautstärke |
+| `BarkMaxDistance` | `120` | > Min | Barks: ab diesem Abstand stumm, dazwischen linear leiser (laufend, auch beim Annähern wieder lauter) |
+| `BarkProbe` | `false` | — | Entwicklung: pro Aussage Figur (Name, Körpertyp, VoiceID, GUID, Abstand) loggen |
 | `AudioLanguage` | `de` | — | Unterordner unter `Mods/DrovaVoice/Audio` |
 | `CacheMB` | `64` | 8–512 | Obergrenze für geladene Clips |
 | `Diagnostics` | `false` | — | Jede Zeile einmal loggen (geladen / ohne Eintrag) |
@@ -57,6 +61,12 @@ Die Dateien sind auf −16 LUFS normiert; wie laut das im Verhältnis zu Musik u
 
 - Der Spieler spricht seine gewählte Antwortoption nicht (wie im Original); der Generator erzeugt dafür keine Dateien (`player_choice`). Der Auswahl-Hook der Mod ist deshalb nur eine Reserve, falls später Optionsdateien im Index stehen.
 - Spielerstimm-Sets fehlen noch. Bei Zeilen mit streichbarem Spielernamen gilt `…#neutral`, sonst die Basis-ID; Zeilen mit nicht streichbarem Namen oder Quest-/Geldwerten bleiben stumm.
-- Barks und Briefe haben noch keine Dateien und keine Regler.
+- Briefe haben noch keine Dateien und keine Regler.
+
+## Barks und Stimmenpool (Plan 7)
+- Barks (Welt-Kommentare, Kampfrufe) liegen unter `bark/` (Kategorie `Bark`, Regler `BarkVolume`). Generische Sprecher (`NPC`, Teacher …) haben keine eigene Stimme: Der Index führt je Zeile Varianten `#vm1…`, `#vw1…` (Pool aus `casting/pools.yaml`).
+- Die Mod liest zur Laufzeit die sprechende Figur (`FigureReader`: Körpertyp `Strong`=m, `Petite`=w, GUID) und wählt mit `PoolVoice.Pick` (Rendezvous-Hashing über die GUID) eine feste Poolstimme. Dieselbe Figur klingt immer gleich; ist die Figur nicht lesbar, entscheidet die Zeilen-ID (kein Absturz). Befund der Probe: `docs/decisions/2026-10-bark-figur-probe.md`.
+- **Falle:** Die Aussage eines Barks ist für alle Figuren dieselbe, und `statement.audio` bleibt nach dem ersten Setzen stehen. Dann ruft die API den Connector bei Wiederholungen nicht mehr auf (falsche Stimme, keine Entfernungsregelung). `BarkDistance` setzt `statement.audio` deshalb wieder auf `null`, sobald der Clip spielt (Log mit `Diagnostics`: `[Bark] Aussage freigegeben`).
+- Entfernung: Die API dämpft Barks nicht (`docs/decisions/2026-10-bark-entfernung.md`); `BarkDistance` regelt `AudioSource.volume` in jedem Frame nach dem Abstand zum Spieler und stellt die Lautstärke am Ende wieder her.
 - Keine Regler im Spiel; Werte nur per Datei und Neustart.
 - Das Dekodieren läuft synchron auf dem Hauptthread (Zeilen sind kurz); Hintergrund-Vorladen gibt es erst, wenn die Messung Ruckler zeigt.
