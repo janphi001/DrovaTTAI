@@ -98,16 +98,30 @@ namespace DrovaVoice
                 _probe = new StaleAudioProbe(LoggerInstance, _voice.Diagnostics);
                 _barkDistance = new BarkDistance(_voice.BarkMinDistance, _voice.BarkMaxDistance, LoggerInstance, _voice.Diagnostics);
                 _voice.BarkDistance = _barkDistance;
-                _menu = new VoiceMenu(_voice, LoggerInstance);
-                _menu.Register();
-                try { _menu.LoadFromConfig(); } catch (Exception) { /* Konfiguration noch nicht bereit: Datei-Einstellungen gelten */ }
-                ChoiceHook.Service = _voice;
+                ChoiceHook.Service = _voice;   // vor dem Menü: ein Menüfehler darf die Auswahloptionen und die Installation nicht kippen
+                try { SetUpMenu(); } catch (Exception e) { LoggerInstance.Warning($"Optionsmenü nicht verfügbar ({e.GetType().Name}). Die Einstellungen aus MelonPreferences.cfg gelten weiter."); }
                 LoggerInstance.Msg("Audio-Connector der Modding API ersetzt.");
             }
             catch (Exception e)
             {
                 _connectorFailed = true;
                 LoggerInstance.Error($"Connector konnte nicht ersetzt werden, Vertonung bleibt aus: {e.GetType().Name}: {e.Message}");
+            }
+        }
+
+        /// <summary>Optionsmenü einrichten. Eigene Methode ohne Inlining: Fehlt ein API-Typ, scheitert schon das JIT dieser Methode, und der Aufrufer fängt es hier ab.</summary>
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private void SetUpMenu()
+        {
+            try
+            {
+                _menu = new VoiceMenu(_voice!, LoggerInstance);
+                _menu.Register();
+                _menu.LoadFromConfig();
+            }
+            catch (Exception e)
+            {
+                LoggerInstance.Warning($"Optionsmenü nicht verfügbar ({e.GetType().Name}: {e.Message}). Die Einstellungen aus MelonPreferences.cfg gelten weiter.");
             }
         }
 

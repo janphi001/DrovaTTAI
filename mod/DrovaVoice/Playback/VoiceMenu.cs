@@ -13,7 +13,8 @@ namespace DrovaVoice.Playback
         private const string ModName = "DrovaVoice";
         private readonly VoiceService _service;
         private readonly MelonLogger.Instance _log;
-        private bool _registered, _built, _failed;
+        private bool _registered, _panelFailed;
+        private readonly HashSet<string> _logged = new HashSet<string>();
 
         public VoiceMenu(VoiceService service, MelonLogger.Instance log) { _service = service; _log = log; }
 
@@ -54,11 +55,13 @@ namespace DrovaVoice.Playback
 
         private void OnOpen()
         {
-            if (_built || _failed) return;
+            if (_panelFailed) return;
             try
             {
                 var builder = OptionMenuAccess.Instance.GetBuilder(ModName);
-                if (builder == null) return;   // die API gibt für eine schon verwendete ID keinen zweiten Builder zurück
+                // Die API gibt für eine schon verwendete ID keinen zweiten Builder zurück (null). Nach einem Szenenwechsel ist das Fenster neu
+                // und die ID wieder frei: dann wird das Panel neu gebaut. Darum gibt es bewusst keinen eigenen „gebaut“-Merker.
+                if (builder == null) return;
                 var s = _service.Settings;
                 builder.CreateHeader(LocalizationAccess.GetLocalizedString(ModName, "title"))
                        .CreateDisclaimer(LocalizationAccess.GetLocalizedString(ModName, "note"))
@@ -69,9 +72,8 @@ namespace DrovaVoice.Playback
                        .CreateSlider(LocalizationAccess.GetLocalizedString(ModName, "barkMin"), MenuKeys.BarkMinDistance, 0, 200, (int)s.BarkMinDistance)
                        .CreateSlider(LocalizationAccess.GetLocalizedString(ModName, "barkMax"), MenuKeys.BarkMaxDistance, 10, 400, (int)s.BarkMaxDistance)
                        .Build();
-                _built = true;
             }
-            catch (Exception e) { Fail("Panel", e); }
+            catch (Exception e) { _panelFailed = true; Fail("Panel", e); }
         }
 
         private void OnClose()
@@ -99,8 +101,7 @@ namespace DrovaVoice.Playback
 
         private void Fail(string what, Exception e)
         {
-            if (_failed) return;
-            _failed = true;
+            if (!_logged.Add(what)) return;
             _log.Warning($"Optionsmenü ({what}): {e.GetType().Name}: {e.Message}. Die Einstellungen aus MelonPreferences.cfg gelten weiter.");
         }
     }
