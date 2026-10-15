@@ -13,3 +13,5 @@ jobs:
           fetch-depth: 0
       - name: Commit messages
         run: python3 tools/checks/commit_messages.py
+      - name: Game dialogue
+        run: python3 tools/checks/no_game_dialogue.py

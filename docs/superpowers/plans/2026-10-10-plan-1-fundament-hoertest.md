@@ -632,22 +632,22 @@ def test_single_line_entries_with_blank_lines():
 
 def test_crlf_and_bom(tmp_path):
     f = tmp_path / "NPC_X_de.loc"
-    f.write_bytes("\ufeffPlh_1 { Grüß dich. }\r\n\r\nPlh_2 { Na? }\r\n".encode("utf-8"))
+    f.write_bytes("\ufeffPlh_1 { Hallo Kappa. }\r\n\r\nPlh_2 { Na? }\r\n".encode("utf-8"))
     res = read_loc_file(f)
-    assert [(e.key, e.text) for e in res.entries] == [("Plh_1", "Grüß dich."), ("Plh_2", "Na?")]
+    assert [(e.key, e.text) for e in res.entries] == [("Plh_1", "Hallo Kappa."), ("Plh_2", "Na?")]
 
 
 def test_key_with_spaces_and_braces_in_text():
-    res = parse_loc("Test Item_name { Testgegenstand {selten} }\n")
+    res = parse_loc("Test Item_name { Ersatzteil {selten} Omega }\n")
     assert res.entries[0].key == "Test Item_name"
-    assert res.entries[0].text == "Testgegenstand {selten}"
+    assert res.entries[0].text == "Ersatzteil {selten} Omega"
 
 
 def test_multiline_entry():
-    content = "Letter_1 { Liebe Mara,\nich komme bald.\nDein Jero }\n\nPlh_2 { Ok. }\n"
+    content = "Letter_1 { Liebe Mu,\nich komme bald Sigma.\nDein Rho }\n\nPlh_2 { Ok. }\n"
     res = parse_loc(content)
     assert res.entries[0].key == "Letter_1"
-    assert res.entries[0].text == "Liebe Mara,\nich komme bald.\nDein Jero"
+    assert res.entries[0].text == "Liebe Mu,\nich komme bald Sigma.\nDein Rho"
     assert res.entries[1].key == "Plh_2"
     assert res.entries[1].line == 5
 
@@ -1589,7 +1589,7 @@ def test_handshake_and_synth(tmp_path):
     out = tmp_path / "a.wav"
     with EngineClient(FAKE) as client:
         assert (client.engine, client.model) == ("fake", "sine-1")
-        resp = client.synth(SynthRequest(id="1", text="Grüß dich, Wanderer.", out_path=str(out)))
+        resp = client.synth(SynthRequest(id="1", text="Hallo, Wanderer Kappa.", out_path=str(out)))
     assert resp.ok and resp.id == "1"
     assert resp.duration == pytest.approx(1.0, abs=0.01)
     with wave.open(str(out)) as w:
@@ -1792,7 +1792,7 @@ LOC = "\n\n".join([
     "Plh_3 { *seufzt* Na gut, dann eben. }",
     f"Plh_4 {{ Danke, {NAME_TOKEN}. Bis bald. }}",
     "Plh_5 { Heute sind $GVAR:QuestVars_Beispiel_Config.Preis$ Münzen. }",
-    "Plh_6 { Wem gehört dieser Hof eigentlich? }",
+    "Plh_6 { Wem gehört diese Kiste Kappa? }",
     "Plh_7 { Verschwinde sofort von hier! }",
     "Plh_8 { Ich habe heute viel zu tun gehabt. }",
     "Plh_9 { *grinst* }",
@@ -2072,7 +2072,7 @@ def test_bakeoff_select_and_run_with_fake_engine(tmp_path):
     game = tmp_path / "game"
     dialog = game / "Drova_Data" / "StreamingAssets" / "Localization" / "de" / "Dialog"
     dialog.mkdir(parents=True)
-    (dialog / "NPC_A_de.loc").write_text("Plh_1 { Wem gehört dieser Hof eigentlich? }\n", encoding="utf-8")
+    (dialog / "NPC_A_de.loc").write_text("Plh_1 { Wem gehört diese Kiste Kappa? }\n", encoding="utf-8")
     cfg = gen / "config.yaml"
     cfg.write_text(f'game_dir: "{game.as_posix()}"\n', encoding="utf-8")
     voices = gen / "voices.yaml"
