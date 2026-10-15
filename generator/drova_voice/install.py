@@ -50,7 +50,8 @@ def install_audio(rows: Sequence[dict], audio_dir: Path, install_dir: Path, lang
     # frühere Einträge behalten, aber nur solche, deren Datei noch da ist
     entries = {i: e for i, e in _load_index(index_path, language).items() if (install_dir / e.get("file", "")).is_file()}
     # Zeilen, die jetzt nicht mehr installiert werden sollen (übersprungen, ohne Stimme, veraltet), verlieren ihren Eintrag
-    entries = {i: e for i, e in entries.items() if split_variant(i)[0] not in drop_ids}
+    # (Basis-ID entfernt alle Varianten, eine Varianten-ID nur diese)
+    entries = {i: e for i, e in entries.items() if i not in drop_ids and split_variant(i)[0] not in drop_ids}
     result = InstallResult()
     for row in rows:
         src, dst = audio_dir / row["rel"], install_dir / row["rel"]

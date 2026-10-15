@@ -89,3 +89,13 @@ def test_drop_ids_remove_entries_of_lines_that_are_no_longer_installed(tmp_path)
     install_audio([], audio, target, "de", drop_ids={"T|P|Plh_2"})  # Varianten gehören zur Basis-ID
     index = read_index(target)
     assert sorted(index["entries"]) == ["T|P|Plh_1"] and index["variants"] == {}
+
+
+def test_drop_ids_with_a_variant_id_remove_exactly_that_entry(tmp_path):
+    audio, target = tmp_path / "audio", tmp_path / "Audio" / "de"
+    make_audio(audio, "dialog/aaaa.ogg")
+    make_audio(audio, "dialog/bbbb.ogg")
+    install_audio([row("T|P|Plh_1", "dialog/aaaa.ogg"), row("T|P|Plh_2#neutral", "dialog/bbbb.ogg")], audio, target, "de")
+    install_audio([], audio, target, "de", drop_ids={"T|P|Plh_2#neutral"})
+    index = read_index(target)
+    assert sorted(index["entries"]) == ["T|P|Plh_1"] and index["variants"] == {}
