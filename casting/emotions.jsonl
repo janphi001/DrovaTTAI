@@ -1,3 +1,4 @@
+{"id": "DT_PreApo_1_NPC_Enya|Dialog/NPC_Enya|Plh_58", "emotion": "joyful", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_PreApo_1_NPC_Jero|Dialog/NPC_Jero|Plh_333", "emotion": "stern", "intensity": 0.5, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_Busy_1_NPC_Jero|Dialog/NPC_Jero|Plh_158", "emotion": "angry", "intensity": 0.7, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_Greet_1_NPC_Adela|Dialog/NPC_Adela|Plh_36", "emotion": "stern", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
@@ -25,6 +26,9 @@
 {"id": "DT_PreApo_Intro_1_NPC_Adela|Dialog/NPC_Adela|Plh_25", "emotion": "angry", "intensity": 0.7, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_Intro_1_NPC_Adela|Dialog/NPC_Adela|Plh_33", "emotion": "angry", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_Intro_1_NPC_Adela|Dialog/NPC_Adela|Plh_5", "emotion": "stern", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
+{"id": "DT_PreApo_Intro_1_NPC_Femke|Dialog/NPC_Femke|Plh_12", "emotion": "joyful", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
+{"id": "DT_PreApo_Intro_1_NPC_Femke|Dialog/NPC_Femke|Plh_17", "emotion": "contemplative", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
+{"id": "DT_PreApo_Intro_1_NPC_Femke|Dialog/NPC_Femke|Plh_22", "emotion": "neutral", "intensity": 0.0, "events": [{"tag": "sigh", "pos": 0}], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_PreApo_Intro_1_NPC_Jero|Dialog/NPC_Jero|Plh_200|c0", "emotion": "sad", "intensity": 0.4, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_Intro_1_NPC_Jero|Dialog/NPC_Jero|Plh_204", "emotion": "excited", "intensity": 0.5, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_Intro_1_NPC_Jero|Dialog/NPC_Jero|Plh_31", "emotion": "sad", "intensity": 0.5, "events": [], "emphasis": [], "notes": [], "source": "llm"}
@@ -47,6 +51,7 @@
 {"id": "DT_Quest_DuellJeroDialog_NPC_Jero|Dialog/NPC_Jero|Plh_452", "emotion": "stern", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_DuellJeroDialog_NPC_Jero|Dialog/NPC_Jero|Plh_453", "emotion": "angry", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_DuellJeroDialog_NPC_Jero|Dialog/NPC_Jero|Plh_485", "emotion": "angry", "intensity": 0.8, "events": [], "emphasis": [], "notes": [], "source": "llm"}
+{"id": "DT_Quest_FavourOfCraftsmenGardener_NPC_Gerion|Dialog/NPC_Gerion|Plh_28", "emotion": "angry", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_Quest_Nemeton_EndSequence_NPC_Henik|RedTower_EndSequence|Plh_1", "emotion": "surprised", "intensity": 0.5, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_Nemeton_EndSequence_NPC_Henik|RedTower_EndSequence|Plh_111", "emotion": "sad", "intensity": 0.5, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_Nemeton_EndSequence_NPC_Henik|RedTower_EndSequence|Plh_112", "emotion": "sad", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
