@@ -60,7 +60,7 @@ def format_report(statuses: Mapping[str, CategoryStatus]) -> str:
     return "\n".join(out) or "keine Zeilen"
 
 
-GAP_STATUSES = ("kodiert", "erzeugt", "fehler", "offen")
+GAP_STATUSES = ("kodiert", "erzeugt", "fehler", "offen", f"übersprungen: {SKIP_NO_VOICE}")
 
 
 def build_speaker_report(lines: Sequence[Line], casting: Casting, synth_rows: Mapping[str, dict],
@@ -91,5 +91,5 @@ def format_speaker_report(report: Mapping[str, Counter], casting: Casting) -> st
         if gaps:
             gap_lines += gaps
             gap_speakers += 1
-    out.append(f"Lücken: {gap_lines} Zeilen bei {gap_speakers} Sprechern (nicht installiert, nicht übersprungen)")
+    out.append(f"Lücken: {gap_lines} Zeilen bei {gap_speakers} Sprechern (nicht installiert, ohne Stimme eingeschlossen)")
     return "\n".join(out)

@@ -78,6 +78,12 @@ def test_emergency_reports_missing_type_and_missing_child_voice():
     assert mismatch(P("o", "f", "alt"), BERTA) is None
 
 
+def test_type_variant_for_a_plain_figure_is_flagged_as_mismatch():
+    assert mismatch(P("o", "m"), RIESE) == "Typ-Variante für gewöhnliche Figur"
+    assert mismatch(P("o", "m", type="riese"), RIESE) is None
+    assert mismatch(P("o", "m"), CARL) is None
+
+
 def test_assignment_is_deterministic():
     stats = [S("a", 5), S("b", 5), S("c", 5)]
     profiles = {s.name: P(s.name) for s in stats}

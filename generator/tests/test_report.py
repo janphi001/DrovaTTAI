@@ -40,4 +40,13 @@ def test_speaker_report_counts_per_speaker_and_lists_gaps():
     assert "Plh_6" not in str(report) and len(report) == 3
     text = format_speaker_report(report, CASTING)
     assert "Mira (lena): 3 Zeilen" in text and "1 installiert" in text and "1 offen" in text
-    assert "Lücken: 2 Zeilen bei 2 Sprechern" in text
+    assert "Lücken: 3 Zeilen bei 3 Sprechern" in text  # Fremder ohne Stimme zählt als Lücke
+
+
+def test_speaker_without_a_voice_counts_as_a_gap_but_legit_skips_do_not():
+    lines = [line("Plh_1", actor="Fremder"), line("Plh_2", actor="Fremder"),
+             line("Plh_3", skip="gvar"), line("Plh_4", skip="unspeakable"), line("Plh_5", skip="id_mismatch")]
+    index = {l.id: {} for l in lines if l.actor == "Mira" and not l.skip}
+    text = format_speaker_report(build_speaker_report(lines, CASTING, {}, {}, index), CASTING)
+    assert "Fremder (keine Stimme): 2 Zeilen -> 2 übersprungen: no_voice" in text
+    assert "Lücken: 2 Zeilen bei 1 Sprechern" in text

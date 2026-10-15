@@ -44,6 +44,8 @@ class _Load:
 def mismatch(profile: Profile, cand: Candidate) -> str | None:
     if profile.type and cand.type != profile.type:
         return f"Typ '{profile.type}' ohne passende Stimme"
+    if cand.type and not profile.type:
+        return "Typ-Variante für gewöhnliche Figur"
     if profile.age == "kind" and cand.age != "kind":
         return "Kind ohne Kinderstimme"
     if cand.age and abs(AGE_RANK[cand.age] - AGE_RANK[profile.age]) >= 2:
