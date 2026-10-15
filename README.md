@@ -9,7 +9,7 @@ Das Projekt besteht aus zwei Teilen:
 
 Dieses Repo enthält **keine Spieltexte und kein Audio**. Beides entsteht lokal auf deinem Rechner aus deiner Spielkopie und liegt nicht im Git (`data/`, `cache/`, `out/` sind ausgeschlossen). Wer die Stimmen nutzen will, erzeugt sie selbst, mit der Anleitung unten.
 
-Stand: Alle 245 benannten Sprecher haben eine Stimme, im Spiel sind rund 11.400 Zeilen vertont (41 Stimmen plus 7 Abwandlungen wie alte Frau, Riese, Zwerg). Nicht vertont sind die Antwortoptionen des Spielers (wie im Original), Barks (Zurufe), Briefe und Zeilen mit Namensvariablen.
+Stand: Alle 245 benannten Sprecher haben eine Stimme, im Spiel sind rund 13.800 Zeilen vertont (41 Stimmen plus 7 Abwandlungen wie alte Frau, Riese, Zwerg). Dazu kommen Barks (Zurufe in der Welt, mit eigener Lautstärke und laufend leiser mit der Entfernung) und Zeilen generischer Figuren (`NPC`, Wache …): Dort wählt die Mod je Figur eine feste Stimme aus einem kleinen Pool nach Geschlecht. Nicht vertont sind die Antwortoptionen des Spielers (wie im Original), Briefe und Zeilen mit Quest- oder Geldwerten; Zeilen mit dem Spielernamen werden ohne den Namen gesprochen.
 
 ## Sprachsynthese: Fish Audio
 

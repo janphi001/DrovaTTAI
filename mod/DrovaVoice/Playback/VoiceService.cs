@@ -10,7 +10,7 @@ namespace DrovaVoice.Playback
     internal sealed class VoiceService
     {
         private readonly AudioIndex _index;
-        private readonly VoiceSettings _settings;
+        private VoiceSettings _settings;
         private readonly ClipStore _store;
         private readonly ClipLoader _loader;
         private readonly MelonLogger.Instance _log;
@@ -22,12 +22,25 @@ namespace DrovaVoice.Playback
         {
             _index = index;
             _settings = settings;
+            BaseSettings = settings;
             _log = log;
             _store = new ClipStore(settings.CacheBytes);
             _loader = new ClipLoader(audioRoot);
         }
 
         public bool Diagnostics => _settings.Diagnostics;
+        public VoiceSettings Settings => _settings;
+        /// <summary>Einstellungen aus MelonPreferences beim Start (Grundlage für die Menüwerte).</summary>
+        public VoiceSettings BaseSettings { get; }
+
+        /// <summary>Tauscht die Einstellungen aus (Optionsmenü). Gibt zurück, was sich geändert hat; Clips bleiben im Cache, ihr Schlüssel enthält die Lautstärke.</summary>
+        public SettingsChange Apply(VoiceSettings next)
+        {
+            var change = VoiceSettings.Diff(_settings, next);
+            _settings = next;
+            if ((change & SettingsChange.Range) != 0) BarkDistance?.SetRange(next.BarkMinDistance, next.BarkMaxDistance);
+            return change;
+        }
 
         public bool ProbeFigures { get; set; }
         public float BarkMinDistance => _settings.BarkMinDistance;
@@ -39,14 +52,15 @@ namespace DrovaVoice.Playback
             if (ProbeFigures && _lineLog.ShouldLog("probe|" + key)) _log.Msg(message);
         }
 
-        /// <summary>True, wenn die Zeile (oder ihre neutrale Variante) einen eigenen Eintrag hat, also keine Poolstimme gewählt werden muss.</summary>
         /// <summary>True, wenn die Zeile keinen eigenen Eintrag, aber Poolvarianten hat (generische Figur).</summary>
         public bool IsPoolLine(string id) => !HasEntry(id) && _index.PoolVariants(id).Count > 0;
 
+        /// <summary>True, wenn die Zeile (oder ihre neutrale Variante) einen eigenen Eintrag hat, also keine Poolstimme gewählt werden muss.</summary>
         public bool HasEntry(string id) => _index.ResolveVariant(id, LineIds.NeutralVariant) is string r && _index.TryGet(r, out _);
 
         public AudioClip? GetClip(string? id, FigureInfo? figure = null)
         {
+            if (!_settings.Enabled) return null;
             id = _index.ResolveVariant(id, LineIds.NeutralVariant);
             id = PoolVoice.Resolve(_index, id, figure);
             if (string.IsNullOrEmpty(id)) return null;
@@ -55,19 +69,21 @@ namespace DrovaVoice.Playback
                 Diag("miss|" + id, $"[Zeile] ohne Eintrag: {id}");
                 return null;
             }
-            if (_store.TryGet(id!, out var cached)) return cached;
+            int percent = _settings.PercentFor(entry.Category);
+            string cacheKey = id + "@" + percent;   // andere Lautstärke = anderer Schlüssel; alte Clips altern aus dem Cache
+            if (_store.TryGet(cacheKey, out var cached)) return cached;
             if (_failed.Contains(id!)) return null;
 
-            var clip = _loader.Load(entry, _settings.PercentFor(entry.Category), out long bytes, out long elapsedMs, out string? error);
+            var clip = _loader.Load(entry, percent, out long bytes, out long elapsedMs, out string? error);
             if (clip == null)
             {
                 _failed.Add(id!);
                 Problem("fail|" + id, $"Zeile bleibt stumm ({error}): {id}", error: false);
                 return null;
             }
-            _store.Put(id!, clip, bytes);
+            _store.Put(cacheKey, clip, bytes);
             if (elapsedMs > ClipLoader.SlowMilliseconds) Problem("slow|" + id, $"Laden dauerte {elapsedMs} ms (Ruckler möglich): {id}", error: false);
-            Diag("hit|" + id, $"[Zeile] geladen: {id} ({entry.File}, {entry.Duration:0.00} s, {entry.Category}, {elapsedMs} ms); Cache {_store.Count} Clips, {_store.TotalBytes / 1024 / 1024} MB");
+            Diag("hit|" + cacheKey, $"[Zeile] geladen: {id} ({entry.File}, {entry.Duration:0.00} s, {entry.Category}, {percent} %, {elapsedMs} ms); Cache {_store.Count} Clips, {_store.TotalBytes / 1024 / 1024} MB");
             return clip;
         }
 
