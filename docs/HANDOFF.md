@@ -51,7 +51,7 @@ Alle Befehle in `generator/` (siehe `docs/generator.md`): `extract` (aus `data/e
 1. **Stichprobe im Spiel** (Spiel starten, mit verschiedenen NPCs sprechen; Alte-Frau-, Riesen- und Kinderstimmen besonders), danach Korrekturen in `casting/casting.yaml` und die betroffenen Zeilen neu erzeugen (WAV in `cache/synth/` löschen, `synth --npc X`, `encode`, `install`). Plan 5 ist sonst abgeschlossen.
 2. Danach Mod-Ausbau: Namensvarianten `#arden`/`#neutral` (535 `$GVAR`-Zeilen, bisher übersprungen), Regler im Spiel, Barks (M6, braucht Entfernungslogik), Briefe (M7).
 3. Offene Lücken: 98-%-Lücke im Export (1.181 Zeilen ohne Sprecher; Lösungsansatz in `docs/decisions/2026-10-export-findings.md`), Jero und Adela im Spiel noch nie gehört, Regler-Wirkung (z. B. 150 %) im Spiel nicht geprüft.
-4. Git: `plan-4-playback` (auf `plan-3-generator` ← `plan-2-fish-export` ← `plan-1-foundation`) mergen oder PR; Historie umschreiben (Gmail-Adresse in ~58 Commits, Skript `.superpowers/rewrite-history.sh`); Lizenz wählen (Empfehlung MIT).
+4. Git: Historie umschreiben (erledigt 2026-10-15, alle Branches, Autor jetzt GitHub-noreply), `main` = `plan-5-casting` (Fast-Forward), MIT-Lizenz da. **Offen:** Backup-Branches `backup/*` und `refs/original` löschen (enthalten noch die Gmail-Adresse), dann pushen (nur nach Rückfrage).
 
 ## Wo steht was
 - Specs und Pläne: `docs/superpowers/specs/`, `docs/superpowers/plans/` (Plan 4: `2026-10-14-plan-4-wiedergabe*.md`).
