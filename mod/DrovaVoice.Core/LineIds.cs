@@ -13,6 +13,7 @@ namespace DrovaVoice.Core
     {
         public const char Separator = '|';
         public const char VariantSeparator = '#';
+        public const string NeutralVariant = "neutral";
 
         public static string NormalizeLocaPath(string? path) => (path ?? string.Empty).Replace('\\', '/').Trim('/');
 

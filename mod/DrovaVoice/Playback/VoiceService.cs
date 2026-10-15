@@ -31,6 +31,7 @@ namespace DrovaVoice.Playback
 
         public AudioClip? GetClip(string? id)
         {
+            id = _index.ResolveVariant(id, LineIds.NeutralVariant);
             if (string.IsNullOrEmpty(id)) return null;
             if (!_index.TryGet(id, out var entry))
             {

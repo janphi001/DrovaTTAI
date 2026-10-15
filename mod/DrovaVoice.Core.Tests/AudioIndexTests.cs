@@ -149,5 +149,45 @@ namespace DrovaVoice.Core.Tests
             var index = AudioIndex.Parse(Choices, "de");
             Assert.False(index.TryGetUniqueChoice(baseId, out _, out _));
         }
+
+        private const string WithNeutral = @"{
+  ""version"": 1, ""language"": ""de"",
+  ""entries"": {
+    ""DT_X|Dialog/A|Plh_1#neutral"": {""file"": ""dialog/0123456789abcdef.ogg"", ""duration"": 1.0},
+    ""DT_X|Dialog/A|Plh_2"":         {""file"": ""dialog/fedcba9876543210.ogg"", ""duration"": 2.0}
+  },
+  ""variants"": {""DT_X|Dialog/A|Plh_1"": [""neutral""]}
+}";
+
+        [Fact]
+        public void ResolveVariantPrefersTheVariantEntry()
+        {
+            var index = AudioIndex.Parse(WithNeutral, "de");
+            Assert.Equal("DT_X|Dialog/A|Plh_1#neutral", index.ResolveVariant("DT_X|Dialog/A|Plh_1", LineIds.NeutralVariant));
+        }
+
+        [Fact]
+        public void ResolveVariantKeepsTheBaseIdWithoutVariantEntry()
+        {
+            var index = AudioIndex.Parse(WithNeutral, "de");
+            Assert.Equal("DT_X|Dialog/A|Plh_2", index.ResolveVariant("DT_X|Dialog/A|Plh_2", LineIds.NeutralVariant));
+            Assert.Equal("DT_X|Dialog/A|Plh_9", index.ResolveVariant("DT_X|Dialog/A|Plh_9", LineIds.NeutralVariant));
+            Assert.Equal("DT_X|Dialog/A|Plh_2|c0", index.ResolveVariant("DT_X|Dialog/A|Plh_2|c0", LineIds.NeutralVariant));
+        }
+
+        [Fact]
+        public void ResolveVariantPassesNullAndEmptyThrough()
+        {
+            var index = AudioIndex.Parse(WithNeutral, "de");
+            Assert.Null(index.ResolveVariant(null, LineIds.NeutralVariant));
+            Assert.Equal("", index.ResolveVariant("", LineIds.NeutralVariant));
+        }
+
+        [Fact]
+        public void VariantEntriesAreNotCountedAsChoiceFallbacks()
+        {
+            var index = AudioIndex.Parse(WithNeutral, "de");
+            Assert.False(index.TryGetUniqueChoice("DT_X|Dialog/A|Plh_1", out _, out _));
+        }
     }
 }

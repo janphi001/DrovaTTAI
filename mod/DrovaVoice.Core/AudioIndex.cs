@@ -42,6 +42,17 @@ namespace DrovaVoice.Core
         }
 
         /// <summary>
+        /// Liefert <c>id#variant</c>, wenn der Index diese Variante hat, sonst <paramref name="id"/> unverändert
+        /// (leere oder fehlende IDs gehen durch). So spielt die Mod bei Zeilen mit Spielernamen die neutrale Fassung.
+        /// </summary>
+        public string? ResolveVariant(string? id, string variant)
+        {
+            if (string.IsNullOrEmpty(id)) return id;
+            string withVariant = LineIds.WithVariant(id!, variant);
+            return _entries.ContainsKey(withVariant) ? withVariant : id;
+        }
+
+        /// <summary>
         /// Fallback für Auswahloptionen: Verschiebt das Spiel die Optionsliste (einmalige Optionen, "Zurück"), passt der
         /// Index <c>k</c> nicht mehr zum Export. Der Schlüssel der Zeile bestimmt den Text eindeutig; gibt es zu
         /// <paramref name="statementId"/> (Baum|Pfad|Schlüssel) genau einen Auswahl-Eintrag, ist es die gesuchte Zeile.
