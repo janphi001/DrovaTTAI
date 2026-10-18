@@ -11,6 +11,26 @@ from drova_voice.loc import read_loc_file
 MAX_EXAMPLES = 5
 TOP_COMBINATIONS = 15
 MAX_LABEL = 40
+FULL_MANIFEST = "manifest.json"
+LOADED_MANIFEST = "manifest-loaded.json"
+
+
+def locate_manifest(directory: Path, explicit: Path | None = None) -> tuple[Path | None, str | None]:
+    """(Pfad, Hinweis). None und die Fehlermeldung, wenn die Datei fehlt. Der Hinweis steht nur beim Ausweichen auf manifest-loaded.json."""
+    if explicit is not None:
+        path = Path(explicit)
+        if path.is_file():
+            return path, None
+        return None, f"Manifest nicht gefunden: {path} (Export im Spiel auslösen, siehe docs/export.md)"
+    directory = Path(directory)
+    full, loaded = directory / FULL_MANIFEST, directory / LOADED_MANIFEST
+    if full.is_file():
+        return full, None
+    if loaded.is_file():
+        return loaded, f"Manifest: {loaded} ({FULL_MANIFEST} fehlt)"
+    return None, (
+        f"Manifest nicht gefunden: {full} (oder {loaded.name}; Export im Spiel auslösen, siehe docs/export.md)"
+    )
 
 
 def _norm(text: object) -> str:

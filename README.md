@@ -121,7 +121,9 @@ cd generator
 .venv/Scripts/drova-voice report --npc Adela
 ```
 
-Spiel starten, einen Spielstand laden, mit Adela sprechen: Du solltest ihre Stimme hören. Mit `synth --limit 20` erzeugst du zum Testen nur die ersten 20 Zeilen.
+`extract` liest `data/export/<Sprache>/manifest.json`. Fehlt die Datei, nimmt es `manifest-loaded.json` (das Ergebnis von `export.trigger`).
+
+Spiel starten, einen Spielstand laden, mit Adela sprechen: Du solltest ihre Stimme hören. Mit `synth --limit 20` erzeugst du zum Testen nur die ersten 20 Zeilen. `synth --limit 0` schickt nichts an Fish.
 
 **Alle Figuren auf einmal** (Casting und Vollauf):
 
@@ -140,15 +142,21 @@ Alle Schritte und Optionen: `docs/generator.md`. Das Dateiformat der Sprachdatei
 
 ### 8. Spielen und einstellen
 
-Spiel starten, Spielstand laden, mit NPCs sprechen. Die Einstellungen stehen in `<Spiel>/UserData/MelonPreferences.cfg` im Abschnitt `[DrovaVoice]` (Änderungen gelten nach einem Neustart):
+Spiel starten, Spielstand laden, mit NPCs sprechen. Die Einstellungen stehen in `<Spiel>/UserData/MelonPreferences.cfg` im Abschnitt `[DrovaVoice]`. Werte in der Datei gelten nach einem Neustart. Lautstärke, Bark-Abstand und der Schalter im Optionsmenü gelten ab der nächsten Zeile.
 
 | Schlüssel | Standard | Bedeutung |
 |---|---|---|
 | `Enabled` | `true` | Vertonung an oder aus |
 | `DialogVolume` | `100` | Lautstärke der NPC-Stimmen in Prozent (0 bis 200) |
 | `PlayerVolume` | `100` | Lautstärke der Spielerzeilen in Prozent (0 bis 200) |
-| `CacheMB` | `64` | Speicher für geladene Sprachclips |
+| `BarkVolume` | `100` | Lautstärke der Welt-Kommentare in Prozent (0 bis 200) |
+| `BarkMinDistance` | `15` | Barks: bis zu diesem Abstand in Weltmetern volle Lautstärke |
+| `BarkMaxDistance` | `120` | Barks: ab diesem Abstand stumm, dazwischen linear leiser |
+| `BarkProbe` | `false` | Entwicklung: pro Aussage die Figur ins Log schreiben |
+| `AudioLanguage` | `de` | Unterordner unter `Mods/DrovaVoice/Audio` |
+| `CacheMB` | `64` | Speicher für geladene Sprachclips (8 bis 512) |
 | `Diagnostics` | `false` | ausführliches Log, hilft bei der Fehlersuche |
+| `ExportLanguage` | `de` | Ordnername des Exports |
 
 Weitere Hinweise, Log-Meldungen und die Abnahme-Checkliste: `docs/playback.md`.
 

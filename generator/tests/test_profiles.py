@@ -58,6 +58,12 @@ def test_merge_import_rules():
     assert len(errors) == 2 and any("unbekannt" in e for e in errors) and any("dee" in e for e in errors)
 
 
+@pytest.mark.parametrize("size", [0, -1])
+def test_prepare_packets_rejects_a_non_positive_size(size):
+    with pytest.raises(ValueError, match="mindestens 1"):
+        prepare_packets([line("a1")], {}, size=size)
+
+
 def test_prepare_packets_only_missing_named_speakers_with_mentions():
     lines = ([line(f"a{i}", "Anna", f"Anna sagt Nummer {i}.") for i in range(5)]
              + [line("b1", "Bob", "Frag doch Anna, sie weiß es."), line("b2", "Bob", "Anna-Maria ist nicht gemeint? Doch.")]

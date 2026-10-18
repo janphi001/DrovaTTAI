@@ -70,6 +70,42 @@ def test_fish_settings_are_optional_and_checked(tmp_path):
         load_config(cfg_file)
 
 
+def test_relative_paths_follow_the_config_file_not_the_working_directory(tmp_path, monkeypatch):
+    gen = tmp_path / "generator"
+    gen.mkdir()
+    cfg_file = gen / "config.yaml"
+    cfg_file.write_text("game_dir: spiel\nrepo_root: ..\n", encoding="utf-8")
+    elsewhere = tmp_path / "other" / "nested"
+    elsewhere.mkdir(parents=True)
+    monkeypatch.chdir(elsewhere)
+    cfg = load_config(cfg_file)
+    assert cfg.game_dir == (gen / "spiel").resolve()
+    assert cfg.repo_root == tmp_path.resolve()
+    assert cfg.data_dir == tmp_path.resolve() / "data"
+
+
+def test_windows_drive_path_stays_a_drive_path_from_another_directory(tmp_path, monkeypatch):
+    gen = tmp_path / "generator"
+    gen.mkdir()
+    cfg_file = gen / "config.yaml"
+    cfg_file.write_text('game_dir: "C:/Game Dir"\nrepo_root: "D:/Arbeit"\n', encoding="utf-8")
+    (tmp_path / "other").mkdir()
+    monkeypatch.chdir(tmp_path / "other")
+    cfg = load_config(cfg_file)
+    assert cfg.game_dir == Path("C:/Game Dir")
+    assert cfg.loc_dir == Path("C:/Game Dir/Drova_Data/StreamingAssets/Localization/de")
+    assert cfg.repo_root == Path("D:/Arbeit")
+    assert "other" not in cfg.game_dir.parts and "other" not in cfg.repo_root.parts
+
+
+def test_config_that_is_not_utf8_names_the_file(tmp_path):
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_bytes(b"\xffgame_dir")
+    with pytest.raises(ValueError, match="UTF-8") as caught:
+        load_config(cfg_file)
+    assert cfg_file.name in str(caught.value)
+
+
 def test_null_or_empty_language_stays_de_and_a_number_is_rejected(tmp_path):
     cfg_file = tmp_path / "config.yaml"
     cfg_file.write_text('game_dir: "/tmp/game"\nlanguage: null\n', encoding="utf-8")

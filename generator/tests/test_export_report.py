@@ -95,7 +95,30 @@ def test_cli_report_returns_1_below_threshold_and_writes_the_missing_list(tmp_pa
 def test_cli_report_without_manifest_exits_2(tmp_path, loc_dir, capsys):
     repo, cfg = _repo(tmp_path, _game_with_loc(tmp_path, loc_dir))
     assert main(["--config", str(cfg), "export", "report"]) == 2
-    assert "Manifest nicht gefunden" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "Manifest nicht gefunden" in err and "manifest-loaded.json" in err
+
+
+@pytest.mark.parametrize("payload", ["[", "[]", "null", '{"lines": null}'])
+def test_cli_report_rejects_unusable_manifest_json(tmp_path, loc_dir, capsys, payload):
+    repo, cfg = _repo(tmp_path, _game_with_loc(tmp_path, loc_dir))
+    manifest = repo / "data" / "export" / "de" / "manifest.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(payload, encoding="utf-8")
+    assert main(["--config", str(cfg), "export", "report"]) == 2
+    err = capsys.readouterr().err
+    assert "FEHLER:" in err and "Manifest" in err and "Traceback" not in err
+    assert not (manifest.parent / "coverage_missing.txt").exists()
+
+
+def test_cli_report_uses_the_loaded_manifest_when_the_full_one_is_missing(tmp_path, loc_dir, capsys):
+    repo, cfg = _repo(tmp_path, _game_with_loc(tmp_path, loc_dir))
+    manifest = repo / "data" / "export" / "de" / "manifest-loaded.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(json.dumps({"lines": [_line("Dialog/NPC_A", "Plh_1")]}), encoding="utf-8")
+    assert main(["--config", str(cfg), "export", "report"]) == 1
+    assert "manifest-loaded.json" in capsys.readouterr().out
+    assert (manifest.parent / "coverage_missing.txt").is_file()
 
 
 def test_cli_fetch_copies_the_export_folder_from_the_game(tmp_path, loc_dir, capsys):

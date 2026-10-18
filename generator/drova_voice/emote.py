@@ -58,6 +58,8 @@ class ImportResult:
 def prepare_emote_packets(lines: Sequence[Line], profiles: Mapping[str, Profile],
                           trees_per_packet: int = 20) -> list[list[dict]]:
     """Pakete für Subagents: je Dialogbaum alle sprechbaren Zeilen am Stück plus Steckbriefe der Sprecher."""
+    if trees_per_packet < 1:
+        raise ValueError("Paketgröße muss mindestens 1 sein")
     by_tree: dict[str, list[Line]] = {}
     for line in lines:
         if not line.skip and line.category != "bark":

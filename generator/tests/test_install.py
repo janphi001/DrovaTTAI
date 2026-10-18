@@ -249,6 +249,47 @@ def test_dry_run_without_prune_lists_orphans(tmp_path):
     assert read_index(target) == before
 
 
+def test_rel_that_leaves_the_folder_is_not_copied(tmp_path):
+    audio, target = tmp_path / "audio", tmp_path / "nest" / "Audio"
+    audio.mkdir()
+    source = tmp_path / "escaped.ogg"
+    source.write_bytes(b"SECRET")
+    escaped = tmp_path / "nest" / "escaped.ogg"
+    result = install_audio([row("T|P|Plh_1", "../escaped.ogg")], audio, target, "de")
+    assert result.copied == 0 and result.entries == 0 and result.errors
+    assert "Plh_1" in result.errors[0]
+    assert not escaped.exists()
+    assert source.read_bytes() == b"SECRET"
+    assert read_index(target)["entries"] == {}
+
+
+def test_absolute_and_drive_rel_stay_out_of_the_index(tmp_path):
+    audio, target = tmp_path / "audio", tmp_path / "Audio" / "de"
+    audio.mkdir()
+    absolute = tmp_path / "abs.ogg"
+    absolute.write_bytes(b"ABS")
+    result = install_audio(
+        [row("T|P|Plh_1", absolute.as_posix()), row("T|P|Plh_2", "C:/Windows/note.ogg")],
+        audio, target, "de")
+    assert result.copied == 0 and result.entries == 0 and len(result.errors) == 2
+    assert absolute.read_bytes() == b"ABS"
+    assert not (target / "C:").exists()
+    assert read_index(target)["entries"] == {}
+
+
+def test_symlink_outside_the_audio_folder_is_not_installed(tmp_path):
+    audio, target = tmp_path / "audio", tmp_path / "Audio" / "de"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    audio.mkdir()
+    (audio / "link").symlink_to(outside, target_is_directory=True)
+    (outside / "x.ogg").write_bytes(b"OUT")
+    result = install_audio([row("T|P|Plh_1", "link/x.ogg")], audio, target, "de")
+    assert result.copied == 0 and result.entries == 0 and result.errors
+    assert (outside / "x.ogg").read_bytes() == b"OUT"
+    assert list(outside.iterdir()) == [outside / "x.ogg"]
+
+
 def test_backslash_file_field_still_protects_the_ogg(tmp_path):
     audio, target = tmp_path / "audio", tmp_path / "Audio" / "de"
     audio.mkdir()

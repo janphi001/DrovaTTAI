@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from drova_voice.cli import main
@@ -16,7 +18,33 @@ def test_extract_writes_lines_and_reports_skips(pipeline_repo, capsys):
 def test_extract_without_manifest_fails_clearly(pipeline_repo, capsys):
     (pipeline_repo.data / "export" / "de" / "manifest.json").unlink()
     assert main(["--config", str(pipeline_repo.cfg), "extract"]) == 2
-    assert "Manifest nicht gefunden" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "Manifest nicht gefunden" in err and "manifest-loaded.json" in err
+
+
+def test_extract_uses_the_loaded_manifest_when_the_full_one_is_missing(pipeline_repo, capsys):
+    export = pipeline_repo.data / "export" / "de"
+    full = export / "manifest.json"
+    loaded = export / "manifest-loaded.json"
+    data = json.loads(full.read_text(encoding="utf-8"))
+    data["lines"] = data["lines"][:1]
+    full.unlink()
+    loaded.write_text(json.dumps(data), encoding="utf-8")
+    assert main(["--config", str(pipeline_repo.cfg), "extract"]) == 0
+    assert len(read_lines(pipeline_repo.data / "lines.jsonl")) == 1
+    assert "manifest-loaded.json" in capsys.readouterr().out
+
+
+def test_extract_prefers_the_full_manifest_when_both_exist(pipeline_repo, capsys):
+    export = pipeline_repo.data / "export" / "de"
+    full = export / "manifest.json"
+    loaded = export / "manifest-loaded.json"
+    data = json.loads(full.read_text(encoding="utf-8"))
+    data["lines"] = data["lines"][:1]
+    loaded.write_text(json.dumps(data), encoding="utf-8")
+    assert main(["--config", str(pipeline_repo.cfg), "extract"]) == 0
+    assert len(read_lines(pipeline_repo.data / "lines.jsonl")) == 6
+    assert "manifest-loaded.json" not in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("payload", ["{", "[]", "null", '"text"', '{"lines": null}', '{"lines": {}}'])

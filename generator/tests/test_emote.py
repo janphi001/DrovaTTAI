@@ -63,6 +63,12 @@ def eline(key, actor="Anna", speech="Hallo da.", tree="T1", category="dialog", s
                 actor=actor, category=category, generic=False, raw=speech, speech="" if skip else speech, stage=stage, skip=skip)
 
 
+@pytest.mark.parametrize("size", [0, -1])
+def test_prepare_emote_packets_rejects_a_non_positive_size(size):
+    with pytest.raises(ValueError, match="mindestens 1"):
+        prepare_emote_packets([eline("1")], {}, trees_per_packet=size)
+
+
 def test_prepare_emote_packets_hold_whole_trees_with_speaker_profiles():
     lines = [eline("1", "Anna", stage=({"text": "seufzt", "pos": 0},)), eline("2", "Bob"), eline("3", "Anna", tree="T2"),
              eline("4", "Cy", skip="gvar"), eline("5", "Cy", category="bark", tree="T3"),

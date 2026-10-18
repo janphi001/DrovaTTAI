@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import shutil
 import sys
@@ -17,7 +16,7 @@ from drova_voice.emotions import EmotionTag
 from drova_voice.engines.client import EngineClient, EngineError, cache_env, worker_command
 from drova_voice.fish_model import resolve_fish_profile
 from drova_voice.engines.protocol import SynthRequest
-from drova_voice.export_report import compute_coverage, format_report
+from drova_voice.export_report import compute_coverage, format_report, locate_manifest
 from drova_voice import pipeline
 from drova_voice.jsonl import read_jsonl, replace_with_retry, write_jsonl
 from drova_voice.render import render_request
@@ -130,11 +129,19 @@ def _run(args: argparse.Namespace) -> int:
         if not cfg.loc_dir.is_dir():
             print(f"FEHLER: Lokalisierungsordner nicht gefunden: {cfg.loc_dir} (game_dir in config.yaml prüfen)", file=sys.stderr)
             return 2
-        manifest_path = args.manifest or (export_dir / "manifest.json")
-        if not manifest_path.is_file():
-            print(f"FEHLER: Manifest nicht gefunden: {manifest_path} (Export im Spiel auslösen, siehe docs/export.md)", file=sys.stderr)
+        manifest_path, notice = locate_manifest(export_dir, args.manifest)
+        if manifest_path is None:
+            print(f"FEHLER: {notice}", file=sys.stderr)
             return 2
-        cov = compute_coverage(json.loads(manifest_path.read_text(encoding="utf-8-sig")), cfg.loc_dir, cfg.language)
+        if notice:
+            print(notice)
+        manifest = pipeline.read_json_object(manifest_path, "Manifest")
+        if manifest is None:
+            return 2
+        if not isinstance(manifest.get("lines", []), list):
+            print(f"FEHLER: Manifest: lines ist keine Liste ({manifest_path})", file=sys.stderr)
+            return 2
+        cov = compute_coverage(manifest, cfg.loc_dir, cfg.language)
         if cov.total == 0:
             print(f"FEHLER: Keine .loc-Einträge im Umfang gefunden in {cfg.loc_dir} (game_dir in config.yaml prüfen)", file=sys.stderr)
             return 2

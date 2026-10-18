@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import filecmp
 import json
+import re
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,6 +12,27 @@ from drova_voice.ids import VARIANT_SEP
 from drova_voice.jsonl import replace_with_retry
 
 INDEX_VERSION = 1
+_DRIVE = re.compile(r"^[A-Za-z]:")
+
+
+def _under(root: Path, rel: object) -> tuple[Path, str] | None:
+    """(Ziel, gespeicherter Relativpfad) unter root.
+
+    `root / rel` wirft root weg, sobald rel absolut ist. Ein Laufwerksbuchstabe ist auf
+    Linux kein absoluter Pfad und auf Windows schon. Beides, und auch `..`, bleibt draußen.
+    """
+    if not isinstance(rel, str) or not rel:
+        return None
+    text = rel.replace("\\", "/")
+    if text.startswith("/") or _DRIVE.match(text):
+        return None
+    root_abs = Path(root).resolve()
+    dest = (root_abs / text).resolve()
+    try:
+        stored = dest.relative_to(root_abs).as_posix()
+    except ValueError:
+        return None
+    return dest, stored
 
 
 @dataclass
@@ -144,7 +166,13 @@ def install_audio(rows: Sequence[dict], audio_dir: Path, install_dir: Path, lang
     entries = {i: e for i, e in entries.items() if i not in drop_ids and split_variant(i)[0] not in drop_ids}
     result = InstallResult()
     for row in rows:
-        src, dst = audio_dir / row["rel"], install_dir / row["rel"]
+        source = _under(audio_dir, row.get("rel"))
+        target = _under(install_dir, row.get("rel"))
+        if source is None or target is None:
+            result.errors.append(f"{row['id']}: relativer Pfad verlässt den Ordner ({row.get('rel')})")
+            continue
+        src = source[0]
+        dst, stored = target
         if not src.is_file():
             result.errors.append(f"{row['id']}: Datei fehlt ({src})")
             continue
@@ -155,7 +183,7 @@ def install_audio(rows: Sequence[dict], audio_dir: Path, install_dir: Path, lang
                 part = dst.with_name(f"{dst.stem}.part.ogg")
                 shutil.copy2(src, part)
                 replace_with_retry(part, dst)
-        entries[row["id"]] = {"file": row["rel"], "duration": round(float(row["duration"]), 3)}
+        entries[row["id"]] = {"file": stored, "duration": round(float(row["duration"]), 3)}
     result.entries = len(entries)
     # Dry-Run zählt nur: nichts kopieren, index.json nicht anlegen und nichts löschen.
     if dry_run:

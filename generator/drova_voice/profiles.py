@@ -96,6 +96,8 @@ def merge_import(existing: Mapping[str, Profile], rows: Iterable[Mapping], known
 def prepare_packets(lines: Sequence[Line], profiles: Mapping[str, Profile], size: int = 20, max_own: int = 40,
                     max_mentions: int = 12, include_known: bool = False) -> list[list[dict]]:
     """Pakete für Subagents: je Sprecher ein Auszug seiner Zeilen und Zeilen anderer, die ihn nennen."""
+    if size < 1:
+        raise ValueError("Paketgröße muss mindestens 1 sein")
     dialog = [l for l in lines if is_named_dialog(l)]
     own_by_name: dict[str, list[Line]] = {}
     for l in sorted(dialog, key=lambda l: l.id):

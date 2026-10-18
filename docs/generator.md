@@ -4,10 +4,10 @@ Der Generator `drova-voice` macht aus dem Export Sprachdateien für die Mod. All
 
 ## Voraussetzungen
 
-- Die Python-Umgebung `generator/.venv` (siehe `docs/setup.md`) und `generator/config.yaml` mit `game_dir` und `language` (Vorlage `config.example.yaml`).
+- Die Python-Umgebung `generator/.venv` (siehe README, Abschnitt „Generator einrichten“) und `generator/config.yaml` mit `game_dir` und `language` (Vorlage `config.example.yaml`).
 - `ffmpeg` und `ffprobe` im PATH, ffmpeg mit `libvorbis`.
 - Für Fish: Umgebungsvariable `FISH_API_KEY` in der Shell. Der Schlüssel steht nie in Dateien oder Befehlen.
-- Der Export aus dem Spiel liegt unter `data/export/de/manifest.json` (siehe `docs/export.md`). Wer nur `manifest-loaded.json` hat, übergibt es mit `extract --manifest <Pfad>`.
+- Der Export aus dem Spiel liegt unter `data/export/<Sprache>/` (siehe `docs/export.md`). `extract` und `export report` nehmen `manifest.json`. Fehlt die Datei, nehmen sie `manifest-loaded.json` (das schreibt `export.trigger`). Ein anderer Pfad geht mit `--manifest`.
 
 ## Reihenfolge
 
@@ -24,7 +24,7 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 | 7 | `drova-voice report --npc Adela` | Status je Kategorie |
 | 8 | `drova-voice preview --npc Adela` | Hörseite `out/preview/index.html` |
 
-`synth` hat `--engine` (Standard `fish`; `fake` für Tests ohne Netz), `--workers` (Standard 8), `--limit N` (nur die ersten N Aufträge, zum Ausprobieren) und `--max-utf8-bytes N` (Budget für neu gesendete UTF-8-Bytes).
+`synth` hat `--engine` (Standard `fish`; `fake` für Tests ohne Netz), `--workers` (Standard 8), `--limit N` (nur die ersten N Aufträge, zum Ausprobieren; `0` sendet nichts) und `--max-utf8-bytes N` (Budget für neu gesendete UTF-8-Bytes).
 
 `install --prune` löscht im Zielordner OGG-Dateien, die danach kein Indexeintrag mehr nennt. Ohne die Option bleiben sie liegen. `install --dry-run` kopiert nichts und schreibt `index.json` nicht; es zählt und listet nur (`würde N kopieren, M Einträge, K verwaist`). Zusammen mit `--prune` gilt der Dry-Run. Beides ist standardmäßig aus.
 

@@ -72,6 +72,26 @@ def test_fish_synth_refuses_a_new_cache_key_until_the_change_is_accepted(pipelin
     assert not (cache / "fish-model.txt").exists()
 
 
+def test_synth_limit_zero_sends_nothing(pipeline_repo, guarded, capsys):
+    run(pipeline_repo, "extract")
+    assert guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake", "--limit", "0")) == 0
+    assert read_jsonl_lenient(pipeline_repo.data / "synth" / "results.jsonl") == []
+    assert list((pipeline_repo.repo / "cache" / "synth").glob("*.wav")) == []
+    out = capsys.readouterr().out
+    assert "0 erzeugt" in out and "0 neu erzeugt" in out
+    usage = read_jsonl_lenient(pipeline_repo.data / "synth" / "usage.jsonl")
+    assert usage[0]["requests"] == 0 and usage[0]["chars"] == 0 and usage[0]["utf8_bytes"] == 0
+
+
+def test_synth_negative_limit_sends_nothing(pipeline_repo, guarded, capsys):
+    run(pipeline_repo, "extract")
+    assert guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake", "--limit", "-1")) == 2
+    err = capsys.readouterr().err
+    assert "FEHLER:" in err and "--limit" in err and "Traceback" not in err
+    assert not (pipeline_repo.data / "synth" / "results.jsonl").exists()
+    assert list((pipeline_repo.repo / "cache" / "synth").glob("*.wav")) == []
+
+
 def test_synth_records_the_characters_sent(pipeline_repo, guarded, capsys):
     texts = (
         "Der Weg nach Norden ist weit.",
