@@ -8,32 +8,33 @@ namespace DrovaVoice.Playback
 {
     /// <summary>
     /// Diagnose für „alte Dialoge spielen beim Herumlaufen ab“ (nur mit Diagnostics): Das Spiel spielt unsere Clips selbst, die Mod
-    /// sieht davon nichts. Die Sonde sucht darum ein paar Mal pro Sekunde alle AudioSources, die einen Clip der Mod halten
-    /// (Clipname beginnt mit <see cref="ClipLoader.ClipNamePrefix"/>), und meldet jede Zustandsänderung: beginnt zu spielen,
-    /// hört auf, hält den Clip im Leerlauf. Ein Leerlauf-Halter mit playOnAwake oder ein Start ohne Gespräch ist der Beleg.
+    /// sieht davon nichts. Die Sonde liest die gemeinsame Suche (<see cref="AudioSourceScan"/>, alle 0,25 s) und achtet auf
+    /// AudioSources, die einen Clip der Mod halten (Clipname beginnt mit <see cref="ClipLoader.ClipNamePrefix"/>). Sie meldet
+    /// jede Zustandsänderung: beginnt zu spielen, hört auf, hält den Clip im Leerlauf. Ein Leerlauf-Halter mit playOnAwake
+    /// oder ein Start ohne Gespräch ist der Beleg. Leerlauf zählt je Suche, nicht je Frame (zwei Suchen sind etwa 0,5 s).
     /// </summary>
     internal sealed class StaleAudioProbe
     {
-        private const int ScanEveryFrames = 15;
         private readonly MelonLogger.Instance _log;
         private readonly Dictionary<int, string> _lastState = new Dictionary<int, string>();
-        private int _frame;
+        private int _seenGeneration;
 
         private readonly bool _verbose;
         private readonly Dictionary<int, int> _idleScans = new Dictionary<int, int>();
 
         public StaleAudioProbe(MelonLogger.Instance log, bool verbose) { _log = log; _verbose = verbose; }
 
-        public void Update()
+        /// <summary>Einmal je neuer Suche. Dieselbe Generation zählt den Leerlauf nicht noch einmal.</summary>
+        public void Observe(AudioSourceScan scan)
         {
-            if (++_frame % ScanEveryFrames != 0) return;
-            try { Scan(); }
+            if (scan.Generation == _seenGeneration) return;
+            _seenGeneration = scan.Generation;
+            try { Scan(scan.Sources); }
             catch (Exception e) { _log.Warning($"Audio-Sonde: {e.GetType().Name}: {e.Message}"); }
         }
 
-        private void Scan()
+        private void Scan(AudioSource[] sources)
         {
-            var sources = UnityEngine.Object.FindObjectsOfType<AudioSource>(true);
             var seen = new HashSet<int>();
             foreach (var source in sources)
             {

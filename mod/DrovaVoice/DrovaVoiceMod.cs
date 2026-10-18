@@ -29,6 +29,8 @@ namespace DrovaVoice
         private VoiceService? _voice;
         private bool _connectorInstalled;
         private bool _connectorFailed;
+        private AudioSourceScan? _sources;
+        private bool _sourceScanWarned;
         private StaleAudioProbe? _probe;
         private BarkDistance? _barkDistance;
         private VoiceMenu? _menu;
@@ -95,6 +97,7 @@ namespace DrovaVoice
             {
                 AudioManager.ReplaceDialogueAudioConnector(new VoiceConnector(_voice));
                 _connectorInstalled = true;
+                _sources = new AudioSourceScan();
                 _probe = new StaleAudioProbe(LoggerInstance, _voice.Diagnostics);
                 _barkDistance = new BarkDistance(_voice.BarkMinDistance, _voice.BarkMaxDistance, LoggerInstance, _voice.Diagnostics);
                 _voice.BarkDistance = _barkDistance;
@@ -129,8 +132,13 @@ namespace DrovaVoice
         {
             _frame++;
             if (!_connectorInstalled) TryInstallConnector();   // billig: nur ein statischer Null-Test pro Frame bis zur Installation
-            _probe?.Update();
-            _barkDistance?.Update();
+            if (_sources != null)
+            {
+                try { _sources.Tick(Time.unscaledTime); }
+                catch (Exception e) { WarnSourceScan(e); }
+                _probe?.Observe(_sources);
+                _barkDistance?.Update(_sources.Sources, Time.unscaledTime);
+            }
             bool trigger = false;
             if (_frame % 60 == 0 && ConsumeTrigger(TriggerPath, ref _exportTriggerStuck)) trigger = true;
             if (!trigger && HotkeyPressed()) trigger = true;
@@ -142,6 +150,13 @@ namespace DrovaVoice
                 try { NpcExporter.Export(Path.Combine(ModDir, "Export", ExportLanguageFolder()), LoggerInstance); }
                 catch (Exception e) { LoggerInstance.Error($"NPC-Export fehlgeschlagen: {e}"); }
             }
+        }
+
+        private void WarnSourceScan(Exception e)
+        {
+            if (_sourceScanWarned) return;
+            _sourceScanWarned = true;
+            LoggerInstance.Warning($"Audioquellen-Suche: {e.GetType().Name}: {e.Message}");
         }
 
         /// <summary>True genau einmal pro Auslöser-Datei: Datei löschen und melden. Lässt sie sich nicht löschen, wird einmal gewarnt und nicht erneut ausgelöst, bis die Datei weg ist.</summary>
