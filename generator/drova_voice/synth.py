@@ -71,6 +71,9 @@ def fatal_reason(error: str | None) -> str | None:
 class SynthStatus:
     aborted: str | None = None  # Grund des Abbruchs
     not_run: int = 0  # Aufträge, die wegen des Abbruchs nicht gestartet wurden
+    sent_requests: int = 0  # abgesetzte Anfragen, jeder Versuch einzeln
+    sent_chars: int = 0  # Zeichen des jeweils gesendeten Texts
+    sent_bytes: int = 0  # UTF-8-Bytes davon (Fish rechnet so ab; Umlaute zählen doppelt)
 
 
 def wav_duration(path: str | Path) -> float:
@@ -127,7 +130,8 @@ def cache_hit(job: SynthJob, key: str, cache_dir: Path) -> SynthResult | None:
     return SynthResult(job.id, key, str(wav), duration, True, 0, not plausible(duration, job.speech_len), None)
 
 
-def synth_one(client, job: SynthJob, key: str, cache_dir: Path, max_attempts: int = MAX_ATTEMPTS) -> SynthResult:
+def synth_one(client, job: SynthJob, key: str, cache_dir: Path, max_attempts: int = MAX_ATTEMPTS,
+              on_sent: Callable[[str], None] | None = None) -> SynthResult:
     hit = cache_hit(job, key, cache_dir)
     if hit is not None:
         return hit
@@ -138,6 +142,10 @@ def synth_one(client, job: SynthJob, key: str, cache_dir: Path, max_attempts: in
     error: str | None = None
     attempt = 0
     for attempt in range(1, max_attempts + 1):
+        # Vor dem Aufruf: auch ein Fehlversuch und jede Wiederholung ist eine gesendete Anfrage.
+        # Wirft der Client, bleibt die Zählung stehen (der Text wurde bereits übergeben).
+        if on_sent is not None:
+            on_sent(job.text)
         resp = client.synth(SynthRequest(id=job.id, text=job.text, out_path=str(part), voice=job.voice, params=job.params))
         if not resp.ok:
             error = resp.error or "unbekannter Fehler"
@@ -208,6 +216,13 @@ def run_synth(jobs: Sequence[SynthJob], engine: str, client_factory: Callable[[s
                     stop.set()
                     why[0] = reason
 
+        def on_sent(text: str) -> None:
+            chars, utf8_bytes = len(text), len(text.encode("utf-8"))
+            with lock:
+                status.sent_requests += 1
+                status.sent_chars += chars
+                status.sent_bytes += utf8_bytes
+
         def work(job: SynthJob) -> None:
             key = keys[job.id]
             r = cache_hit(job, key, cache_dir)  # Cache-Treffer brauchen keinen Worker (auch nicht, wenn alle tot sind)
@@ -221,7 +236,7 @@ def run_synth(jobs: Sequence[SynthJob], engine: str, client_factory: Callable[[s
                     r = SynthResult(job.id, key, None, None, False, 0, False, "kein Worker mehr verfügbar")
                 else:
                     try:
-                        r = synth_one(client, job, key, cache_dir)
+                        r = synth_one(client, job, key, cache_dir, on_sent=on_sent if status is not None else None)
                     except EngineError as e:  # Worker tot: nicht zurücklegen, Rest dieses Laufs scheitert sauber
                         with lock:
                             alive[0] -= 1
