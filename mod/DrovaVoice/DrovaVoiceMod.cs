@@ -190,6 +190,7 @@ namespace DrovaVoice
         {
             if (_exporting) { LoggerInstance.Warning("Export läuft bereits, Auslöser ignoriert."); return; }
             _exporting = true;
+            CatalogLoad? catalogLoad = null;
             try
             {
                 if (_voice != null && !_connectorInstalled && WorldEventSystemManager.Instance == null)
@@ -198,7 +199,6 @@ namespace DrovaVoice
                 LogLanguage(lang);
                 var exporter = new DialogueExporter(lang, LoggerInstance);
                 IEnumerable<Il2CppNodeCanvas.DialogueTrees.DialogueTree> trees;
-                bool loaderGaveUp = false;
                 int? addressCount = null;
                 if (useCatalog)
                 {
@@ -211,14 +211,15 @@ namespace DrovaVoice
                     var addresses = CatalogReader.TreeAddresses(File.ReadAllText(catalog));
                     addressCount = addresses.Count;
                     LoggerInstance.Msg($"Katalog: {addresses.Count} Baum-Adressen");
-                    var catalogTrees = CatalogTreeLoader.Load(addresses, LoggerInstance, out loaderGaveUp);
-                    int fromCatalog = catalogTrees.Count;
-                    trees = TreeSource.CatalogUnionLoaded(catalogTrees, out int addedLoaded);
+                    catalogLoad = CatalogTreeLoader.Load(addresses, LoggerInstance);
+                    int fromCatalog = catalogLoad.Trees.Count;
+                    trees = TreeSource.CatalogUnionLoaded(catalogLoad.Trees, out int addedLoaded);
                     LoggerInstance.Msg($"Bäume: {fromCatalog} aus dem Katalog, {addedLoaded} zusätzlich aus dem Speicher");
                 }
                 else trees = TreeSource.LoadedTrees();
                 var manifest = exporter.Export(trees);
                 string path = Path.Combine(ModDir, "Export", lang, useCatalog ? ManifestFile.FullName : ManifestFile.LoadedName);
+                bool loaderGaveUp = catalogLoad != null && catalogLoad.GaveUp;
                 string? blocked = ExportGuard.ShouldSave(manifest.Lines.Count, loaderGaveUp, addressCount);
                 if (blocked != null)
                 {
@@ -234,6 +235,7 @@ namespace DrovaVoice
             }
             finally
             {
+                catalogLoad?.Dispose();
                 _exporting = false;
             }
         }

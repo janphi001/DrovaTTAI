@@ -9,6 +9,63 @@ using UnityEngine.ResourceManagement.AsyncOperations;
 
 namespace DrovaVoice.Export
 {
+    /// <summary>Gehaltene Katalog-Bäume. <see cref="Dispose"/> gibt die Addressables-Handles frei, nachdem der Export sie gelesen hat.</summary>
+    public sealed class CatalogLoad : IDisposable
+    {
+        private readonly MelonLogger.Instance _log;
+        private readonly AssetLease _lease = new AssetLease();
+        private readonly List<AsyncOperationHandle> _handles = new List<AsyncOperationHandle>();
+        private bool _disposed;
+        private bool _releaseWarned;
+
+        public List<DialogueTree> Trees { get; } = new List<DialogueTree>();
+        public bool GaveUp { get; internal set; }
+
+        internal CatalogLoad(MelonLogger.Instance log) { _log = log; }
+
+        internal bool Keep(AsyncOperationHandle handle)
+        {
+            if (!_lease.Keep()) return false;
+            _handles.Add(handle);
+            return true;
+        }
+
+        internal void DiscardBatch()
+        {
+            Trees.Clear();
+            ReleaseKept(close: false);
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            ReleaseKept(close: true);
+        }
+
+        private void ReleaseKept(bool close)
+        {
+            if (close) _lease.End();
+            else _lease.Discard();
+            for (int i = 0; i < _handles.Count; i++) ReleaseOne(_handles[i]);
+            _handles.Clear();
+        }
+
+        internal void ReleaseOne(AsyncOperationHandle handle)
+        {
+            try
+            {
+                if (handle.IsValid()) Addressables.Release(handle);
+            }
+            catch (Exception e)
+            {
+                if (_releaseWarned) return;
+                _releaseWarned = true;
+                _log.Warning($"Addressables-Freigabe: {e.GetType().Name}");
+            }
+        }
+    }
+
     public static class CatalogTreeLoader
     {
         /// <summary>So viele Ladeversuche je Variante entscheiden, ob sie überhaupt funktioniert.</summary>
@@ -18,24 +75,38 @@ namespace DrovaVoice.Export
         /// Lädt jeden Baum synchron über seine Adresse. Fehler pro Baum werden gezählt, nie geworfen.
         /// Primär: LoadAssetAsync&lt;DialogueTree&gt;. Scheitern die ersten ProbeSize Versuche ohne einen einzigen Erfolg
         /// (Ausnahme oder null), wird von vorn mit LoadAssetAsync&lt;UnityEngine.Object&gt; + TryCast&lt;DialogueTree&gt;() begonnen.
-        /// Scheitert auch dort die ganze Probe, wird abgebrochen; <paramref name="gaveUp"/> ist dann true (der Export darf nichts überschreiben).
+        /// Scheitert auch dort die ganze Probe, wird abgebrochen; <see cref="CatalogLoad.GaveUp"/> ist dann true (der Export darf nichts überschreiben).
+        /// Handles erfolgreicher Bäume bleiben bis <see cref="CatalogLoad.Dispose"/> gehalten. Ein Variantenwechsel gibt die verworfene Charge sofort frei.
         /// </summary>
-        public static List<DialogueTree> Load(IReadOnlyList<string> addresses, MelonLogger.Instance log, out bool gaveUp)
+        public static CatalogLoad Load(IReadOnlyList<string> addresses, MelonLogger.Instance log)
         {
-            var trees = new List<DialogueTree>();
+            var load = new CatalogLoad(log);
+            try
+            {
+                Fill(load, addresses, log);
+                return load;
+            }
+            catch
+            {
+                load.Dispose();
+                throw;
+            }
+        }
+
+        private static void Fill(CatalogLoad load, IReadOnlyList<string> addresses, MelonLogger.Instance log)
+        {
             var probe = new VariantProbe(ProbeSize);
             int failed = 0, logged = 0;
-            gaveUp = false;
             string firstReason = "";
             for (int i = 0; i < addresses.Count; i++)
             {
                 bool fallback = probe.UsingFallback;
                 DialogueTree? tree = null;
                 string reason = "null";
-                try { tree = fallback ? LoadViaObject(addresses[i]) : LoadGeneric(addresses[i]); }
+                try { tree = fallback ? LoadViaObject(addresses[i], load) : LoadGeneric(addresses[i], load); }
                 catch (Exception e) { reason = e.GetType().Name; }
                 bool ok = tree != null;
-                if (ok) trees.Add(tree!);
+                if (ok) load.Trees.Add(tree!);
                 else
                 {
                     failed++;
@@ -51,7 +122,7 @@ namespace DrovaVoice.Export
                 if (decision == ProbeDecision.SwitchToFallback)
                 {
                     log.Warning($"LoadAssetAsync<DialogueTree> lieferte in den ersten {ProbeSize} Versuchen keinen Erfolg (erster Grund: {firstReason}); wechsle für alle Adressen auf LoadAssetAsync<Object> + TryCast und beginne von vorn.");
-                    trees.Clear();
+                    load.DiscardBatch();
                     failed = 0;
                     logged = 0;
                     firstReason = "";
@@ -60,26 +131,47 @@ namespace DrovaVoice.Export
                 else if (decision == ProbeDecision.GiveUp)
                 {
                     log.Error($"Katalog-Laden abgebrochen: weder LoadAssetAsync<DialogueTree> noch LoadAssetAsync<Object> + TryCast lieferte in den ersten {ProbeSize} Versuchen einen Baum (letzter Grund: {firstReason}). Restliche Adressen werden nicht versucht.");
-                    gaveUp = true;
+                    load.GaveUp = true;
                     break;
                 }
                 else if ((i + 1) % 200 == 0) log.Msg($"Bäume geladen: {i + 1} von {addresses.Count} (fehlgeschlagen {failed})");
             }
-            log.Msg($"Katalog: {trees.Count} Bäume geladen, {failed} fehlgeschlagen, {addresses.Count} Adressen (Variante: {(probe.UsingFallback ? "Object + TryCast" : "DialogueTree")}{(gaveUp ? ", abgebrochen" : "")})");
-            return trees;
+            log.Msg($"Katalog: {load.Trees.Count} Bäume geladen, {failed} fehlgeschlagen, {addresses.Count} Adressen (Variante: {(probe.UsingFallback ? "Object + TryCast" : "DialogueTree")}{(load.GaveUp ? ", abgebrochen" : "")})");
         }
 
-        private static DialogueTree? LoadGeneric(string address)
+        private static DialogueTree? LoadGeneric(string address, CatalogLoad load)
         {
             AsyncOperationHandle<DialogueTree> handle = Addressables.LoadAssetAsync<DialogueTree>(address);
-            return handle.WaitForCompletion();
+            try
+            {
+                DialogueTree? tree = handle.WaitForCompletion();
+                if (tree != null && load.Keep(handle)) return tree;
+                load.ReleaseOne(handle);
+                return null;
+            }
+            catch
+            {
+                load.ReleaseOne(handle);
+                throw;
+            }
         }
 
-        private static DialogueTree? LoadViaObject(string address)
+        private static DialogueTree? LoadViaObject(string address, CatalogLoad load)
         {
             AsyncOperationHandle<UnityEngine.Object> handle = Addressables.LoadAssetAsync<UnityEngine.Object>(address);
-            UnityEngine.Object? obj = handle.WaitForCompletion();
-            return obj?.TryCast<DialogueTree>();
+            try
+            {
+                UnityEngine.Object? obj = handle.WaitForCompletion();
+                DialogueTree? tree = obj?.TryCast<DialogueTree>();
+                if (tree != null && load.Keep(handle)) return tree;
+                load.ReleaseOne(handle);
+                return null;
+            }
+            catch
+            {
+                load.ReleaseOne(handle);
+                throw;
+            }
         }
     }
 }
