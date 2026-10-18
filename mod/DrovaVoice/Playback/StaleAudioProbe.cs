@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using DrovaVoice.Core;
 using MelonLoader;
 using UnityEngine;
 
@@ -14,24 +15,25 @@ namespace DrovaVoice.Playback
     /// </summary>
     internal sealed class StaleAudioProbe
     {
-        private const int ScanEveryFrames = 15;
         private readonly MelonLogger.Instance _log;
         private readonly Dictionary<int, string> _lastState = new Dictionary<int, string>();
-        private int _frame;
-
         private readonly bool _verbose;
-        private readonly Dictionary<int, int> _idleScans = new Dictionary<int, int>();
+        private readonly IdleClipPolicy _idle = new IdleClipPolicy();
+        private float _nextScan = -1f;
 
         public StaleAudioProbe(MelonLogger.Instance log, bool verbose) { _log = log; _verbose = verbose; }
 
         public void Update()
         {
-            if (++_frame % ScanEveryFrames != 0) return;
-            try { Scan(); }
+            float now = Time.unscaledTime;
+            if (_nextScan < 0f) { _nextScan = now + IdleClipPolicy.ScanIntervalSeconds; return; }
+            if (now < _nextScan) return;
+            _nextScan = now + IdleClipPolicy.ScanIntervalSeconds;
+            try { Scan(now); }
             catch (Exception e) { _log.Warning($"Audio-Sonde: {e.GetType().Name}: {e.Message}"); }
         }
 
-        private void Scan()
+        private void Scan(float now)
         {
             var sources = UnityEngine.Object.FindObjectsOfType<AudioSource>(true);
             var seen = new HashSet<int>();
@@ -44,7 +46,7 @@ namespace DrovaVoice.Playback
                 if (!name.StartsWith(ClipLoader.ClipNamePrefix, StringComparison.Ordinal)) continue;
                 int id = source.GetInstanceID();
                 seen.Add(id);
-                if (CleanIdle(source, id)) continue;
+                if (CleanIdle(source, id, now)) continue;
                 if (!_verbose) continue;
                 string state = source.isPlaying ? "spielt" : "haelt";
                 string key = state + "|" + name;
@@ -52,12 +54,7 @@ namespace DrovaVoice.Playback
                 _lastState[id] = key;
                 _log.Msg($"[Sonde] {state}: {name} auf {PathOf(source.transform)} (playOnAwake={source.playOnAwake}, loop={source.loop}, zeit={source.time:0.00}/{clip.length:0.00} s, volume={source.volume:0.00}, aktiv={source.gameObject.activeInHierarchy})");
             }
-            if (_idleScans.Count > seen.Count)
-            {
-                var stale = new List<int>();
-                foreach (int id in _idleScans.Keys) if (!seen.Contains(id)) stale.Add(id);
-                foreach (int id in stale) _idleScans.Remove(id);
-            }
+            _idle.ForgetUnseen(seen);
             if (_verbose && _lastState.Count > seen.Count)
             {
                 var gone = new List<int>();
@@ -72,14 +69,12 @@ namespace DrovaVoice.Playback
 
         /// <summary>
         /// Das Spiel lässt den Clip nach dem Abspielen an der AudioSource (playOnAwake=True) stehen; wird der NPC später neu
-        /// aktiviert, spielt die Quelle ihn erneut ab. Steht die Quelle in zwei Läufen hintereinander still, wird der Clip abgenommen.
+        /// aktiviert, spielt die Quelle ihn erneut ab. <see cref="IdleClipPolicy"/> nimmt ihn nach einer halben Sekunde Leerlauf ab.
+        /// Eine pausierte Quelle (time &gt; 0) behält den Clip.
         /// </summary>
-        private bool CleanIdle(AudioSource source, int id)
+        private bool CleanIdle(AudioSource source, int id, float now)
         {
-            if (source.isPlaying) { _idleScans.Remove(id); return false; }
-            _idleScans.TryGetValue(id, out int n);
-            if (n + 1 < 2) { _idleScans[id] = n + 1; return false; }
-            _idleScans.Remove(id);
+            if (!_idle.ShouldStrip(id, source.isPlaying, source.time, now)) return false;
             if (_verbose) _log.Msg($"[Sonde] Clip abgenommen: {source.clip.name} auf {PathOf(source.transform)}");
             source.clip = null;
             _lastState.Remove(id);
