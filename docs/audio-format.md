@@ -35,7 +35,7 @@ Dateien sind OGG Vorbis, **48 kHz**, mono, auf −16 LUFS angeglichen, Stille am
 - `variants` listet je Basis-ID die vorhandenen Varianten; Zeilen ohne Variante stehen nicht darin. Fehlt die gewünschte Variante, gilt die Basis-ID. Eine Basis-ID kann dabei ohne eigenen Eintrag nur über ihre Variante vertont sein (Beispiel oben: `<locaKey>` hat nur `#neutral`).
 - Zeilen ohne Eintrag bleiben stumm (Untertitel wie im Original). Zeilen, deren einziger Platzhalter der Spielername (`$GVAR:EVars_Player.Name$`) ist, haben, wenn sich der Name sauber streichen lässt, nur den Eintrag `<Basis-ID>#neutral` (Text ohne den Namen); die Mod spielt diese Variante bevorzugt. Zeilen, in denen der Name nicht streichbar ist (z. B. mitten im Satz; Grund `gvar_name`), und Zeilen mit Quest- oder Geldwerten (`gvar_value`) bleiben stumm. `#arden` wird nicht erzeugt.
 - **Poolvarianten:** Zeilen generischer Sprecher (`NPC`, Teacher …) haben keinen Eintrag unter der Basis-ID, nur `<Basis-ID>#vm1`, `#vm2`, …, `#vw1`, … (Tag `v<Geschlecht m|w><Nr ab 1>`, Datei je Stimme). Die Mod wählt zur Laufzeit nach Geschlecht und Figur (`docs/playback.md`).
-- Der Generator ergänzt den Index bei jedem `install` (frühere Einträge bleiben, solange ihre Datei existiert).
+- Der Generator ergänzt den Index bei jedem `install` (frühere Einträge bleiben, solange ihre Datei existiert). OGG-Dateien, die kein Eintrag mehr nennt, bleiben liegen. `install --prune` löscht sie, `install --dry-run` listet sie nur.
 
 ## Lautstärke
 
