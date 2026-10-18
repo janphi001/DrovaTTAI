@@ -168,7 +168,7 @@ def _seed_keep_and_orphan(tmp_path):
 
 def test_without_prune_orphan_oggs_stay(tmp_path):
     audio, target = _seed_keep_and_orphan(tmp_path)
-    result = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, target, "de")
+    result = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, target, "de", drop_ids={"T|P|Plh_2"})
     assert result.pruned == []
     assert (target / "dialog" / "drop.ogg").read_bytes() == b"DROP"
     assert (target / "bark" / "stray.ogg").is_file()
@@ -177,7 +177,8 @@ def test_without_prune_orphan_oggs_stay(tmp_path):
 
 def test_prune_deletes_only_unreferenced_oggs(tmp_path):
     audio, target = _seed_keep_and_orphan(tmp_path)
-    result = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, target, "de", prune=True)
+    result = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, target, "de",
+                           drop_ids={"T|P|Plh_2"}, prune=True)
     assert result.pruned == ["bark/stray.ogg", "dialog/drop.ogg"]
     assert result.errors == [] and result.entries == 1
     assert (target / "dialog" / "keep.ogg").read_bytes() == b"KEEP"
@@ -189,7 +190,8 @@ def test_prune_deletes_only_unreferenced_oggs(tmp_path):
 
 def test_prune_dry_run_lists_orphans_and_keeps_them(tmp_path):
     audio, target = _seed_keep_and_orphan(tmp_path)
-    result = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, target, "de", prune=True, dry_run=True)
+    result = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, target, "de",
+                           drop_ids={"T|P|Plh_2"}, prune=True, dry_run=True)
     assert result.pruned == ["bark/stray.ogg", "dialog/drop.ogg"]
     assert (target / "dialog" / "drop.ogg").is_file() and (target / "bark" / "stray.ogg").is_file()
     assert sorted(read_index(target)["entries"]) == ["T|P|Plh_1"]
@@ -197,7 +199,8 @@ def test_prune_dry_run_lists_orphans_and_keeps_them(tmp_path):
 
 def test_dry_run_without_prune_lists_orphans(tmp_path):
     audio, target = _seed_keep_and_orphan(tmp_path)
-    result = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, target, "de", dry_run=True)
+    result = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, target, "de",
+                           drop_ids={"T|P|Plh_2"}, dry_run=True)
     assert result.pruned == ["bark/stray.ogg", "dialog/drop.ogg"]
     assert (target / "dialog" / "keep.ogg").is_file() and (target / "dialog" / "drop.ogg").is_file()
 
