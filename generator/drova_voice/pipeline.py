@@ -396,12 +396,13 @@ def _install(cfg: Config, args: argparse.Namespace) -> int:
     result = install_audio(rows, audio_dir(cfg), cfg.install_dir, cfg.language, drop_ids=drop,
                            prune=prune, dry_run=dry_run)
     result.errors.extend(stale)
-    print(f"{result.copied} Dateien kopiert, index.json mit {result.entries} Einträgen -> {cfg.install_dir}")
-    if prune or dry_run:
-        if dry_run or not prune:
-            print(f"Dry-Run: {len(result.pruned)} verwaiste OGG")
-        else:
+    if dry_run:
+        print(f"würde {result.copied} kopieren, {result.entries} Einträge, {len(result.pruned)} verwaist")
+    else:
+        print(f"{result.copied} Dateien kopiert, index.json mit {result.entries} Einträgen -> {cfg.install_dir}")
+        if prune:
             print(f"gelöscht: {len(result.pruned)} verwaiste OGG")
+    if dry_run or prune:
         for rel in result.pruned:
             print(f"  {rel}")
     for e in result.errors[:10]:
@@ -573,7 +574,8 @@ def add_parsers(sub) -> None:
     ins.add_argument("--prune", action="store_true",
                      help="verwaiste OGG im Zielordner löschen (stehen danach nicht im Index; Standard: aus)")
     ins.add_argument("--dry-run", action="store_true",
-                     help="verwaiste OGG nur auflisten, nichts löschen (gilt auch zusammen mit --prune)")
+                     help="nichts kopieren und index.json nicht schreiben; nur zählen und auflisten "
+                          "(würde N kopieren, M Einträge, K verwaist; gilt auch zusammen mit --prune)")
     rp = sub.add_parser("report", help="Status je Kategorie: offen, erzeugt, kodiert, installiert, übersprungen")
     _add_selection(rp)
     rp.add_argument("--by-speaker", action="store_true", help="Status je Sprecher statt je Kategorie")

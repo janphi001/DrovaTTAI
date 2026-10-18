@@ -47,19 +47,27 @@ def test_install_prune_and_dry_run_flags(pipeline_repo, capsys):
 
     assert main(base + ["install"]) == 0
     plain = capsys.readouterr().out
-    assert "verwaiste" not in plain and "Dry-Run" not in plain
+    assert "verwaiste" not in plain and "würde" not in plain
     assert (target / "dialog" / "keep.ogg").read_bytes() == b"OggS-keep"
     assert (target / "dialog" / "old.ogg").is_file()
+    installed = {
+        path.relative_to(target).as_posix(): path.read_bytes()
+        for path in target.rglob("*") if path.is_file()
+    }
 
     assert main(base + ["install", "--dry-run"]) == 0
     dry = capsys.readouterr().out
-    assert "Dry-Run:" in dry and "dialog/old.ogg" in dry
+    assert "würde 0 kopieren, 1 Einträge, 1 verwaist" in dry and "dialog/old.ogg" in dry
+    assert "Dateien kopiert" not in dry
     assert (target / "dialog" / "old.ogg").is_file()
 
     assert main(base + ["install", "--prune", "--dry-run"]) == 0
     both = capsys.readouterr().out
-    assert "Dry-Run:" in both and "gelöscht:" not in both
-    assert (target / "dialog" / "old.ogg").is_file()
+    assert "würde 0 kopieren, 1 Einträge, 1 verwaist" in both and "gelöscht:" not in both
+    assert {
+        path.relative_to(target).as_posix(): path.read_bytes()
+        for path in target.rglob("*") if path.is_file()
+    } == installed
 
     assert main(base + ["install", "--prune"]) == 0
     pruned = capsys.readouterr().out

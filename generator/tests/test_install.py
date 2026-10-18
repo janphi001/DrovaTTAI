@@ -188,21 +188,55 @@ def test_prune_deletes_only_unreferenced_oggs(tmp_path):
     assert (audio / "dialog" / "drop.ogg").read_bytes() == b"DROP"
 
 
+def _tree_bytes(root):
+    if not root.exists():
+        return None
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
 def test_prune_dry_run_lists_orphans_and_keeps_them(tmp_path):
     audio, target = _seed_keep_and_orphan(tmp_path)
     result = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, target, "de",
                            drop_ids={"T|P|Plh_2"}, prune=True, dry_run=True)
-    assert result.pruned == ["bark/stray.ogg", "dialog/drop.ogg"]
+    assert (result.copied, result.entries, result.pruned) == (0, 1, ["bark/stray.ogg", "dialog/drop.ogg"])
     assert (target / "dialog" / "drop.ogg").is_file() and (target / "bark" / "stray.ogg").is_file()
-    assert sorted(read_index(target)["entries"]) == ["T|P|Plh_1"]
+    assert sorted(read_index(target)["entries"]) == ["T|P|Plh_1", "T|P|Plh_2"]
+
+
+def test_dry_run_leaves_the_target_byte_identical(tmp_path):
+    audio, target = _seed_keep_and_orphan(tmp_path)
+    make_audio(audio, "dialog/keep.ogg", b"NEU")
+    make_audio(audio, "dialog/fresh.ogg", b"FRESH")
+    before = _tree_bytes(target)
+    result = install_audio(
+        [row("T|P|Plh_1", "dialog/keep.ogg", 2.5), row("U|Q|Plh_9", "dialog/fresh.ogg", 3.25)],
+        audio, target, "de", drop_ids={"T|P|Plh_2"}, prune=True, dry_run=True,
+    )
+    assert (result.copied, result.entries, result.errors) == (2, 2, [])
+    assert result.pruned == ["bark/stray.ogg", "dialog/drop.ogg"]
+    assert _tree_bytes(target) == before
+    assert not (target / "index.json.tmp").exists()
+    assert not (target / "dialog" / "fresh.ogg").exists()
+    assert (target / "dialog" / "keep.ogg").read_bytes() == b"KEEP"
+
+    missing = tmp_path / "fehlt"
+    empty = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, missing, "de", dry_run=True)
+    assert empty.copied == 1 and empty.entries == 1 and empty.pruned == []
+    assert _tree_bytes(missing) is None
 
 
 def test_dry_run_without_prune_lists_orphans(tmp_path):
     audio, target = _seed_keep_and_orphan(tmp_path)
+    before = read_index(target)
     result = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, target, "de",
                            drop_ids={"T|P|Plh_2"}, dry_run=True)
     assert result.pruned == ["bark/stray.ogg", "dialog/drop.ogg"]
     assert (target / "dialog" / "keep.ogg").is_file() and (target / "dialog" / "drop.ogg").is_file()
+    assert read_index(target) == before
 
 
 def test_backslash_file_field_still_protects_the_ogg(tmp_path):
