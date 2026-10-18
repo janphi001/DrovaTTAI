@@ -31,6 +31,18 @@ def test_synth_second_run_uses_the_cache(pipeline_repo, guarded, capsys):
     assert "0 neu erzeugt" in capsys.readouterr().out
 
 
+def test_synth_second_run_does_not_append_cached_rows(pipeline_repo, guarded):
+    run(pipeline_repo, "extract")
+    guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake"))
+    path = pipeline_repo.data / "synth" / "results.jsonl"
+    first = read_jsonl_lenient(path)
+    assert len(first) == 3
+    raw = path.read_bytes()
+    guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake"))
+    assert path.read_bytes() == raw
+    assert read_jsonl_lenient(path) == first
+
+
 def test_synth_reports_speaker_without_voice(pipeline_repo, guarded, capsys):
     (pipeline_repo.casting / "casting.yaml").write_text("default_player: leon\nspeakers: {}\n", encoding="utf-8")
     run(pipeline_repo, "extract")

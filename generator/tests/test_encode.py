@@ -1,7 +1,10 @@
-import shutil
-import wave
+import json
 import math
+import shutil
 import struct
+import subprocess
+import wave
+from pathlib import Path
 
 import pytest
 
@@ -44,7 +47,10 @@ def test_rel_audio_path_by_category():
 
 def test_filter_chain_and_whisper():
     base = build_filter([])
-    assert "silenceremove" in base and "loudnorm=I=-16" in base and "volume=" not in base
+    assert "silenceremove" in base and "loudnorm=I=-16" in base and ":linear=true" in base and "volume=" not in base
+    assert "aresample=48000,loudnorm=" in base
+    after = base.split("loudnorm", 1)[1].split(",", 1)[1]
+    assert after.startswith("aresample=48000")  # aresample bleibt direkt vor und nach loudnorm
     assert build_filter(["whisper"]).endswith("volume=-6dB")
     assert build_filter(["drunk"]) == base  # unbekannte Hinweise ändern nichts
 
@@ -66,8 +72,6 @@ def test_find_tools_reports_ffmpeg_without_vorbis(monkeypatch):
 
 @needs_ffmpeg
 def test_output_is_48khz_mono_vorbis(tmp_path):
-    import subprocess
-
     ffmpeg, ffprobe = find_tools()
     wav = tmp_path / "in.wav"
     sine_wav(wav, rate=44100)
@@ -168,3 +172,116 @@ def test_encode_one_applies_the_variant_and_restamps(tmp_path):
     slow = encode_one(ffmpeg, ffprobe, wav, dst, [], "k", variant(pitch=1.0, formant=1.0, tempo=0.5))
     assert dst.stat().st_mtime_ns != before  # anderes Rezept -> neu kodiert
     assert slow > plain * 1.5  # Tempo 0.5 dehnt die Zeit
+
+
+def _stamp(dst):
+    return json.loads(dst.with_suffix(".stamp").read_text(encoding="utf-8"))
+
+
+def test_cache_hit_does_not_run_ffprobe(tmp_path, monkeypatch):
+    dst = tmp_path / "a.ogg"
+    dst.write_bytes(b"OggS")
+    recipe = build_filter([])
+    dst.with_suffix(".stamp").write_text(json.dumps({"duration": 1.25, "filter": recipe, "key": "k"}) + "\n", encoding="utf-8")
+
+    def boom(*_a, **_k):
+        raise AssertionError("subprocess")
+
+    monkeypatch.setattr("drova_voice.encode.subprocess.run", boom)
+    assert encode_one("ffmpeg", "ffprobe", tmp_path / "in.wav", dst, [], "k") == pytest.approx(1.25)
+
+
+def test_legacy_text_stamp_is_probed_once(tmp_path, monkeypatch):
+    dst = tmp_path / "a.ogg"
+    dst.write_bytes(b"OggS")
+    recipe = build_filter([])
+    dst.with_suffix(".stamp").write_text(f"k|{recipe}", encoding="utf-8")
+    calls = []
+
+    class Result:
+        returncode = 0
+        stdout = "1.5\n"
+        stderr = ""
+
+    def fake(cmd, **_k):
+        calls.append(list(cmd))
+        assert cmd[0] == "ffprobe"
+        return Result()
+
+    monkeypatch.setattr("drova_voice.encode.subprocess.run", fake)
+    assert encode_one("ffmpeg", "ffprobe", tmp_path / "in.wav", dst, [], "k") == pytest.approx(1.5)
+    assert len(calls) == 1 and _stamp(dst)["duration"] == pytest.approx(1.5)
+    assert encode_one("ffmpeg", "ffprobe", tmp_path / "in.wav", dst, [], "k") == pytest.approx(1.5)
+    assert len(calls) == 1
+
+
+def test_fresh_encode_applies_measured_linear_loudnorm_and_then_skips_ffprobe(tmp_path, monkeypatch):
+    wav = tmp_path / "in.wav"
+    wav.write_bytes(b"RIFF")
+    dst = tmp_path / "out" / "a.ogg"
+    calls = []
+
+    class Result:
+        def __init__(self, stdout="", stderr="", code=0):
+            self.returncode = code
+            self.stdout = stdout
+            self.stderr = stderr
+
+    def fake(cmd, **_k):
+        calls.append(list(cmd))
+        if cmd[0] == "ffprobe":
+            return Result(stdout="0.42\n")
+        audio_filter = cmd[cmd.index("-af") + 1]
+        if "print_format=json" in audio_filter:
+            return Result(stderr="\n".join([
+                "{",
+                '  "input_i" : "-20.00",',
+                '  "input_tp" : "-4.00",',
+                '  "input_lra" : "1.00",',
+                '  "input_thresh" : "-30.00",',
+                '  "target_offset" : "0.10"',
+                "}",
+            ]))
+        assert "measured_I=-20.00" in audio_filter and "linear=true" in audio_filter and "apad" not in audio_filter
+        assert audio_filter.index("aresample=48000") < audio_filter.index("loudnorm")
+        Path(cmd[-1]).write_bytes(b"OggS")
+        return Result()
+
+    monkeypatch.setattr("drova_voice.encode.subprocess.run", fake)
+    assert encode_one("ffmpeg", "ffprobe", wav, dst, [], "k") == pytest.approx(0.42)
+    assert _stamp(dst)["loudnorm"]["input_i"] == "-20.00"
+    calls.clear()
+    assert encode_one("ffmpeg", "ffprobe", wav, dst, [], "k") == pytest.approx(0.42)
+    assert calls == []
+
+
+def _integrated_lufs(ffmpeg, path):
+    proc = subprocess.run([ffmpeg, "-hide_banner", "-nostats", "-i", str(path), "-af", "ebur128", "-f", "null", "-"],
+                          capture_output=True, text=True)
+    text = proc.stderr
+    start = text.rfind("Integrated loudness:")
+    assert start >= 0, text[-400:]
+    for line in text[start:].splitlines():
+        if "I:" in line and "LUFS" in line:
+            return float(line.split()[1])
+    raise AssertionError(text[start:start + 200])
+
+
+@needs_ffmpeg
+def test_short_clip_stays_short_and_near_minus_16_lufs(tmp_path, monkeypatch):
+    ffmpeg, ffprobe = find_tools()
+    wav = tmp_path / "in.wav"
+    sine_wav(wav, seconds=0.45, lead_silence=0.0, rate=48000)
+    dst = tmp_path / "out" / "short.ogg"
+    duration = encode_one(ffmpeg, ffprobe, wav, dst, [], "k")
+    assert 0.2 < duration < 1.2  # nicht auf 3 s aufgefüllt
+    assert _integrated_lufs(ffmpeg, dst) == pytest.approx(-16.0, abs=1.0)
+    stamp = _stamp(dst)
+    assert "linear=true" in stamp["filter"] and "aresample=48000,loudnorm=" in stamp["filter"]
+    assert "input_i" in stamp["loudnorm"]
+
+    def boom(*_a, **_k):
+        raise AssertionError("subprocess")
+
+    monkeypatch.setattr("drova_voice.encode.subprocess.run", boom)
+    assert encode_one(ffmpeg, ffprobe, wav, dst, [], "k") == pytest.approx(duration)

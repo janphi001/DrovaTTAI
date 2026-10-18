@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.yaml"
+# Dieselbe Ordnerregel wie AudioLanguage in der Mod (VoiceSettings.CleanFolderName): 1–16 Zeichen,
+# nur Buchstaben, Ziffern, '_' und '-'. Punkte und Schrägstriche würden install --prune aus dem Sprachordner heben.
+_LANGUAGE_FOLDER = re.compile(r"[A-Za-z0-9_-]{1,16}\Z")
 
 
 @dataclass(frozen=True)
@@ -74,13 +78,25 @@ def load_config(path: Path) -> Config:
         repo_root = Path(root_raw)
     else:
         raise ValueError(f"{path}: 'repo_root' muss ein Text sein")
-    language = raw.get("language", "de")
-    if language is None or language == "":
-        language = "de"
-    elif not isinstance(language, str):
-        raise ValueError(f"{path}: 'language' muss ein Text sein")
+    language = _language_folder(raw.get("language", "de"), path)
     return Config(
         game_dir=Path(game_dir),
         language=language,
         repo_root=repo_root.resolve(),
     )
+
+
+def _language_folder(language: object, path: Path) -> str:
+    if language is None or language == "":
+        return "de"
+    if not isinstance(language, str):
+        raise ValueError(f"{path}: 'language' muss ein Text sein")
+    language = language.strip()
+    if language == "":
+        return "de"
+    if _LANGUAGE_FOLDER.fullmatch(language) is None:
+        raise ValueError(
+            f"{path}: 'language' = '{language}' ist kein gültiger Ordnername "
+            "(erlaubt sind 1–16 Zeichen aus Buchstaben, Ziffern, '_' und '-')"
+        )
+    return language

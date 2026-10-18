@@ -121,5 +121,32 @@ namespace DrovaVoice.Core.Tests
             Assert.Equal(cacheMb, s.CacheMegabytes);
             Assert.Empty(w);
         }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("..")]
+        [InlineData("de/..")]
+        [InlineData("../de")]
+        [InlineData("de/en")]
+        [InlineData("d e")]
+        [InlineData("averyveryverylonglanguage")]
+        public void ExportLanguageUsesTheAudioLanguageFolderRule(string? input)
+        {
+            var w = new List<string>();
+            Assert.Equal("de", VoiceSettings.CleanFolderName(input, "ExportLanguage", w));
+            Assert.Contains("ExportLanguage", w[0]);
+        }
+
+        [Theory]
+        [InlineData("zh_CN", "zh_CN")]
+        [InlineData("en-GB", "en-GB")]
+        [InlineData(" en ", "en")]
+        public void ExportLanguageKeepsAFolderSafeCode(string input, string expected)
+        {
+            var w = new List<string>();
+            Assert.Equal(expected, VoiceSettings.CleanFolderName(input, "ExportLanguage", w));
+            Assert.Empty(w);
+        }
     }
 }
