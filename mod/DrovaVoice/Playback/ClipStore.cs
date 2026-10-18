@@ -41,5 +41,16 @@ namespace DrovaVoice.Playback
                 if (_clips.Remove(evictedId, out var old) && old != null) Object.Destroy(old);
             }
         }
+
+        /// <summary>Zerstört alle gehaltenen Clips. Nach einem Index-Reload, damit ersetzte Dateien neu geladen werden.</summary>
+        public void Clear()
+        {
+            foreach (var pair in _clips)
+            {
+                if (pair.Value != null) Object.Destroy(pair.Value);
+                _budget.Remove(pair.Key);
+            }
+            _clips.Clear();
+        }
     }
 }

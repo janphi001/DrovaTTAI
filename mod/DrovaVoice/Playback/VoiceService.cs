@@ -6,10 +6,10 @@ using UnityEngine;
 
 namespace DrovaVoice.Playback
 {
-    /// <summary>Zentrale Stelle der Wiedergabe: ID -> Index -> Cache oder Laden. Fehlschläge werden gemerkt und nur einmal geloggt.</summary>
+    /// <summary>Zentrale Stelle der Wiedergabe: ID -> Index -> Cache oder Laden. Fehlschläge werden gemerkt und nur einmal geloggt, bis der Index neu geladen wird.</summary>
     internal sealed class VoiceService
     {
-        private readonly AudioIndex _index;
+        private AudioIndex _index;
         private VoiceSettings _settings;
         private readonly ClipStore _store;
         private readonly ClipLoader _loader;
@@ -115,5 +115,14 @@ namespace DrovaVoice.Playback
 
         public void LogError(string where, string? id, Exception e) =>
             Problem("err|" + where + "|" + id + "|" + e.GetType().Name, $"{where}: {e.GetType().Name}: {e.Message} (Zeile: {id ?? "?"})", error: true);
+
+        /// <summary>Tauscht den Index. Fehlschläge und der Clip-Cache werden vergessen, damit ersetzte Dateien erneut geladen und geloggt werden.</summary>
+        public void ReplaceIndex(AudioIndex index)
+        {
+            _index = index ?? throw new ArgumentNullException(nameof(index));
+            _failed.Clear();
+            _problemLog.Clear();
+            _store.Clear();
+        }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using DrovaVoice.Core;
 using Drova_Modding_API.Systems.Audio;
 using Drova_Modding_API.Systems.WorldEvents;
@@ -32,11 +33,17 @@ namespace DrovaVoice
         private StaleAudioProbe? _probe;
         private BarkDistance? _barkDistance;
         private VoiceMenu? _menu;
+        private VoiceSettings? _bootSettings;
+        private bool _barkProbe;
+        private readonly IndexWatch _indexWatch = new IndexWatch();
+        private bool _reloadTriggerStuck;
+        private bool _indexIoLogged;
 
         private string ModDir => Path.Combine(MelonEnvironment.ModsDirectory, "DrovaVoice");
         private string TriggerPath => Path.Combine(ModDir, "export.trigger");
         private string TriggerAllPath => Path.Combine(ModDir, "export-all.trigger");
         private string TriggerNpcsPath => Path.Combine(ModDir, "export-npcs.trigger");
+        private string ReloadTriggerPath => Path.Combine(ModDir, "reload.trigger");
 
         public override void OnInitializeMelon()
         {
@@ -54,31 +61,101 @@ namespace DrovaVoice
             var diagnostics = category.CreateEntry("Diagnostics", false, description: "Jede Zeile einmal loggen (geladen/ohne Eintrag)");
             Directory.CreateDirectory(ModDir);
             string probe = LineIds.AudioFileName(LineIds.Statement("DT_Main_NPC_Adela", "Dialog/NPC_Adela", "Plh_5"));
-            LoggerInstance.Msg($"DrovaVoice {Info.Version} geladen (Core ok: {probe}). Export: Datei export.trigger in {ModDir} anlegen oder F9 drücken.");
+            LoggerInstance.Msg($"DrovaVoice {Info.Version} geladen (Core ok: {probe}). Export: Datei export.trigger in {ModDir} anlegen oder F9 drücken. Index neu: reload.trigger, oder wenn sich index.json ändert.");
+
+            WarnIfDrovaTtsLoaded();
 
             var warnings = new List<string>();
             var settings = VoiceSettings.Create(enabled.Value, dialogVolume.Value, playerVolume.Value, audioLanguage.Value, cacheMb.Value, diagnostics.Value, warnings, barkVolume.Value, barkMin.Value, barkMax.Value);
             foreach (string w in warnings) LoggerInstance.Warning(w);
-            _voice = CreateVoice(settings);
-            if (_voice != null) _voice.ProbeFigures = barkProbe.Value;   // ChoiceHook.Service folgt erst, wenn der Connector ersetzt ist
+            _bootSettings = settings;
+            _barkProbe = barkProbe.Value;
+            if (!settings.Enabled) LoggerInstance.Msg("Vertonung ist ausgeschaltet (Enabled=false); im Optionsmenü wieder einschaltbar.");
+            PollIndex(force: false);   // ChoiceHook.Service folgt erst, wenn der Connector ersetzt ist
         }
 
-        private VoiceService? CreateVoice(VoiceSettings settings)
+        /// <summary>Melon-Name von DrovaTTS ist „Drova TTS“, die Assembly heißt DrovaTTS. Eines von beiden reicht für die Warnung.</summary>
+        private void WarnIfDrovaTtsLoaded()
         {
-            if (!settings.Enabled) LoggerInstance.Msg("Vertonung ist ausgeschaltet (Enabled=false); im Optionsmenü wieder einschaltbar.");
-            string root = Path.Combine(ModDir, "Audio", settings.Language);
-            string indexPath = Path.Combine(root, "index.json");
             try
             {
-                if (!File.Exists(indexPath)) { LoggerInstance.Warning($"Kein index.json unter {indexPath}; Vertonung bleibt aus."); return null; }
-                var index = AudioIndex.Parse(File.ReadAllText(indexPath), settings.Language);
-                LoggerInstance.Msg($"Index: {index.Count} Zeilen ({index.Skipped} übersprungen), Dialog {settings.DialogPercent} %, Spieler {settings.PlayerPercent} %, Barks {settings.BarkPercent} %, Cache {settings.CacheMegabytes} MB.");
-                return new VoiceService(index, root, settings, LoggerInstance);
+                var melonNames = new List<string>();
+                foreach (MelonBase melon in MelonBase.RegisteredMelons)
+                {
+                    string? name = melon.Info?.Name;
+                    if (name != null) melonNames.Add(name);
+                }
+                var assemblyNames = new List<string>();
+                foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    string? name = asm.GetName().Name;
+                    if (name != null) assemblyNames.Add(name);
+                }
+                if (ModConflict.DrovaTtsLoaded(melonNames, assemblyNames))
+                    LoggerInstance.Warning(ModConflict.DrovaTtsWarning);
             }
             catch (Exception e)
             {
-                LoggerInstance.Error($"Index nicht nutzbar, Vertonung bleibt aus: {e.GetType().Name}: {e.Message}");
-                return null;
+                LoggerInstance.Warning($"DrovaTTS-Prüfung fehlgeschlagen ({e.GetType().Name}). Ob beide Mods denselben Connector ersetzen, bleibt ungewiss.");
+            }
+        }
+
+        /// <summary>
+        /// Liest index.json neu, wenn sich Länge oder Schreibzeit geändert haben oder reload.trigger liegt.
+        /// Fehlt die Datei oder schlägt das Lesen fehl, steht das einmal im Log. Ein schon geladener Index bleibt dabei erhalten.
+        /// </summary>
+        private void PollIndex(bool force)
+        {
+            if (_bootSettings == null) return;
+            string path = Path.Combine(ModDir, "Audio", _bootSettings.Language, "index.json");
+            bool exists;
+            FileStamp? stamp = null;
+            try
+            {
+                exists = IndexWatch.TryReadStamp(path, out var read);
+                if (exists) stamp = read;
+                _indexIoLogged = false;
+            }
+            catch (Exception e)
+            {
+                if (!_indexIoLogged)
+                {
+                    _indexIoLogged = true;
+                    LoggerInstance.Error(IndexMessages.Unreadable(e));
+                }
+                return;
+            }
+
+            IndexWatchStep step = _indexWatch.Poll(exists, stamp, force);
+            if (step.Action == IndexWatchAction.None) return;
+            if (step.Action == IndexWatchAction.Missing)
+            {
+                if (step.Log)
+                    LoggerInstance.Warning(_indexWatch.HasIndex ? IndexMessages.MissingKept(path) : IndexMessages.Missing(path));
+                return;
+            }
+
+            try
+            {
+                var index = AudioIndex.Parse(File.ReadAllText(path), _bootSettings.Language);
+                if (_voice == null)
+                {
+                    string root = Path.Combine(ModDir, "Audio", _bootSettings.Language);
+                    _voice = new VoiceService(index, root, _bootSettings, LoggerInstance) { ProbeFigures = _barkProbe };
+                    LoggerInstance.Msg(IndexMessages.FirstLoad(index.Count, index.Skipped, _bootSettings.DialogPercent, _bootSettings.PlayerPercent, _bootSettings.BarkPercent, _bootSettings.CacheMegabytes));
+                }
+                else
+                {
+                    _voice.ReplaceIndex(index);
+                    LoggerInstance.Msg(IndexMessages.Reloaded(index.Count, index.Skipped));
+                }
+                if (stamp is FileStamp loaded) _indexWatch.NoteLoaded(loaded);
+            }
+            catch (Exception e)
+            {
+                if (step.Log)
+                    LoggerInstance.Error(_indexWatch.HasIndex ? IndexMessages.ReloadFailed(e) : IndexMessages.Unusable(e));
+                _indexWatch.NoteFailure(stamp);
             }
         }
 
@@ -132,7 +209,11 @@ namespace DrovaVoice
             _probe?.Update();
             _barkDistance?.Update();
             bool trigger = false;
-            if (_frame % 60 == 0 && ConsumeTrigger(TriggerPath, ref _exportTriggerStuck)) trigger = true;
+            if (_frame % 60 == 0)
+            {
+                if (ConsumeTrigger(TriggerPath, ref _exportTriggerStuck)) trigger = true;
+                PollIndex(ConsumeTrigger(ReloadTriggerPath, ref _reloadTriggerStuck));
+            }
             if (!trigger && HotkeyPressed()) trigger = true;
             bool all = _frame % 60 == 0 && ConsumeTrigger(TriggerAllPath, ref _exportAllTriggerStuck);
             if (all) RunExport(useCatalog: true);

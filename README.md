@@ -150,6 +150,16 @@ Spiel starten, Spielstand laden, mit NPCs sprechen. Die Einstellungen stehen in 
 
 Weitere Hinweise, Log-Meldungen und die Abnahme-Checkliste: `docs/playback.md`.
 
+Eine neue oder geänderte `index.json` liest die Mod im laufenden Spiel nach (etwa einmal pro Sekunde, an Größe und Schreibzeit der Datei). Dieselbe Datei noch einmal laden, ohne dass sich Größe oder Zeit geändert haben: leere Datei `Mods/DrovaVoice/reload.trigger` anlegen. Schlägt das Laden fehl, steht der Grund in `MelonLoader/Latest.log`; ein vorher gültiger Index bleibt aktiv.
+
+## Kompatibilität
+
+**[DrovaTTS](https://github.com/Raster96/DrovaTTS)** (Nexus: drovaforsakenkin/mods/30) und DrovaVoice ersetzen denselben Dialog-Connector der Modding API. Sind beide Mods installiert, gewinnt der letzte Aufruf; die andere bleibt stumm, ohne dass das Spiel selbst einen Fehler zeigt. DrovaTTS meldet sich in MelonLoader als „Drova TTS“, die Assembly heißt `DrovaTTS`.
+
+DrovaVoice prüft das beim Start: die MelonLoader-Mod-Liste und die geladenen Assemblies. Trifft eines von beiden zu, schreibt sie eine Warnung ins Log (`MelonLoader/Latest.log`, Text beginnt mit `DrovaTTS ist geladen`). Beide Mods nicht zusammen verwenden. Eine von beiden entfernen und das Spiel neu starten.
+
+Leisere Musik während der Sprache (Ducking) ist nur eine Idee und hier nicht gebaut. Andere Voice-Mods senken die Musik, solange die Dialogquelle spielt. Ob Drova dafür eine eigene Mixer-Gruppe hat, müsste man im Spiel nachsehen. Ein solcher Regler wäre abschaltbar (volle Lautstärke heißt: Musik bleibt, wie das Spiel sie mischt). Die Musik ändert diese Mod nicht.
+
 ## Verwendete Stimmen
 
 Das Projekt nutzt **41 Fish-Stimmen** (22 männlich, 19 weiblich) und **7 Abwandlungen**. Alle stehen mit ihren Fish-IDs in `casting/fish_voices.yaml`; hier die Übersicht. Die Auswahl habe ich nach dem Anhören von Hörproben getroffen. Imitationen realer Personen habe ich vorab ausgeschlossen.
@@ -234,7 +244,8 @@ Für Figuren, für die es keine passende Stimme gibt, formt `encode` eine Basiss
 
 | Problem | Lösung |
 |---|---|
-| Keine Stimmen im Spiel | Log `MelonLoader/Latest.log` ansehen: Steht dort `Audio-Connector der Modding API ersetzt.` (erst nach dem Laden eines Spielstands)? Gibt es `Mods/DrovaVoice/Audio/de/index.json`? |
+| Keine Stimmen im Spiel | Log `MelonLoader/Latest.log` ansehen: Steht dort `Audio-Connector der Modding API ersetzt.` (erst nach dem Laden eines Spielstands)? Gibt es `Mods/DrovaVoice/Audio/de/index.json`? Steht dort `DrovaTTS ist geladen`, ist DrovaTTS ebenfalls installiert; eine der beiden Mods entfernen |
+| Neue Zeilen nach `install` fehlen | Die Mod liest `index.json` nach, wenn sich Größe oder Schreibzeit ändern, oder über `reload.trigger`. Im Log steht `Index neu geladen` oder eine Fehlermeldung (`Index nicht nutzbar` / `Index nicht neu geladen`) |
 | Export bringt nichts | Im Hauptmenü und mit dem Fenster im Vordergrund auslösen, danach Spiel beenden (`docs/export.md`) |
 | `synth` bricht ab | Fish-Guthaben, Limit oder Schlüssel prüfen und danach den Befehl wiederholen |
 | Build schlägt fehl | Spiel schließen, Pfad (`DROVA_GAME_DIR`) prüfen |
