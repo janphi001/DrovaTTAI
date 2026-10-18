@@ -47,7 +47,8 @@ namespace DrovaVoice.Core.Tests
             Assert.Equal(DecodeStatus.Ready, cache.Peek("a@100", out var clip, out var error));
             Assert.Same(first, clip);
             Assert.Null(error);
-            Assert.Equal(8, clip!.Bytes);
+            Assert.Equal(4, clip!.Bytes);
+            Assert.Equal(8, new DecodedClip(new[] { 0.1f, 0.2f }, 2, 48000, 0).Bytes);
         }
 
         [Fact]
