@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "language": "de",
+  "lines": [
+    {
+      "id": "DT_Verify_Probe|Dialog/NPC_Probe|Plh_1",
+      "tree": "DT_Verify_Probe",
+      "nodeId": 1,
+      "nodeType": "statement",
+      "actorName": "Adela",
+      "category": "dialog",
+      "generic": false,
+      "locaPath": "Dialog/NPC_Probe",
+      "locaKey": "Plh_1",
+      "text": "Die Probe klingt klar und fertig.",
+      "gvars": []
+    },
+    {
+      "id": "DT_Verify_Probe|Dialog/NPC_Probe|Plh_2|c0",
+      "tree": "DT_Verify_Probe",
+      "nodeId": 2,
+      "nodeType": "choice",
+      "choiceIndex": 0,
+      "actorName": "Player",
+      "category": "player",
+      "generic": false,
+      "locaPath": "Dialog/NPC_Probe",
+      "locaKey": "Plh_2",
+      "text": "Diese Auswahl bleibt stumm.",
+      "gvars": []
+    }
+  ]
+}
