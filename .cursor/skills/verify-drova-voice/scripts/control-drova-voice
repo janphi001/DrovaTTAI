@@ -1,0 +1,504 @@
+#!/usr/bin/env python3
+"""Drive drova-voice in an isolated run. Invocation is in SKILL.md."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+VERIFY_HOME = Path(os.environ.get("DROVA_VOICE_VERIFY_HOME", "/tmp/drova-voice-verify"))
+EVIDENCE_ROOT = Path(os.environ.get("DROVA_VOICE_VERIFY_EVIDENCE_ROOT", str(VERIFY_HOME / "evidence")))
+TMUX_BIN = Path("/exec-daemon/tmux")
+TMUX_CONF = Path("/exec-daemon/tmux.portal.conf")
+SPEECH = "Die Probe klingt klar und fertig."
+CHOICE_TEXT = "Diese Auswahl bleibt stumm."
+LINE_ID = "DT_Verify_Probe|Dialog/NPC_Probe|Plh_1"
+CHOICE_ID = "DT_Verify_Probe|Dialog/NPC_Probe|Plh_2|c0"
+DRIVE_TIMEOUT_S = 120
+
+
+def repo_root() -> Path:
+    start = Path(__file__).resolve()
+    for candidate in [start, *start.parents]:
+        if (candidate / "generator" / "pyproject.toml").is_file() and (candidate / "casting" / "casting.yaml").is_file():
+            return candidate
+    sys.exit("repo root not found (generator/pyproject.toml and casting/casting.yaml)")
+
+
+def tmux_cmd(*args: str) -> list[str]:
+    binary = str(TMUX_BIN if TMUX_BIN.is_file() else Path(shutil.which("tmux") or "tmux"))
+    if TMUX_CONF.is_file():
+        return [binary, "-f", str(TMUX_CONF), *args]
+    return [binary, *args]
+
+
+def run_id_from_env() -> str | None:
+    value = os.environ.get("DROVA_VOICE_VERIFY_RUN", "").strip()
+    return value or None
+
+
+def current_path() -> Path:
+    return VERIFY_HOME / "current"
+
+
+def resolve_run_id() -> str:
+    chosen = run_id_from_env()
+    if chosen:
+        return chosen
+    path = current_path()
+    if path.is_file():
+        return path.read_text(encoding="utf-8").strip()
+    sys.exit("no verification run (launch one, or set DROVA_VOICE_VERIFY_RUN)")
+
+
+def state_path(run_id: str) -> Path:
+    return VERIFY_HOME / "runs" / run_id / "state.json"
+
+
+def load_state(run_id: str | None = None) -> dict:
+    run_id = run_id or resolve_run_id()
+    path = state_path(run_id)
+    if not path.is_file():
+        sys.exit(f"verification run not found: {run_id}")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def save_state(state: dict) -> None:
+    path = state_path(state["run_id"])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+
+
+def ensure_venv(repo: Path) -> Path:
+    venv = repo / "generator" / ".venv"
+    binary = venv / "bin" / "drova-voice"
+    if binary.is_file():
+        return binary
+    python = shutil.which("python3") or sys.executable
+    subprocess.run([python, "-m", "venv", str(venv)], check=True)
+    subprocess.run(
+        [str(venv / "bin" / "pip"), "install", "--disable-pip-version-check", "-e", ".[dev]"],
+        cwd=repo / "generator",
+        check=True,
+    )
+    if not binary.is_file():
+        sys.exit(f"drova-voice was not installed into {binary}")
+    return binary
+
+
+def write_config(path: Path, game_dir: Path, root: Path) -> None:
+    path.write_text(
+        f'game_dir: "{game_dir.as_posix()}"\nlanguage: de\nrepo_root: "{root.as_posix()}"\n',
+        encoding="utf-8",
+    )
+
+
+def seed_fixture(game_dir: Path, manifest_dest: Path) -> None:
+    source = Path(__file__).resolve().parent / "fixture"
+    loc_dir = game_dir / "Drova_Data" / "StreamingAssets" / "Localization" / "de" / "Dialog"
+    loc_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source / "NPC_Probe_de.loc", loc_dir / "NPC_Probe_de.loc")
+    manifest_dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source / "manifest.json", manifest_dest)
+
+
+def launch() -> int:
+    repo = repo_root()
+    binary = ensure_venv(repo)
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    run_id = f"{stamp}-{os.getpid()}"
+    run_dir = VERIFY_HOME / "runs" / run_id
+    root = run_dir / "root"
+    game_dir = run_dir / "game"
+    evidence = EVIDENCE_ROOT / run_id
+    if evidence.exists() or run_dir.exists():
+        sys.exit(f"run already exists: {run_id}")
+    evidence.mkdir(parents=True)
+    root.mkdir(parents=True)
+    game_dir.mkdir(parents=True)
+    shutil.copytree(repo / "casting", root / "casting")
+    manifest = run_dir / "fixture" / "manifest.json"
+    seed_fixture(game_dir, manifest)
+    config = run_dir / "config.yaml"
+    write_config(config, game_dir, root)
+    state = {
+        "run_id": run_id,
+        "repo": str(repo),
+        "run_dir": str(run_dir),
+        "evidence_dir": str(evidence),
+        "config": str(config),
+        "manifest": str(manifest),
+        "game_dir": str(game_dir),
+        "repo_root": str(root),
+        "install_dir": str(game_dir / "Mods" / "DrovaVoice" / "Audio" / "de"),
+        "venv_bin": str(binary),
+        "sessions": [],
+        "speech": SPEECH,
+        "choice_text": CHOICE_TEXT,
+        "line_id": LINE_ID,
+        "choice_id": CHOICE_ID,
+    }
+    save_state(state)
+    current_path().parent.mkdir(parents=True, exist_ok=True)
+    current_path().write_text(run_id + "\n", encoding="utf-8")
+    env_file = run_dir / "env.sh"
+    env_file.write_text(
+        f"export DROVA_VOICE_VERIFY_RUN={run_id}\n"
+        f"export DROVA_VOICE_VERIFY_MANIFEST={manifest}\n"
+        f"export DROVA_VOICE_VERIFY_EVIDENCE={evidence}\n",
+        encoding="utf-8",
+    )
+    (evidence / "run.json").write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+    print(f"run_id: {run_id}")
+    print(f"source: {env_file}")
+    print(f"evidence: {evidence}")
+    return doctor(state)
+
+
+def ffmpeg_has_libvorbis(ffmpeg: str) -> bool:
+    proc = subprocess.run(
+        [ffmpeg, "-hide_banner", "-encoders"],
+        capture_output=True,
+        text=True,
+        errors="replace",
+        check=False,
+    )
+    return "libvorbis" in proc.stdout
+
+
+def doctor(state: dict | None = None) -> int:
+    state = state or load_state()
+    repo = Path(state["repo"])
+    binary = Path(state["venv_bin"])
+    ffmpeg = shutil.which("ffmpeg") or ""
+    ffprobe = shutil.which("ffprobe") or ""
+    fake = repo / "generator" / "workers" / "fake" / "worker.py"
+    lines = [
+        "verify-drova-voice doctor",
+        f"run_id: {state['run_id']}",
+        f"repo: {repo}",
+        f"drova_voice: {binary}",
+        f"ffmpeg: {ffmpeg or 'missing'}",
+        f"ffprobe: {ffprobe or 'missing'}",
+        f"fake_worker: {fake}",
+        f"fish_api_key: {'present' if os.environ.get('FISH_API_KEY') else 'absent'}",
+        f"game_dir: {state['game_dir']}",
+        f"repo_root: {state['repo_root']}",
+        f"install_dir: {state['install_dir']}",
+        f"manifest: {state['manifest']}",
+        f"evidence: {state['evidence_dir']}",
+        "mod: nicht in der Cloud verifizierbar",
+    ]
+    problems: list[str] = []
+    if not binary.is_file():
+        problems.append("drova-voice binary missing")
+    if not ffmpeg or not ffmpeg_has_libvorbis(ffmpeg):
+        problems.append("ffmpeg with libvorbis missing")
+    if not ffprobe:
+        problems.append("ffprobe missing")
+    if not fake.is_file():
+        problems.append("fake worker missing")
+    if not (TMUX_BIN.is_file() or shutil.which("tmux")):
+        problems.append("tmux missing")
+    if not shutil.which("strace"):
+        problems.append("strace missing")
+    if os.environ.get("FISH_API_KEY"):
+        problems.append("FISH_API_KEY is set; unset it before driving")
+    run_dir = Path(state["run_dir"]).resolve()
+    game_dir = Path(state["game_dir"]).resolve()
+    root = Path(state["repo_root"]).resolve()
+    if run_dir != (VERIFY_HOME / "runs" / state["run_id"]).resolve():
+        problems.append("run_dir escaped the verification home")
+    if not str(game_dir).startswith(str(run_dir) + os.sep):
+        problems.append("game_dir is outside this run")
+    if not str(root).startswith(str(run_dir) + os.sep):
+        problems.append("repo_root is outside this run")
+    loc = game_dir / "Drova_Data" / "StreamingAssets" / "Localization" / "de" / "Dialog" / "NPC_Probe_de.loc"
+    if not loc.is_file():
+        problems.append(f"loc fixture missing: {loc}")
+    if not Path(state["manifest"]).is_file():
+        problems.append("manifest fixture missing")
+    casting = root / "casting" / "casting.yaml"
+    if not casting.is_file() or "adela:" not in casting.read_text(encoding="utf-8"):
+        problems.append("copied casting.yaml has no adela voice")
+    if binary.is_file():
+        help_proc = subprocess.run([str(binary), "--help"], capture_output=True, text=True, errors="replace", check=False)
+        if help_proc.returncode != 0 or "extract" not in help_proc.stdout:
+            problems.append("drova-voice --help did not list extract")
+    ready = not problems
+    lines.append(f"ready: {'yes' if ready else 'no'}")
+    for problem in problems:
+        lines.append(f"problem: {problem}")
+    text = "\n".join(lines) + "\n"
+    evidence = Path(state["evidence_dir"])
+    evidence.mkdir(parents=True, exist_ok=True)
+    (evidence / "doctor.txt").write_text(text, encoding="utf-8")
+    sys.stdout.write(text)
+    return 0 if ready else 1
+
+
+def guard(argv: list[str]) -> str | None:
+    if any(token == "fish" or token.startswith("workers/fish") for token in argv):
+        return "this harness does not call Fish"
+    if not argv:
+        return "missing drova-voice command"
+    if argv[0] == "bakeoff":
+        return "bakeoff is outside this harness"
+    if argv[0] == "synth":
+        if "--engine" not in argv:
+            return "synth defaults to fish; pass --engine fake"
+        engine = argv[argv.index("--engine") + 1] if argv.index("--engine") + 1 < len(argv) else ""
+        if engine != "fake":
+            return "synth in this harness requires --engine fake"
+    if argv[0] == "smoke" and (len(argv) < 2 or argv[1] != "fake"):
+        return "smoke in this harness requires the fake engine"
+    return None
+
+
+def external_connects(trace: str) -> list[str]:
+    rows: list[str] = []
+    for line in trace.splitlines():
+        if "connect(" not in line:
+            continue
+        if "AF_UNIX" in line or "inet_addr(\"127." in line or "inet_pton(AF_INET6, \"::1\"" in line:
+            continue
+        if "inet_addr(\"" in line or "inet_pton(AF_INET6" in line:
+            rows.append(line.strip())
+    return rows
+
+
+def next_step_dir(evidence: Path, name: str) -> Path:
+    existing = [p for p in evidence.iterdir() if p.is_dir() and len(p.name) > 4 and p.name[:3].isdigit()]
+    dest = evidence / f"{len(existing) + 1:03d}-{name}"
+    dest.mkdir(parents=True)
+    return dest
+
+
+def drive(argv: list[str]) -> int:
+    reason = guard(argv)
+    if reason:
+        print(f"FEHLER: {reason}", file=sys.stderr)
+        return 2
+    state = load_state()
+    if doctor(state) != 0:
+        return 1
+    evidence = Path(state["evidence_dir"])
+    step = next_step_dir(evidence, argv[0])
+    stdout_path = step / "stdout.txt"
+    stderr_path = step / "stderr.txt"
+    exit_path = step / "exitcode.txt"
+    script_path = step / "drive.sh"
+    command = [state["venv_bin"], "--config", state["config"], *argv]
+    trace_path = step / "strace.txt"
+    (step / "command.txt").write_text(" ".join(command) + "\n", encoding="utf-8")
+    traced = ["strace", "-f", "-e", "trace=execve,connect", "-s", "200", "-o", str(trace_path), "--", *command]
+    script = "\n".join(
+        [
+            "#!/bin/bash",
+            "set -u",
+            "unset FISH_API_KEY",
+            'if [ -n "${FISH_API_KEY+x}" ]; then echo "FISH_API_KEY=set"; else echo "FISH_API_KEY=unset"; fi',
+            " ".join(shlex_quote(part) for part in traced)
+            + f" > {shlex_quote(str(stdout_path))} 2> {shlex_quote(str(stderr_path))}",
+            f"echo $? > {shlex_quote(str(exit_path))}",
+            "exec sleep 60",
+            "",
+        ]
+    )
+    script_path.write_text(script, encoding="utf-8")
+    script_path.chmod(0o755)
+    session = f"dvv-{state['run_id'][-12:]}-{step.name[:3]}"
+    state["sessions"].append(session)
+    save_state(state)
+    created = subprocess.run(tmux_cmd("new-session", "-d", "-s", session, "--", "bash", "-l"), check=False)
+    if created.returncode != 0:
+        print(created.stderr or "tmux new-session failed", file=sys.stderr)
+        return 1
+    subprocess.run(tmux_cmd("set-option", "-t", session, "remain-on-exit", "on"), check=False)
+    sent = subprocess.run(tmux_cmd("send-keys", "-t", session, f"bash {shlex_quote(str(script_path))}", "C-m"), check=False)
+    if sent.returncode != 0:
+        subprocess.run(tmux_cmd("kill-session", "-t", session), check=False)
+        return 1
+    deadline = time.time() + DRIVE_TIMEOUT_S
+    while time.time() < deadline and not exit_path.is_file():
+        time.sleep(0.05)
+    pane = subprocess.run(
+        tmux_cmd("capture-pane", "-p", "-t", session, "-S", "-200"),
+        capture_output=True,
+        text=True,
+        errors="replace",
+        check=False,
+    )
+    (step / "pane.txt").write_text(pane.stdout, encoding="utf-8")
+    subprocess.run(tmux_cmd("kill-session", "-t", session), check=False)
+    state = load_state(state["run_id"])
+    state["sessions"] = [name for name in state["sessions"] if name != session]
+    save_state(state)
+    if not exit_path.is_file():
+        print("FEHLER: drive timed out", file=sys.stderr)
+        return 1
+    app_exit = int(exit_path.read_text(encoding="utf-8").strip() or "1")
+    trace = trace_path.read_text(encoding="utf-8", errors="replace") if trace_path.is_file() else ""
+    execs = [line.strip() for line in trace.splitlines() if "execve(" in line]
+    connects = external_connects(trace)
+    (step / "processes.txt").write_text("\n".join(execs) + "\n", encoding="utf-8")
+    (step / "sockets.txt").write_text("\n".join(connects) + "\n", encoding="utf-8")
+    fish_worker = "workers/fish/worker.py" in trace
+    fake_worker = "workers/fake/worker.py" in trace
+    network_ok = not connects and not fish_worker and not (argv[0] == "synth" and not fake_worker)
+    (step / "network.txt").write_text(
+        "\n".join(
+            [
+                f"fake_worker_seen: {'yes' if fake_worker else 'no'}",
+                f"fish_worker_seen: {'yes' if fish_worker else 'no'}",
+                f"external_tcp: {len(connects)}",
+                f"network: {'clean' if network_ok else 'dirty'}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    print(f"exit: {app_exit}")
+    print(f"network: {'clean' if network_ok else 'dirty'}")
+    if argv[0] == "synth":
+        print(f"fake_worker_seen: {'yes' if fake_worker else 'no'}")
+    print(f"evidence: {step}")
+    if not network_ok:
+        print("FEHLER: drive opened a Fish worker or an external TCP socket, or synth did not exec the fake worker", file=sys.stderr)
+        return 3
+    return app_exit
+
+
+def shlex_quote(value: str) -> str:
+    return "'" + value.replace("'", "'\"'\"'") + "'"
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def snapshot(label: str) -> int:
+    state = load_state()
+    safe = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in label) or "state"
+    dest = Path(state["evidence_dir"]) / f"snapshot-{safe}"
+    if dest.exists():
+        sys.exit(f"snapshot already exists: {dest}")
+    dest.mkdir(parents=True)
+    copies = {
+        "lines.jsonl": Path(state["repo_root"]) / "data" / "lines.jsonl",
+        "results.jsonl": Path(state["repo_root"]) / "data" / "synth" / "results.jsonl",
+        "encoded.jsonl": Path(state["repo_root"]) / "data" / "encoded.jsonl",
+        "usage.jsonl": Path(state["repo_root"]) / "data" / "synth" / "usage.jsonl",
+        "index.json": Path(state["install_dir"]) / "index.json",
+    }
+    inventory: list[str] = []
+    for name, source in copies.items():
+        if source.is_file():
+            shutil.copyfile(source, dest / name)
+            inventory.append(f"copy {name} bytes={source.stat().st_size} sha256={sha256(source)}")
+        else:
+            inventory.append(f"missing {name} path={source}")
+    media_dirs = [
+        ("install", Path(state["install_dir"])),
+        ("encoded", Path(state["repo_root"]) / "out" / "audio" / "de"),
+        ("cache", Path(state["repo_root"]) / "cache" / "synth"),
+    ]
+    ffprobe = shutil.which("ffprobe")
+    for label_name, folder in media_dirs:
+        if not folder.is_dir():
+            inventory.append(f"missing-dir {label_name} {folder}")
+            continue
+        for media in sorted(folder.rglob("*")):
+            if not media.is_file() or media.suffix not in {".ogg", ".wav"}:
+                continue
+            target = dest / "media" / label_name / media.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if media.stat().st_size <= 2_000_000:
+                shutil.copyfile(media, target)
+            probe = ""
+            if ffprobe and media.suffix == ".ogg":
+                proc = subprocess.run(
+                    [
+                        ffprobe, "-v", "error",
+                        "-show_entries", "stream=codec_name,sample_rate,channels",
+                        "-show_entries", "format=duration",
+                        "-of", "default=nw=1",
+                        str(media),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    errors="replace",
+                    check=False,
+                )
+                probe = " ".join(proc.stdout.split())
+            inventory.append(
+                f"media {media} bytes={media.stat().st_size} sha256={sha256(media)} {probe}".rstrip()
+            )
+    (dest / "inventory.txt").write_text("\n".join(inventory) + "\n", encoding="utf-8")
+    print(f"evidence: {dest}")
+    for line in inventory:
+        print(line)
+    return 0
+
+
+def cleanup() -> int:
+    state = load_state()
+    for session in list(state.get("sessions", [])):
+        subprocess.run(tmux_cmd("kill-session", "-t", session), check=False)
+    run_dir = Path(state["run_dir"]).resolve()
+    expected = (VERIFY_HOME / "runs" / state["run_id"]).resolve()
+    evidence = Path(state["evidence_dir"]).resolve()
+    if run_dir != expected:
+        sys.exit(f"refusing to delete unexpected run dir: {run_dir}")
+    if evidence == run_dir or run_dir in evidence.parents:
+        sys.exit("refusing to delete evidence")
+    if run_dir.is_dir():
+        shutil.rmtree(run_dir)
+    if current_path().is_file() and current_path().read_text(encoding="utf-8").strip() == state["run_id"]:
+        current_path().unlink()
+    print(f"cleaned: {run_dir}")
+    print(f"evidence: {evidence}")
+    print(f"evidence_exists: {'yes' if evidence.is_dir() else 'no'}")
+    return 0 if evidence.is_dir() else 1
+
+
+def main(argv: list[str]) -> int:
+    if not argv or argv[0] in {"-h", "--help"}:
+        print(
+            "usage: control-drova-voice launch|doctor|cleanup|snapshot [--label NAME]|cli -- <drova-voice args>",
+            file=sys.stderr,
+        )
+        return 2
+    command, rest = argv[0], argv[1:]
+    if rest[:1] == ["--"]:
+        rest = rest[1:]
+    if command == "launch":
+        return launch()
+    if command == "doctor":
+        return doctor()
+    if command == "cleanup":
+        return cleanup()
+    if command == "snapshot":
+        label = "state"
+        if rest[:1] == ["--label"] and len(rest) >= 2:
+            label = rest[1]
+        elif rest:
+            print("usage: control-drova-voice snapshot [--label NAME]", file=sys.stderr)
+            return 2
+        return snapshot(label)
+    if command == "cli":
+        return drive(rest)
+    print(f"unknown command: {command}", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
