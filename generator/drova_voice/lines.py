@@ -9,7 +9,7 @@ import yaml
 from drova_voice.export_report import loca_path_of
 from drova_voice.ids import VARIANT_SEP, choice_id, normalize_loca_path, statement_id, with_variant
 from drova_voice.jsonl import read_jsonl, write_jsonl
-from drova_voice.loc import parse_loc
+from drova_voice.loc import read_loc_file
 from drova_voice.player_name import NAME_VAR, make_name_variants
 from drova_voice.speech_text import GVAR_RE, Lexicon, build_speech_text, compile_lexicon
 
@@ -56,7 +56,7 @@ def load_loc_texts(loc_dir: Path, language: str) -> dict[tuple[str, str], str]:
     loc_dir = Path(loc_dir)
     for file in sorted(loc_dir.rglob("*.loc")):
         path = loca_path_of(file, loc_dir, language)
-        for entry in parse_loc(file.read_text(encoding="utf-8-sig", errors="replace")).entries:
+        for entry in read_loc_file(file).entries:
             texts[(path, entry.key)] = entry.text
     return texts
 

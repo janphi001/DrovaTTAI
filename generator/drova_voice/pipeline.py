@@ -301,8 +301,12 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     cache_dir = cfg.cache_dir / "synth"
     path = synth_results_path(cfg)
     status = SynthStatus()
+    budget = getattr(args, "max_utf8_bytes", None)
+    if budget is not None and budget < 1:
+        return _fail("--max-utf8-bytes muss mindestens 1 sein")
     results = run_synth(jobs, args.engine, _client_factory(cfg), cache_dir, args.workers,
-                        on_result=lambda r: append_jsonl(path, r.to_dict()), status=status)
+                        on_result=lambda r: append_jsonl(path, r.to_dict()), status=status,
+                        max_utf8_bytes=budget)
     done = [r for r in results if r.ok]
     new = [r for r in done if r.attempts > 0]
     failed = [r for r in results if not r.ok]
@@ -565,6 +569,8 @@ def add_parsers(sub) -> None:
     sy.add_argument("--engine", default="fish")
     sy.add_argument("--workers", type=int, default=8, help="parallele Anfragen (Standard 8, gemessen ohne 429 bis 16)")
     sy.add_argument("--limit", type=int, help="nur die ersten N Aufträge (zum Ausprobieren)")
+    sy.add_argument("--max-utf8-bytes", type=int,
+                    help="höchstens so viele UTF-8-Bytes neu senden, danach abbrechen (Cache zählt nicht)")
     _add_selection(sy)
     en = sub.add_parser("encode", help="WAV -> OGG (Stille trimmen, -16 LUFS, mono) nach out/audio/<Sprache>")
     en.add_argument("--workers", type=int, default=4)

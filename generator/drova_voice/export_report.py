@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from drova_voice.ids import normalize_loca_path
-from drova_voice.loc import parse_loc
+from drova_voice.loc import read_loc_file
 
 
 MAX_EXAMPLES = 5
@@ -71,7 +71,7 @@ def compute_coverage(manifest: dict, loc_dir: Path, language: str) -> Coverage:
             continue
         path = loca_path_of(file, loc_dir, language)
         folder = rel.parts[0] if len(rel.parts) > 1 else "(Wurzel)"
-        result = parse_loc(file.read_text(encoding="utf-8-sig", errors="replace"))
+        result = read_loc_file(file)
         for entry in result.entries:
             wanted.add((path, entry.key))
             folder_of[(path, entry.key)] = folder

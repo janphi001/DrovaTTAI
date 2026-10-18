@@ -75,7 +75,13 @@ def parse_loc(content: str) -> LocParseResult:
 
 
 def read_loc_file(path: Path) -> LocParseResult:
-    return parse_loc(Path(path).read_text(encoding="utf-8-sig"))
+    path = Path(path)
+    try:
+        content = path.read_text(encoding="utf-8-sig")
+    except UnicodeError as e:
+        # Kein errors=replace: ein einzelnes Latin-1-Byte würde sonst still zu U+FFFD und so vertont.
+        raise ValueError(f"{path}: Datei ist kein gültiges UTF-8 ({e.reason})") from None
+    return parse_loc(content)
 
 
 def loc_rel_path(lang_dir: Path, file: Path, language: str) -> str:

@@ -4,6 +4,7 @@ import contextlib
 import hashlib
 import json
 import queue
+import struct
 import threading
 import wave
 from concurrent.futures import ThreadPoolExecutor
@@ -21,6 +22,11 @@ from drova_voice.lines import SKIP_UNSPEAKABLE, Line, emotion_id
 from drova_voice.render import render_request
 
 SKIP_NO_VOICE = "no_voice"
+BUDGET_REACHED = "UTF-8-Budget erreicht"
+
+
+class BudgetExceeded(Exception):
+    """Die nächste Anfrage würde das UTF-8-Budget überschreiten. Es wurde nichts gesendet."""
 
 # Fish, Deutsch, gemessen 2026-10-12 (docs/decisions/2026-10-fish-throughput.md): 37.068 Zeichen -> 2.169 s Audio.
 CHARS_PER_SECOND = 17.0
@@ -81,6 +87,28 @@ def wav_duration(path: str | Path) -> float:
         return w.getnframes() / w.getframerate()
 
 
+def wav_resumable(path: str | Path) -> bool:
+    """True, wenn die Datei eine fertige WAV ist (RIFF-Größe gleich den vorhandenen Bytes, Dauer > 0).
+
+    Eine beim Schreiben abgebrochene Datei hat entweder keinen gültigen Header oder eine RIFF-Größe,
+    die über das Dateiende hinausreicht. So eine Datei darf nicht als Cache-Treffer gelten.
+    """
+    file = Path(path)
+    try:
+        data = file.read_bytes()
+    except OSError:
+        return False
+    if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+        return False
+    if struct.unpack_from("<I", data, 4)[0] != len(data) - 8:
+        return False
+    try:
+        duration = wav_duration(file)
+    except (wave.Error, EOFError, OSError, ZeroDivisionError):
+        return False
+    return duration > 0
+
+
 def make_key(engine: str, model: str | None, voice: str | None, text: str, params: Mapping) -> str:
     payload = json.dumps([engine, model, voice, text, dict(params)], ensure_ascii=False, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:32]
@@ -118,16 +146,30 @@ def build_jobs(lines: Sequence[Line], casting: Casting, fish_table: Mapping[str,
 
 
 def cache_hit(job: SynthJob, key: str, cache_dir: Path) -> SynthResult | None:
-    """Fertige WAV im Cache (nur fertige Dateien liegen unter dem endgültigen Namen); kaputte Dateien werden verworfen."""
+    """Fertige WAV im Cache. Eine vollständige `.part.wav` (Abbruch nach dem Schreiben, vor dem Umbenennen)
+    wird übernommen und nicht neu angefordert. Kaputte oder halbe Dateien werden verworfen.
+
+    Wirft OSError, wenn die Part-Datei fertig ist, das Umbenennen aber scheitert. Der Aufrufer darf dann
+    nicht neu anfragen: der bezahlte Ton liegt noch unter dem Part-Namen.
+    """
     wav = Path(cache_dir) / f"{key}.wav"
-    if not wav.exists():
-        return None
-    try:
+    part = wav.with_name(f"{key}.part.wav")
+    if wav.exists():
+        try:
+            duration = wav_duration(wav)
+        except (wave.Error, EOFError, OSError, ZeroDivisionError):
+            wav.unlink(missing_ok=True)
+        else:
+            try:
+                part.unlink(missing_ok=True)
+            except OSError:
+                pass
+            return SynthResult(job.id, key, str(wav), duration, True, 0, not plausible(duration, job.speech_len), None)
+    if wav_resumable(part):
+        replace_with_retry(part, wav)
         duration = wav_duration(wav)
-    except (wave.Error, EOFError, OSError, ZeroDivisionError):
-        wav.unlink(missing_ok=True)
-        return None
-    return SynthResult(job.id, key, str(wav), duration, True, 0, not plausible(duration, job.speech_len), None)
+        return SynthResult(job.id, key, str(wav), duration, True, 0, not plausible(duration, job.speech_len), None)
+    return None
 
 
 def synth_one(client, job: SynthJob, key: str, cache_dir: Path, max_attempts: int = MAX_ATTEMPTS,
@@ -140,12 +182,19 @@ def synth_one(client, job: SynthJob, key: str, cache_dir: Path, max_attempts: in
     part = wav.with_name(f"{key}.part.wav")
     duration: float | None = None  # Dauer der Datei, die gerade unter dem endgültigen Namen liegt
     error: str | None = None
-    attempt = 0
+    sent = 0
     for attempt in range(1, max_attempts + 1):
         # Vor dem Aufruf: auch ein Fehlversuch und jede Wiederholung ist eine gesendete Anfrage.
         # Wirft der Client, bleibt die Zählung stehen (der Text wurde bereits übergeben).
         if on_sent is not None:
-            on_sent(job.text)
+            try:
+                on_sent(job.text)
+            except BudgetExceeded:
+                # Noch nichts gesendet: der Auftrag gilt als nicht gestartet. Sonst den bisherigen Ton oder Fehler behalten.
+                if sent == 0:
+                    raise
+                break
+        sent = attempt
         resp = client.synth(SynthRequest(id=job.id, text=job.text, out_path=str(part), voice=job.voice, params=job.params))
         if not resp.ok:
             error = resp.error or "unbekannter Fehler"
@@ -156,8 +205,8 @@ def synth_one(client, job: SynthJob, key: str, cache_dir: Path, max_attempts: in
         if plausible(duration, job.speech_len):
             break
     if duration is None:
-        return SynthResult(job.id, key, None, None, False, attempt, False, error)
-    return SynthResult(job.id, key, str(wav), duration, True, attempt, not plausible(duration, job.speech_len), None)
+        return SynthResult(job.id, key, None, None, False, sent, False, error)
+    return SynthResult(job.id, key, str(wav), duration, True, sent, not plausible(duration, job.speech_len), None)
 
 
 def _acquire(idle: "queue.Queue", alive: list[int], lock: threading.Lock):
@@ -173,7 +222,8 @@ def _acquire(idle: "queue.Queue", alive: list[int], lock: threading.Lock):
 def run_synth(jobs: Sequence[SynthJob], engine: str, client_factory: Callable[[str], ContextManager],
               cache_dir: Path, workers: int = 8,
               on_result: Callable[[SynthResult], None] | None = None,
-              status: SynthStatus | None = None) -> list[SynthResult]:
+              status: SynthStatus | None = None,
+              max_utf8_bytes: int | None = None) -> list[SynthResult]:
     jobs = list(jobs)
     if not jobs:
         return []
@@ -198,6 +248,8 @@ def run_synth(jobs: Sequence[SynthJob], engine: str, client_factory: Callable[[s
         streak = [0]
         why: list[str | None] = [None]
         not_run = [0]
+        spent = [0]  # UTF-8-Bytes, wenn kein SynthStatus mitgeführt wird
+        track_sent = status is not None or max_utf8_bytes is not None
 
         def emit(r: SynthResult) -> None:
             with lock:
@@ -219,36 +271,68 @@ def run_synth(jobs: Sequence[SynthJob], engine: str, client_factory: Callable[[s
         def on_sent(text: str) -> None:
             chars, utf8_bytes = len(text), len(text.encode("utf-8"))
             with lock:
-                status.sent_requests += 1
-                status.sent_chars += chars
-                status.sent_bytes += utf8_bytes
+                used = status.sent_bytes if status is not None else spent[0]
+                if max_utf8_bytes is not None and used + utf8_bytes > max_utf8_bytes:
+                    # Prüfen und zählen unter demselben Lock, sonst senden parallele Worker über das Budget hinaus.
+                    if why[0] is None:
+                        why[0] = BUDGET_REACHED
+                    stop.set()
+                    raise BudgetExceeded()
+                if status is not None:
+                    status.sent_requests += 1
+                    status.sent_chars += chars
+                    status.sent_bytes += utf8_bytes
+                else:
+                    spent[0] += utf8_bytes
+
+        def skip_unfinished(key: str) -> None:
+            part = Path(cache_dir) / f"{key}.part.wav"
+            if not wav_resumable(part):
+                part.unlink(missing_ok=True)
+
+        def count_not_run(key: str) -> None:
+            with lock:
+                not_run[0] += 1 + len(followers.get(key, []))
 
         def work(job: SynthJob) -> None:
             key = keys[job.id]
-            r = cache_hit(job, key, cache_dir)  # Cache-Treffer brauchen keinen Worker (auch nicht, wenn alle tot sind)
-            if r is None:
-                if stop.is_set():  # abgebrochen: nichts mehr starten, auch keine Fehlerzeile schreiben
-                    with lock:
-                        not_run[0] += 1 + len(followers.get(key, []))
+            try:
+                r = cache_hit(job, key, cache_dir)  # Cache-Treffer brauchen keinen Worker (auch nicht, wenn alle tot sind)
+            except OSError as e:
+                # Fertige Part-Datei ließ sich nicht umbenennen: nicht neu anfragen, Datei für den nächsten Lauf behalten.
+                r = SynthResult(job.id, key, None, None, False, 0, False, f"{type(e).__name__}: {e}")
+            if r is not None:
+                if not r.ok:
+                    note(r)
+                emit(r)
+                for other in followers.get(key, []):
+                    emit(SynthResult(other.id, key, r.wav, r.duration, r.ok, r.attempts, r.flagged, r.error))
+                return
+            if stop.is_set():  # abgebrochen: nichts mehr starten, auch keine Fehlerzeile schreiben
+                count_not_run(key)
+                return
+            client = _acquire(idle, alive, lock)
+            if client is None:
+                r = SynthResult(job.id, key, None, None, False, 0, False, "kein Worker mehr verfügbar")
+            else:
+                try:
+                    r = synth_one(client, job, key, cache_dir, on_sent=on_sent if track_sent else None)
+                except BudgetExceeded:
+                    idle.put(client)
+                    count_not_run(key)
                     return
-                client = _acquire(idle, alive, lock)
-                if client is None:
-                    r = SynthResult(job.id, key, None, None, False, 0, False, "kein Worker mehr verfügbar")
+                except EngineError as e:  # Worker tot: nicht zurücklegen, Rest dieses Laufs scheitert sauber
+                    with lock:
+                        alive[0] -= 1
+                    r = SynthResult(job.id, key, None, None, False, 0, False, str(e))
+                except Exception as e:  # z. B. gesperrte Cache-Datei: Worker ist in Ordnung, dieser Auftrag nicht
+                    idle.put(client)
+                    r = SynthResult(job.id, key, None, None, False, 0, False, f"{type(e).__name__}: {e}")
                 else:
-                    try:
-                        r = synth_one(client, job, key, cache_dir, on_sent=on_sent if status is not None else None)
-                    except EngineError as e:  # Worker tot: nicht zurücklegen, Rest dieses Laufs scheitert sauber
-                        with lock:
-                            alive[0] -= 1
-                        r = SynthResult(job.id, key, None, None, False, 0, False, str(e))
-                    except Exception as e:  # z. B. gesperrte Cache-Datei: Worker ist in Ordnung, dieser Auftrag nicht
-                        idle.put(client)
-                        r = SynthResult(job.id, key, None, None, False, 0, False, f"{type(e).__name__}: {e}")
-                    else:
-                        idle.put(client)
-                    if not r.ok:
-                        (Path(cache_dir) / f"{key}.part.wav").unlink(missing_ok=True)
-                note(r)
+                    idle.put(client)
+                if not r.ok:
+                    skip_unfinished(key)
+            note(r)
             emit(r)
             for other in followers.get(key, []):
                 emit(SynthResult(other.id, key, r.wav, r.duration, r.ok, r.attempts, r.flagged, r.error))

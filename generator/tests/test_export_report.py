@@ -201,6 +201,15 @@ def test_breakdown_counts_categories_and_top_combinations(tmp_path):
     assert text.count("\n") < 40  # Länge begrenzt
 
 
+def test_coverage_rejects_a_loc_file_that_is_not_utf8(tmp_path):
+    d = tmp_path / "de"
+    (d / "Dialog").mkdir(parents=True)
+    (d / "Dialog" / "NPC_B_de.loc").write_bytes(b"B_1 { Aa\xe4 }\n")
+    with pytest.raises(ValueError, match="kein gültiges UTF-8") as info:
+        compute_coverage({"lines": []}, d, "de")
+    assert "Aa" not in str(info.value) and "\ufffd" not in str(info.value)
+
+
 def test_old_style_coverage_construction_still_works():
     from drova_voice.export_report import Coverage
     cov = Coverage(total=1, covered=1, missing=(), extra=0, by_folder={})

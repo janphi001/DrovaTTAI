@@ -29,6 +29,15 @@ def test_extract_rejects_unusable_manifest_json(pipeline_repo, capsys, payload):
     assert not (pipeline_repo.data / "lines.jsonl").exists()
 
 
+def test_extract_rejects_a_loc_file_that_is_not_utf8(pipeline_repo, capsys):
+    loc = pipeline_repo.game / "Drova_Data" / "StreamingAssets" / "Localization" / "de" / "Dialog" / "NPC_Mira_de.loc"
+    loc.write_bytes(b"Plh_1 { Aa\xe4 }\n")
+    assert main(["--config", str(pipeline_repo.cfg), "extract"]) == 2
+    err = capsys.readouterr().err
+    assert "FEHLER:" in err and "kein gültiges UTF-8" in err and "Traceback" not in err
+    assert "Aa" not in err and not (pipeline_repo.data / "lines.jsonl").exists()
+
+
 def test_extract_rejects_manifest_that_is_not_utf8(pipeline_repo, capsys):
     path = pipeline_repo.data / "export" / "de" / "manifest.json"
     path.write_bytes(b"\xff\xfe{")
