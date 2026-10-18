@@ -46,6 +46,12 @@ voices:
   kind_von_oben_578878: {id: "57887823e98a48e0a7c01819628ba59b", label: "Kind von oben", gender: f, region: de, age: kind, source: bibliothek, tags: ["female", "young", "social-media", "entertainment", "energetic", "cheerful"], note: "Kinderstimme (Annäherung), nur Kurzzeilen testen"}
   warmer_junger_mann_179999: {id: "1799997c77204a1b8753511fdf47f485", label: "Warmer junger Mann", gender: m, region: de, age: jung, source: bibliothek, tags: ["male", "old", "conversational", "crisp", "narration", "deep"], note: "Tags der Bibliothek sagen alt; klingt laut Nutzer warm/jung (tiefe Lage, 93 Hz)"}
 
+# Fallbacks (optional): wenn eine Fish-ID fehlt, nennt `cast --check-voices` den Ersatz.
+# synth wechselt nicht von selbst, weil ein anderer Schlüssel den Cache verfehlt.
+# Ziel ist ein Schlüssel aus voices oder variants. Beispiel (auskommentiert):
+# fallbacks:
+#   beispiel_stimme: lena
+#
 # Varianten: abgeleitet aus einer Stimme (base) per ffmpeg, vom Nutzer am 2026-10-12 nach Anhören ausgewählt.
 # Rezept (pitch = Gesamt-Tonhöhe, formant = Klangfarbe/Vokaltrakt, tempo = Geschwindigkeit; je als Faktor):
 #   ffmpeg -af "asetrate=<44100*formant>,aresample=44100,rubberband=pitch=<pitch/formant>:tempo=<tempo/formant>:formant=preserved"

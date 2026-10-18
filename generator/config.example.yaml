@@ -3,3 +3,13 @@
 # denn in doppelten Anführungszeichen ist "\G" ein ungültiges YAML-Escape.
 game_dir: "D:/Games/Steam/steamapps/common/Drova - Forsaken Kin"
 language: de
+# Fish-Modell für synth. Weglassen heißt s2.1-pro-free (kostenlos bis 30.11.2026).
+# Erlaubt: s2.1-pro-free, s2.1-pro, s2-pro, s1, drama-3.
+# FISH_MODEL in der Shell überschreibt den Wert für einen Lauf.
+# Ein anderes Modell, eine andere Sprache, Latenz oder Sampling-Werte ändern den Cache-Schlüssel.
+# synth bleibt dann stehen, bis --accept-model-change den Wechsel bestätigt
+# (vorhandene WAVs werden neu erzeugt).
+# fish_model: s2.1-pro-free
+# fish_latency: normal
+# fish_temperature: 0.7
+# fish_top_p: 0.7

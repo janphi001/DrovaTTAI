@@ -15,6 +15,8 @@ Stand: Alle 245 benannten Sprecher haben eine Stimme, im Spiel sind rund 13.800 
 
 Die Stimmen werden mit **[Fish Audio](https://fish.audio)** erzeugt (Modell `s2.1-pro-free`). Ich habe Fish gewählt, weil die Nutzung für Entwickler über die API kostenlos ist und die Qualität für Deutsch und für Emotionen im Text überzeugt hat. Das ist der Stand bei der Entwicklung (Oktober 2026); Fish kann Preise und Limits jederzeit ändern. Schau vor dem Vollauf in dein Konto, was aktuell gilt.
 
+`s2.1-pro-free` ist laut Fish-Changelog dasselbe Modell wie `s2.1-pro` und kostenlos bis **30.11.2026**. Danach steht in der Preisliste `s2.1-pro` mit 15 USD je Million UTF-8-Bytes. Die Modell-ID steht an einer Stelle: `fish_model` in `generator/config.yaml`, sonst die Umgebungsvariable `FISH_MODEL`, sonst `s2.1-pro-free`. Der Cache-Schlüssel enthält das Modell (`fish-audio/<id>`), die Sprache aus `language`, die Latenz und die Sampling-Werte `temperature` und `top_p`. Ein Wechsel trifft keine vorhandene WAV. `synth` bricht dann ab und erzeugt erst nach `synth --accept-model-change` neu. Lässt du eine ID stehen, die Fish nicht mehr kennt, fällt die Anfrage laut TTS-Doku still auf `s2.1-pro` zurück und wird berechnet, ohne dass der Cache-Schlüssel sich ändert.
+
 Wichtig zu wissen:
 
 - Fish ist ein **Cloud-Dienst**. Der Sprechtext jeder Zeile wird an `api.fish.audio` gesendet. Es gelten die Bedingungen von Fish.
@@ -201,7 +203,7 @@ Das Projekt nutzt **41 Fish-Stimmen** (22 männlich, 19 weiblich) und **7 Abwand
 | `kind_von_oben_578878` | Kind von oben | weiblich | Deutschland | kind | Bibliothek (Community) | `57887823e98a48e0a7c01819628ba59b` |
 | `warmer_junger_mann_179999` | Warmer junger Mann | männlich | Deutschland | jung | Bibliothek (Community) | `1799997c77204a1b8753511fdf47f485` |
 
-Leere Altersfelder bedeuten: bei den offiziellen Stimmen nicht angegeben. Die Fish-ID ist die Kennung der Stimme bei Fish (auch in der API). Entfernt ein Community-Autor seine Stimme, funktioniert die ID nicht mehr; dann muss in `casting/casting.yaml` eine andere eingetragen werden.
+Leere Altersfelder bedeuten: bei den offiziellen Stimmen nicht angegeben. Die Fish-ID ist die Kennung der Stimme bei Fish (auch in der API). Die Bibliothek hat keine feste Lebensdauer: der Autor kann die Stimme löschen oder verstecken, Fish kann sie abnehmen, und `GET /model/{id}` liefert dann 404. Das Feld `pvc_release_state` kann `retiring` sein, mit Datum `pvc_retire_effective_at`. Vor einem Vollauf prüft `drova-voice cast --check-voices` die IDs, die die Besetzung wirklich nutzt. Ohne `FISH_API_KEY` überspringt der Befehl die Prüfung und macht keinen Aufruf. Einen Ersatz trägst du optional unter `fallbacks:` in `casting/fish_voices.yaml` ein (`stimme: andere_stimme`). Die Prüfung nennt ihn, `synth` wechselt nicht von selbst.
 
 ### Abwandlungen
 

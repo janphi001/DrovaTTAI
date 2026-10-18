@@ -32,6 +32,15 @@ def _warm_up(state: Any, synth: Callable[[Any, dict], tuple[int, float]], text: 
         traceback.print_exc()
 
 
+def _http_attempts(state: Any) -> dict:
+    """Nur die POST-Zählung des Fish-Workers. Der Zustand selbst (samt Schlüssel) geht nicht raus."""
+    if isinstance(state, dict):
+        attempts = state.get("http_attempts")
+        if isinstance(attempts, int) and not isinstance(attempts, bool) and attempts >= 0:
+            return {"http_attempts": attempts}
+    return {}
+
+
 def serve(engine: str, model: str, load: Callable[[], Any], synth: Callable[[Any, dict], tuple[int, float]],
           warmup_text: str | None = None) -> None:
     # Protokoll-Kanal auf eine eigene Kopie von fd 1 legen, danach fd 1 auf stderr umleiten:
@@ -84,7 +93,7 @@ def serve(engine: str, model: str, load: Callable[[], Any], synth: Callable[[Any
                 send({"id": req.get("id"), "ok": False, "error": f"Leeres Audio (Dauer 0): {out_path}"})
                 continue
             send({"id": req.get("id"), "ok": True, "out_path": out_path,
-                  "sample_rate": sample_rate, "duration": duration})
+                  "sample_rate": sample_rate, "duration": duration, **_http_attempts(state)})
         except Exception as e:  # noqa: BLE001 – jeder Fehler wird gemeldet, der Worker lebt weiter
             traceback.print_exc()
-            send({"id": req.get("id"), "ok": False, "error": f"{type(e).__name__}: {e}"})
+            send({"id": req.get("id"), "ok": False, "error": f"{type(e).__name__}: {e}", **_http_attempts(state)})

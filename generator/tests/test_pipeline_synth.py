@@ -57,6 +57,20 @@ def test_synth_limit(pipeline_repo, guarded):
     assert len(rows) == 1
 
 
+def test_fish_synth_refuses_a_new_cache_key_until_the_change_is_accepted(pipeline_repo, monkeypatch, capsys):
+    monkeypatch.delenv("FISH_API_KEY", raising=False)
+    for name in ("FISH_MODEL", "FISH_LATENCY", "FISH_TEMPERATURE", "FISH_TOP_P"):
+        monkeypatch.delenv(name, raising=False)
+    run(pipeline_repo, "extract")
+    cache = pipeline_repo.repo / "cache" / "synth"
+    cache.mkdir(parents=True)
+    (cache / "alt.wav").write_bytes(b"RIFF")
+    assert run(pipeline_repo, "synth", "--engine", "fish") == 2
+    err = capsys.readouterr().err
+    assert "Cache-Schlüssel" in err and "accept-model-change" in err
+    assert not (cache / "fish-model.txt").exists()
+
+
 def test_synth_records_the_characters_sent(pipeline_repo, guarded, capsys):
     texts = (
         "Der Weg nach Norden ist weit.",

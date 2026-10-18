@@ -6,6 +6,8 @@ from pathlib import Path
 
 import yaml
 
+from drova_voice.fish_model import resolve_fish_model
+
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.yaml"
 # Dieselbe Ordnerregel wie AudioLanguage in der Mod (VoiceSettings.CleanFolderName): 1–16 Zeichen,
 # nur Buchstaben, Ziffern, '_' und '-'. Punkte und Schrägstriche würden install --prune aus dem Sprachordner heben.
@@ -17,6 +19,10 @@ class Config:
     game_dir: Path
     language: str
     repo_root: Path
+    fish_model: str | None = None  # None: Standard aus drova_voice.fish_model, sonst diese Modell-ID
+    fish_latency: str | None = None
+    fish_temperature: float | None = None
+    fish_top_p: float | None = None
 
     @property
     def loc_dir(self) -> Path:
@@ -79,10 +85,24 @@ def load_config(path: Path) -> Config:
     else:
         raise ValueError(f"{path}: 'repo_root' muss ein Text sein")
     language = _language_folder(raw.get("language", "de"), path)
+    fish_model = raw.get("fish_model")
+    if fish_model is None or fish_model == "":
+        fish_model = None
+    elif not isinstance(fish_model, str):
+        raise ValueError(f"{path}: 'fish_model' muss ein Text sein")
+    else:
+        fish_model = resolve_fish_model(fish_model, {})  # leere Umgebung: nur den Konfigurationswert prüfen
+    fish_latency = _optional_text(raw, path, "fish_latency")
+    fish_temperature = _optional_unit(raw, path, "fish_temperature")
+    fish_top_p = _optional_unit(raw, path, "fish_top_p")
     return Config(
         game_dir=Path(game_dir),
         language=language,
         repo_root=repo_root.resolve(),
+        fish_model=fish_model,
+        fish_latency=fish_latency,
+        fish_temperature=fish_temperature,
+        fish_top_p=fish_top_p,
     )
 
 
@@ -100,3 +120,24 @@ def _language_folder(language: object, path: Path) -> str:
             "(erlaubt sind 1–16 Zeichen aus Buchstaben, Ziffern, '_' und '-')"
         )
     return language
+
+
+def _optional_text(raw: dict, path: Path, field: str) -> str | None:
+    if field not in raw or raw[field] is None or raw[field] == "":
+        return None
+    value = raw[field]
+    if not isinstance(value, str):
+        raise ValueError(f"{path}: '{field}' muss ein Text sein")
+    return value
+
+
+def _optional_unit(raw: dict, path: Path, field: str) -> float | None:
+    if field not in raw or raw[field] is None or raw[field] == "":
+        return None
+    value = raw[field]
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{path}: '{field}' muss eine Zahl sein")
+    number = float(value)
+    if number != number or number in (float("inf"), float("-inf")) or not 0 < number <= 1:
+        raise ValueError(f"{path}: '{field}' muss größer als 0 und höchstens 1 sein")
+    return number
