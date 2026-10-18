@@ -298,7 +298,6 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     jobs, skipped = build_jobs(lines, casting, catalog.synth_table(), emotions, args.engine)
     if args.limit:
         jobs = jobs[: args.limit]
-    chars = {j.id: len(j.text) for j in jobs}
     cache_dir = cfg.cache_dir / "synth"
     path = synth_results_path(cfg)
     status = SynthStatus()
@@ -312,12 +311,17 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     detail = ", ".join(f"{k}: {n}" for k, n in sorted(reasons.items())) or "keine"
     print(f"{len(done)} erzeugt ({len(done) - len(new)} aus dem Cache, {len(new)} neu erzeugt), {len(failed)} Fehler, "
           f"{len(flagged)} auffällige Dauer; übersprungen: {detail}")
-    unique_new = {r.key: r for r in new}  # gleicher Text + Stimme wird nur einmal gesendet
-    new_chars = sum(chars[r.id] for r in unique_new.values())
+    unique_new = {r.key: r for r in new}  # Zeilen mit neuem Ton; Anfragen und Bytes stehen in status
     append_jsonl(usage_path(cfg), {"at": datetime.now().isoformat(timespec="seconds"), "engine": args.engine,
-                                   "lines": len(unique_new), "chars": new_chars})
-    total = sum(row.get("chars", 0) for row in read_jsonl_lenient(usage_path(cfg)) if row.get("engine") == args.engine)
-    print(f"Zeichen neu an {args.engine} gesendet: {new_chars}; insgesamt bisher: {total}")
+                                   "lines": len(unique_new), "requests": status.sent_requests,
+                                   "chars": status.sent_chars, "utf8_bytes": status.sent_bytes})
+    history = [row for row in read_jsonl_lenient(usage_path(cfg)) if row.get("engine") == args.engine]
+    total_chars = sum(row.get("chars", 0) for row in history)
+    # Ältere Zeilen haben nur `chars`. Die sind eine Untergrenze der UTF-8-Bytes.
+    total_bytes = sum(row["utf8_bytes"] if "utf8_bytes" in row else row.get("chars", 0) for row in history)
+    print(f"Zeichen neu an {args.engine} gesendet: {status.sent_chars} "
+          f"({status.sent_bytes} UTF-8-Bytes, {status.sent_requests} Anfragen); "
+          f"insgesamt bisher: {total_chars} ({total_bytes} UTF-8-Bytes)")
     for r in failed[:10]:
         print(f"FEHLER {r.id}: {r.error}", file=sys.stderr)
     for r in flagged[:10]:

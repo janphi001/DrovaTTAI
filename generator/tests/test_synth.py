@@ -10,8 +10,8 @@ from drova_voice.engines.client import EngineError
 from drova_voice.engines.protocol import SynthResponse
 from drova_voice.fish_voices import FishVoice
 from drova_voice.lines import Line
-from drova_voice.synth import (ABORT_AFTER, SKIP_NO_VOICE, SynthJob, SynthStatus, build_jobs, fatal_reason, make_key,
-                               plausible, run_synth, wav_duration)
+from drova_voice.synth import (ABORT_AFTER, MAX_ATTEMPTS, SKIP_NO_VOICE, SynthJob, SynthStatus, build_jobs,
+                               fatal_reason, make_key, plausible, run_synth, synth_one, wav_duration)
 
 FISH = {"lena": FishVoice("lena", "a" * 32, "Lena", "f", "de"), "leon": FishVoice("leon", "b" * 32, "Leon", "m", "de")}
 CASTING = Casting("leon", {"mira": "lena"})
@@ -225,3 +225,85 @@ def test_a_success_resets_the_fatal_streak(tmp_path):
     status = SynthStatus()
     results = run_synth(jobs, "fish", quota_factory([]), tmp_path, workers=1, status=status)
     assert len(results) == len(texts) and status.aborted is None and status.not_run == 0
+
+
+def test_synth_one_reports_every_attempt_including_a_raise(tmp_path):
+    sent = []
+
+    class RaiseOnce:
+        def synth(self, req):
+            raise EngineError("Worker beendet")
+
+    with pytest.raises(EngineError):
+        synth_one(RaiseOnce(), job("a", "Grüße."), "k", tmp_path, on_sent=sent.append)
+    assert sent == ["Grüße."]
+
+
+def test_synth_one_reports_each_failed_attempt(tmp_path):
+    sent = []
+
+    class AlwaysFail:
+        def synth(self, req):
+            return SynthResponse(req.id, False, error="HTTP 500")
+
+    result = synth_one(AlwaysFail(), job("a", "Grüße."), "k", tmp_path, on_sent=sent.append)
+    assert not result.ok and result.attempts == MAX_ATTEMPTS and sent == ["Grüße."] * MAX_ATTEMPTS
+
+
+def test_sent_usage_counts_retries_of_implausible_audio_in_utf8_bytes(tmp_path):
+    text = "Grüße."
+    status = SynthStatus()
+    (result,) = run_synth([job("a", text)], "fake", factory([], seconds=40.0), tmp_path, status=status)
+    assert result.ok and result.flagged and result.attempts == MAX_ATTEMPTS
+    assert status.sent_requests == MAX_ATTEMPTS
+    assert status.sent_chars == MAX_ATTEMPTS * len(text)
+    assert status.sent_bytes == MAX_ATTEMPTS * len(text.encode("utf-8"))
+    assert status.sent_bytes > status.sent_chars
+
+
+def test_sent_usage_counts_failed_requests(tmp_path):
+    text = "Das schlägt FEHL."
+    status = SynthStatus()
+    (result,) = run_synth([job("a", text)], "fake", factory([], fail_on="FEHL"), tmp_path, status=status)
+    assert not result.ok and result.attempts == MAX_ATTEMPTS
+    assert status.sent_requests == MAX_ATTEMPTS
+    assert status.sent_chars == MAX_ATTEMPTS * len(text)
+    assert status.sent_bytes == MAX_ATTEMPTS * len(text.encode("utf-8")) > status.sent_chars
+
+
+def test_sent_usage_ignores_cache_hits_and_duplicate_text(tmp_path):
+    text = "Gleicher Satz."
+    status = SynthStatus()
+    run_synth([job("a", text), job("b", text)], "fake", factory([]), tmp_path, workers=2, status=status)
+    assert status.sent_requests == 1 and status.sent_chars == len(text) and status.sent_bytes == len(text.encode("utf-8"))
+    again = SynthStatus()
+    run_synth([job("a", text), job("b", text)], "fake", factory([]), tmp_path, workers=2, status=again)
+    assert again.sent_requests == 0 and again.sent_chars == 0 and again.sent_bytes == 0
+
+
+def test_sent_usage_counts_rendered_text_not_the_speech_length(tmp_path):
+    rendered = "[sad] Grüße."
+    status = SynthStatus()
+    (result,) = run_synth([SynthJob("a", rendered, 6, None, {})], "fake", factory([]), tmp_path, status=status)
+    assert result.ok and result.attempts == 1
+    assert status.sent_chars == len(rendered) and status.sent_bytes == len(rendered.encode("utf-8"))
+    assert status.sent_bytes > status.sent_chars
+
+
+def test_sent_usage_counts_a_request_whose_worker_dies(tmp_path):
+    status = SynthStatus()
+    jobs = [job("a", "Das ist STOPP hier."), job("b", "Danach kommt noch etwas.")]
+    results = run_synth(jobs, "fake", factory([], die_on="STOPP"), tmp_path, workers=1, status=status)
+    by_id = {r.id: r for r in results}
+    assert not by_id["a"].ok and not by_id["b"].ok
+    assert status.sent_requests == 1 and status.sent_chars == len(jobs[0].text)
+
+
+def test_fatal_failures_count_every_attempt_until_abort(tmp_path):
+    status = SynthStatus()
+    jobs = [job(f"T|P|{i}", f"quota Nummer {i}.") for i in range(12)]
+    results = run_synth(jobs, "fish", quota_factory([]), tmp_path, workers=1, status=status)
+    assert len(results) == ABORT_AFTER and status.not_run == 12 - ABORT_AFTER
+    assert status.sent_requests == ABORT_AFTER * MAX_ATTEMPTS
+    assert status.sent_chars == sum(len(j.text) * MAX_ATTEMPTS for j in jobs[:ABORT_AFTER])
+    assert status.sent_bytes == status.sent_chars

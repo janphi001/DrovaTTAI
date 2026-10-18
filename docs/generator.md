@@ -42,7 +42,7 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 | h | `synth --batch N`, `encode --batch N`, `install --batch N` | eine Etappe erzeugen; `synth` bricht bei Guthaben-/Limit-/Anmeldefehlern nach 5 Fehlern in Folge sauber ab |
 | i | `report --by-speaker` | Status und Lücken je Sprecher |
 
-`--sample` und `--batch N` gelten für `synth`, `encode`, `install`, `report` und `preview`. Varianten (`voice: alte_frau` in `casting.yaml`) werden mit der Basisstimme erzeugt und beim Kodieren per ffmpeg (`rubberband`) umgeformt. Der Zeichenverbrauch je Lauf steht am Ende der `synth`-Ausgabe und in `data/synth/usage.jsonl`.
+`--sample` und `--batch N` gelten für `synth`, `encode`, `install`, `report` und `preview`. Varianten (`voice: alte_frau` in `casting.yaml`) werden mit der Basisstimme erzeugt und beim Kodieren per ffmpeg (`rubberband`) umgeformt. Verbrauch je Lauf (Zeichen und UTF-8-Bytes je tatsächlich gesendeter Anfrage, inklusive Wiederholungen und fehlgeschlagener Anfragen) steht am Ende der `synth`-Ausgabe und in `data/synth/usage.jsonl` (`chars`, `utf8_bytes`, `requests`).
 
 `profile --import` und `emote --import` brechen bei einer fehlenden Importdatei ab (Exit 2) und melden unlesbare Zeilen (Exit 1), schreiben aber die gültigen Zeilen.
 
