@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading;
 using DrovaVoice.Core;
 using MelonLoader;
 using UnityEngine;
@@ -13,6 +15,7 @@ namespace DrovaVoice.Playback
         private VoiceSettings _settings;
         private readonly ClipStore _store;
         private readonly ClipLoader _loader;
+        private readonly DecodeCache _decodes = new DecodeCache();
         private readonly MelonLogger.Instance _log;
         private readonly HashSet<string> _failed = new HashSet<string>(StringComparer.Ordinal);
         private readonly OnceLog _lineLog = new OnceLog();   // Diagnose je Zeile (miss/hit)
@@ -74,17 +77,64 @@ namespace DrovaVoice.Playback
             if (_store.TryGet(cacheKey, out var cached)) return cached;
             if (_failed.Contains(id!)) return null;
 
-            var clip = _loader.Load(entry, percent, out long bytes, out long elapsedMs, out string? error);
+            var watch = Stopwatch.StartNew();
+            var status = AwaitSamples(cacheKey, entry, percent, out var decoded, out string? error);
+            if (status != DecodeStatus.Ready || decoded == null)
+            {
+                _failed.Add(id!);
+                _decodes.TryRemove(cacheKey, out _, out _);
+                Problem("fail|" + id, $"Zeile bleibt stumm ({error ?? "Dekodieren fehlgeschlagen"}): {id}", error: false);
+                return null;
+            }
+            var clip = _loader.CreateClip(entry, decoded, out error);
+            watch.Stop();
+            long elapsedMs = watch.ElapsedMilliseconds;
+            _decodes.TryRemove(cacheKey, out _, out _);
             if (clip == null)
             {
                 _failed.Add(id!);
                 Problem("fail|" + id, $"Zeile bleibt stumm ({error}): {id}", error: false);
                 return null;
             }
-            _store.Put(cacheKey, clip, bytes);
+            _store.Put(cacheKey, clip, decoded.Bytes);
             if (elapsedMs > ClipLoader.SlowMilliseconds) Problem("slow|" + id, $"Laden dauerte {elapsedMs} ms (Ruckler möglich): {id}", error: false);
             Diag("hit|" + cacheKey, $"[Zeile] geladen: {id} ({entry.File}, {entry.Duration:0.00} s, {entry.Category}, {percent} %, {elapsedMs} ms); Cache {_store.Count} Clips, {_store.TotalBytes / 1024 / 1024} MB");
             return clip;
+        }
+
+        /// <summary>
+        /// Dekodiert im ThreadPool und wartet hier auf das PCM. Unity (<c>AudioClip</c>) läuft erst danach, auf diesem Thread.
+        /// Der Worker darf kein Unity anfassen. Der Connector braucht den Clip, bevor er zurückkehrt.
+        /// </summary>
+        private DecodeStatus AwaitSamples(string key, IndexEntry entry, int percent, out DecodedClip? decoded, out string? error)
+        {
+            var status = _decodes.Peek(key, out decoded, out error);
+            if (status == DecodeStatus.Ready || status == DecodeStatus.Failed) return status;
+            if (status == DecodeStatus.Missing && _decodes.TryBegin(key))
+            {
+                var captured = entry;
+                int capturedPercent = percent;
+                ThreadPool.QueueUserWorkItem(_ => DecodeWorker(key, captured, capturedPercent));
+            }
+            return _decodes.Wait(key, ClipLoader.DecodeWait, out decoded, out error);
+        }
+
+        private void DecodeWorker(string key, IndexEntry entry, int percent)
+        {
+            try
+            {
+                var pcm = _loader.Decode(entry, percent);
+                if (pcm.Samples == null)
+                {
+                    _decodes.Fail(key, string.IsNullOrEmpty(pcm.Error) ? "Dekodieren fehlgeschlagen" : pcm.Error!);
+                    return;
+                }
+                _decodes.Complete(key, new DecodedClip(pcm.Samples, pcm.Channels, pcm.SampleRate, pcm.ElapsedMilliseconds));
+            }
+            catch (Exception e)
+            {
+                try { _decodes.Fail(key, e.GetType().Name + ": " + e.Message); } catch (Exception) { }
+            }
         }
 
         /// <summary>

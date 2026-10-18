@@ -16,6 +16,7 @@ namespace DrovaVoice.Playback
     ///    wieder auf null gesetzt, damit der Connector bei der nächsten Ausführung neu entscheidet.
     /// 2. <b>Entfernung:</b> Spielt ein Bark-Clip (Clipname <c>DrovaVoice/bark/…</c>), regelt die Klasse in jedem Frame
     ///    <c>AudioSource.volume</c> nach <see cref="BarkAttenuation"/> (nah laut, weiter weg leiser, wieder lauter beim Annähern).
+    ///    Die AudioSources kommen aus der gemeinsamen Suche (<see cref="AudioSourceScan"/>), nicht aus einer eigenen.
     ///    Am Ende wird die ursprüngliche Lautstärke wiederhergestellt, weil dieselbe Quelle später normale Dialoge spielt.
     ///    Ist die Spielerposition nicht lesbar, wird nichts neu geregelt: Ein laufender Bark behält den zuletzt gesetzten Wert.
     /// </summary>
@@ -47,9 +48,13 @@ namespace DrovaVoice.Playback
         public void Watch(DS_Statement statement, AudioClip clip) =>
             _pending.Add(new Pending { Statement = statement, Clip = clip, Since = Time.unscaledTime, Name = SafeName(clip) });
 
-        public void Update()
+        /// <summary>
+        /// <paramref name="sources"/> ist die gemeinsame, gedrosselte Liste aus <see cref="AudioSourceScan"/>.
+        /// Die Lautstärke läuft trotzdem in jedem Frame; nur die Suche selbst ist gedrosselt.
+        /// </summary>
+        public void Update(AudioSource[] sources, float now)
         {
-            if (_pending.Count > 0) Guard("Freigabe", ResolvePending);
+            if (_pending.Count > 0) Guard("Freigabe", () => ResolvePending(sources, now));
             if (_tracked.Count > 0) Guard("Regelung", Apply);
         }
 
@@ -63,23 +68,29 @@ namespace DrovaVoice.Playback
             }
         }
 
-        private void ResolvePending()
+        private void ResolvePending(AudioSource[] sources, float now)
         {
             var playing = new List<AudioSource>();
-            Guard("Suche", () =>
+            if (sources != null)
             {
-                foreach (var source in UnityEngine.Object.FindObjectsOfType<AudioSource>(true))
+                foreach (var source in sources)
                 {
-                    if (source == null || !source.isPlaying || source.clip == null) continue;
-                    playing.Add(source);
-                    var clip = source.clip;
-                    if (clip.name == null || !clip.name.StartsWith(BarkClipPrefix, StringComparison.Ordinal)) continue;
-                    if (!_ids.Add(source.GetInstanceID())) continue;
-                    _tracked.Add(new Tracked { Source = source, OriginalVolume = source.volume, ClipId = clip.GetInstanceID() });
-                    if (_verbose) _log.Msg($"[Bark] Entfernungsregelung für {clip.name} (Lautstärke vorher {source.volume:0.00})");
+                    try
+                    {
+                        if (source == null || !source.isPlaying || source.clip == null) continue;
+                        playing.Add(source);
+                        var clip = source.clip;
+                        if (clip.name == null || !clip.name.StartsWith(BarkClipPrefix, StringComparison.Ordinal)) continue;
+                        if (!_ids.Add(source.GetInstanceID())) continue;
+                        _tracked.Add(new Tracked { Source = source, OriginalVolume = source.volume, ClipId = clip.GetInstanceID() });
+                        if (_verbose) _log.Msg($"[Bark] Entfernungsregelung für {clip.name} (Lautstärke vorher {source.volume:0.00})");
+                    }
+                    catch (Exception e)
+                    {
+                        if (_warned.Add("Suche")) _log.Warning($"Bark-Suche: {e.GetType().Name}: {e.Message}");
+                    }
                 }
-            });
-            float now = Time.unscaledTime;
+            }
             for (int i = _pending.Count - 1; i >= 0; i--)
             {
                 var p = _pending[i];
