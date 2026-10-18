@@ -1,5 +1,9 @@
+import json
+
 from drova_voice.cli import main
 from drova_voice.jsonl import latest_by_id, read_jsonl_lenient
+from drova_voice.lines import read_lines
+from drova_voice.synth import MAX_ATTEMPTS
 
 NPC_TREE = "DT_Test_NPC_Mira|Dialog/NPC_Mira|"
 
@@ -42,10 +46,71 @@ def test_synth_limit(pipeline_repo, guarded):
 
 
 def test_synth_records_the_characters_sent(pipeline_repo, guarded, capsys):
+    texts = (
+        "Der Weg nach Norden ist weit.",
+        "Wohin soll ich dich führen?",
+        "Zum Brunnen, bitte.",
+    )
+    chars = sum(len(text) for text in texts)
+    utf8_bytes = sum(len(text.encode("utf-8")) for text in texts)
+    assert utf8_bytes > chars
     run(pipeline_repo, "extract")
     guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake"))
     first = capsys.readouterr().out
     guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake"))
     rows = read_jsonl_lenient(pipeline_repo.data / "synth" / "usage.jsonl")
-    assert [r["chars"] > 0 for r in rows] == [True, False] and rows[0]["engine"] == "fake"
-    assert "Zeichen neu" in first and f"insgesamt bisher: {rows[0]['chars']}" in first
+    assert rows[0]["engine"] == "fake" and rows[0]["requests"] == 3
+    assert rows[0]["chars"] == chars and rows[0]["utf8_bytes"] == utf8_bytes
+    assert rows[1]["chars"] == 0 and rows[1]["utf8_bytes"] == 0 and rows[1]["requests"] == 0
+    assert f"Zeichen neu an fake gesendet: {chars} ({utf8_bytes} UTF-8-Bytes, 3 Anfragen)" in first
+    assert f"insgesamt bisher: {chars} ({utf8_bytes} UTF-8-Bytes)" in first
+
+
+def test_usage_total_counts_old_rows_without_byte_field(pipeline_repo, guarded, capsys):
+    usage = pipeline_repo.data / "synth"
+    usage.mkdir(parents=True)
+    (usage / "usage.jsonl").write_text(
+        '{"at": "2026-10-01T00:00:00", "engine": "fake", "lines": 1, "chars": 40}\n', encoding="utf-8")
+    texts = ("Der Weg nach Norden ist weit.", "Wohin soll ich dich führen?", "Zum Brunnen, bitte.")
+    chars = 40 + sum(len(text) for text in texts)
+    utf8_bytes = 40 + sum(len(text.encode("utf-8")) for text in texts)
+    run(pipeline_repo, "extract")
+    assert guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake")) == 0
+    out = capsys.readouterr().out
+    assert f"insgesamt bisher: {chars} ({utf8_bytes} UTF-8-Bytes)" in out
+
+
+def test_synth_counts_retries_and_failed_fake_requests(pipeline_repo, guarded, capsys):
+    fail = "FAIL Grüße vom Test."
+    loc = (pipeline_repo.game / "Drova_Data" / "StreamingAssets" / "Localization" / "de" / "Dialog"
+           / "NPC_Mira_de.loc")
+    loc.write_text(loc.read_text(encoding="utf-8") + f"Plh_7 {{ {fail} }}\n", encoding="utf-8")
+    manifest_path = pipeline_repo.data / "export" / "de" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["lines"].append({
+        "id": "DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_7", "tree": "DT_Test_NPC_Mira", "nodeId": 7,
+        "nodeType": "statement", "actorName": "Mira", "category": "dialog", "generic": False,
+        "locaPath": "Dialog/NPC_Mira", "locaKey": "Plh_7", "text": "x", "gvars": [],
+    })
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    run(pipeline_repo, "extract")
+    speech = {line.loca_key: line.speech for line in read_lines(pipeline_repo.data / "lines.jsonl") if not line.skip}
+    assert speech["Plh_7"] == fail
+    ok = ("Der Weg nach Norden ist weit.", "Wohin soll ich dich führen?", "Zum Brunnen, bitte.")
+    assert set(ok) <= set(speech.values())
+    first_chars = sum(len(text) for text in ok) + MAX_ATTEMPTS * len(fail)
+    first_bytes = sum(len(text.encode("utf-8")) for text in ok) + MAX_ATTEMPTS * len(fail.encode("utf-8"))
+    first_requests = len(ok) + MAX_ATTEMPTS
+    assert first_bytes > first_chars
+    assert guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake")) == 1
+    first = capsys.readouterr().out
+    assert guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake")) == 1
+    second = capsys.readouterr().out
+    rows = read_jsonl_lenient(pipeline_repo.data / "synth" / "usage.jsonl")
+    assert rows[0]["lines"] == len(ok) and rows[0]["requests"] == first_requests
+    assert rows[0]["chars"] == first_chars and rows[0]["utf8_bytes"] == first_bytes
+    retry_chars, retry_bytes = MAX_ATTEMPTS * len(fail), MAX_ATTEMPTS * len(fail.encode("utf-8"))
+    assert rows[1]["lines"] == 0 and rows[1]["requests"] == MAX_ATTEMPTS
+    assert rows[1]["chars"] == retry_chars and rows[1]["utf8_bytes"] == retry_bytes
+    assert f"Zeichen neu an fake gesendet: {first_chars} ({first_bytes} UTF-8-Bytes, {first_requests} Anfragen)" in first
+    assert (f"insgesamt bisher: {first_chars + retry_chars} ({first_bytes + retry_bytes} UTF-8-Bytes)") in second

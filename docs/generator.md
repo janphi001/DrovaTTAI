@@ -26,6 +26,8 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 
 `synth` hat `--engine` (Standard `fish`; `fake` für Tests ohne Netz), `--workers` (Standard 8) und `--limit N` (nur die ersten N Aufträge, zum Ausprobieren).
 
+`install --prune` löscht im Zielordner OGG-Dateien, die danach kein Indexeintrag mehr nennt. Ohne die Option bleiben sie liegen. `install --dry-run` listet dieselben Dateien und löscht nichts; zusammen mit `--prune` gilt der Dry-Run. Beides ist standardmäßig aus.
+
 ## Casting und Vollauf (Plan 5)
 
 | Schritt | Befehl | Ergebnis |
@@ -40,7 +42,7 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 | h | `synth --batch N`, `encode --batch N`, `install --batch N` | eine Etappe erzeugen; `synth` bricht bei Guthaben-/Limit-/Anmeldefehlern nach 5 Fehlern in Folge sauber ab |
 | i | `report --by-speaker` | Status und Lücken je Sprecher |
 
-`--sample` und `--batch N` gelten für `synth`, `encode`, `install`, `report` und `preview`. Varianten (`voice: alte_frau` in `casting.yaml`) werden mit der Basisstimme erzeugt und beim Kodieren per ffmpeg (`rubberband`) umgeformt. Der Zeichenverbrauch je Lauf steht am Ende der `synth`-Ausgabe und in `data/synth/usage.jsonl`.
+`--sample` und `--batch N` gelten für `synth`, `encode`, `install`, `report` und `preview`. Varianten (`voice: alte_frau` in `casting.yaml`) werden mit der Basisstimme erzeugt und beim Kodieren per ffmpeg (`rubberband`) umgeformt. Verbrauch je Lauf (Zeichen und UTF-8-Bytes je tatsächlich gesendeter Anfrage, inklusive Wiederholungen und fehlgeschlagener Anfragen) steht am Ende der `synth`-Ausgabe und in `data/synth/usage.jsonl` (`chars`, `utf8_bytes`, `requests`).
 
 `profile --import` und `emote --import` brechen bei einer fehlenden Importdatei ab (Exit 2) und melden unlesbare Zeilen (Exit 1), schreiben aber die gültigen Zeilen.
 

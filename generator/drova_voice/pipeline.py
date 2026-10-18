@@ -36,6 +36,19 @@ def _fail(message: str) -> int:
     return 2
 
 
+def _read_json_object(path: Path, what: str) -> dict | None:
+    """JSON-Objekt lesen. None (mit Meldung), wenn die Datei unlesbar oder kein Objekt ist."""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as e:
+        _fail(f"{what} nicht lesbar: {path} ({e})")
+        return None
+    if not isinstance(data, dict):
+        _fail(f"{what} ist kein JSON-Objekt: {path}")
+        return None
+    return data
+
+
 def lines_path(cfg: Config) -> Path:
     return cfg.data_dir / "lines.jsonl"
 
@@ -90,7 +103,11 @@ def _extract(cfg: Config, args: argparse.Namespace) -> int:
         return _fail(f"Manifest nicht gefunden: {manifest_path} (Export im Spiel auslösen, siehe docs/export.md)")
     if not cfg.loc_dir.is_dir():
         return _fail(f"Lokalisierungsordner nicht gefunden: {cfg.loc_dir} (game_dir in config.yaml prüfen)")
-    manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8-sig"))
+    manifest = _read_json_object(Path(manifest_path), "Manifest")
+    if manifest is None:
+        return 2
+    if not isinstance(manifest.get("lines", []), list):
+        return _fail(f"Manifest: lines ist keine Liste ({manifest_path})")
     lexicon = load_lexicon(cfg.casting_dir / "lexicon.yaml")
     lines = build_lines(manifest, load_loc_texts(cfg.loc_dir, cfg.language), lexicon)
     write_lines(lines_path(cfg), lines)
@@ -281,7 +298,6 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     jobs, skipped = build_jobs(lines, casting, catalog.synth_table(), emotions, args.engine)
     if args.limit:
         jobs = jobs[: args.limit]
-    chars = {j.id: len(j.text) for j in jobs}
     cache_dir = cfg.cache_dir / "synth"
     path = synth_results_path(cfg)
     status = SynthStatus()
@@ -295,12 +311,17 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     detail = ", ".join(f"{k}: {n}" for k, n in sorted(reasons.items())) or "keine"
     print(f"{len(done)} erzeugt ({len(done) - len(new)} aus dem Cache, {len(new)} neu erzeugt), {len(failed)} Fehler, "
           f"{len(flagged)} auffällige Dauer; übersprungen: {detail}")
-    unique_new = {r.key: r for r in new}  # gleicher Text + Stimme wird nur einmal gesendet
-    new_chars = sum(chars[r.id] for r in unique_new.values())
+    unique_new = {r.key: r for r in new}  # Zeilen mit neuem Ton; Anfragen und Bytes stehen in status
     append_jsonl(usage_path(cfg), {"at": datetime.now().isoformat(timespec="seconds"), "engine": args.engine,
-                                   "lines": len(unique_new), "chars": new_chars})
-    total = sum(row.get("chars", 0) for row in read_jsonl_lenient(usage_path(cfg)) if row.get("engine") == args.engine)
-    print(f"Zeichen neu an {args.engine} gesendet: {new_chars}; insgesamt bisher: {total}")
+                                   "lines": len(unique_new), "requests": status.sent_requests,
+                                   "chars": status.sent_chars, "utf8_bytes": status.sent_bytes})
+    history = [row for row in read_jsonl_lenient(usage_path(cfg)) if row.get("engine") == args.engine]
+    total_chars = sum(row.get("chars", 0) for row in history)
+    # Ältere Zeilen haben nur `chars`. Die sind eine Untergrenze der UTF-8-Bytes.
+    total_bytes = sum(row["utf8_bytes"] if "utf8_bytes" in row else row.get("chars", 0) for row in history)
+    print(f"Zeichen neu an {args.engine} gesendet: {status.sent_chars} "
+          f"({status.sent_bytes} UTF-8-Bytes, {status.sent_requests} Anfragen); "
+          f"insgesamt bisher: {total_chars} ({total_bytes} UTF-8-Bytes)")
     for r in failed[:10]:
         print(f"FEHLER {r.id}: {r.error}", file=sys.stderr)
     for r in flagged[:10]:
@@ -370,9 +391,19 @@ def _install(cfg: Config, args: argparse.Namespace) -> int:
     drop |= {with_variant(l.id, "neutral") for l in lines if not l.skip and VARIANT_SEP not in l.id} - {r["id"] for r in rows}
     # Poolzeilen: alle Varianten der Basis-ID neu aufbauen, damit Stimmen, die aus dem Pool gefallen sind, verschwinden.
     drop |= {emotion_id(l) for l in lines if l.pool}
-    result = install_audio(rows, audio_dir(cfg), cfg.install_dir, cfg.language, drop_ids=drop)
+    prune = bool(getattr(args, "prune", False))
+    dry_run = bool(getattr(args, "dry_run", False))
+    result = install_audio(rows, audio_dir(cfg), cfg.install_dir, cfg.language, drop_ids=drop,
+                           prune=prune, dry_run=dry_run)
     result.errors.extend(stale)
     print(f"{result.copied} Dateien kopiert, index.json mit {result.entries} Einträgen -> {cfg.install_dir}")
+    if prune or dry_run:
+        if dry_run or not prune:
+            print(f"Dry-Run: {len(result.pruned)} verwaiste OGG")
+        else:
+            print(f"gelöscht: {len(result.pruned)} verwaiste OGG")
+        for rel in result.pruned:
+            print(f"  {rel}")
     for e in result.errors[:10]:
         print(f"FEHLER {e}", file=sys.stderr)
     return 1 if result.errors else 0
@@ -387,9 +418,14 @@ def _report(cfg: Config, args: argparse.Namespace) -> int:
     except (OSError, ValueError) as e:
         return _fail(str(e))
     index_path = cfg.install_dir / "index.json"
-    entries = {}
+    entries: dict = {}
     if index_path.is_file():
-        entries = json.loads(index_path.read_text(encoding="utf-8-sig")).get("entries", {})
+        index = _read_json_object(index_path, "index.json")
+        if index is None:
+            return 2
+        entries = index.get("entries", {})
+        if not isinstance(entries, dict):
+            return _fail(f"index.json: entries ist kein Objekt ({index_path})")
     synth_rows = latest_by_id(read_jsonl_lenient(synth_results_path(cfg)))
     encoded = latest_by_id(read_jsonl_lenient(encoded_path(cfg)))
     if args.by_speaker:
@@ -534,6 +570,10 @@ def add_parsers(sub) -> None:
     _add_selection(en)
     ins = sub.add_parser("install", help="Dateien in den Mod-Ordner kopieren und index.json schreiben")
     _add_selection(ins, "nur Bäume, in denen dieser NPC spricht (frühere Einträge bleiben erhalten)")
+    ins.add_argument("--prune", action="store_true",
+                     help="verwaiste OGG im Zielordner löschen (stehen danach nicht im Index; Standard: aus)")
+    ins.add_argument("--dry-run", action="store_true",
+                     help="verwaiste OGG nur auflisten, nichts löschen (gilt auch zusammen mit --prune)")
     rp = sub.add_parser("report", help="Status je Kategorie: offen, erzeugt, kodiert, installiert, übersprungen")
     _add_selection(rp)
     rp.add_argument("--by-speaker", action="store_true", help="Status je Sprecher statt je Kategorie")
