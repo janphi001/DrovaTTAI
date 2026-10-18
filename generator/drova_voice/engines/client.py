@@ -35,13 +35,74 @@ def _json_dict(text: str) -> dict | None:
     return obj if isinstance(obj, dict) else None
 
 
+def _decode_stdout_line(raw: bytes) -> str | None:
+    """Dekodiert eine fertige Zeile strikt. None: die Bytes sind kein UTF-8 und kein Protokoll.
+
+    Erst die ganze Zeile, dann ein Decode. Ein Mehrbyte-Zeichen, das auf zwei
+    Reads fiel, ist dann vollständig und wird nicht zu U+FFFD. Ungültige Bytes
+    dürfen den JSON-Parser nicht erreichen, auch nicht als Ersatzzeichen.
+    """
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        marker = _READY_MARKER.encode("ascii")
+        cut = raw.find(marker)
+        if cut > 0:
+            try:
+                suffix = raw[cut:].decode("utf-8")
+            except UnicodeDecodeError:
+                pass
+            else:
+                print(f"[worker stdout] {raw[:cut]!r}", file=sys.stderr)
+                return suffix
+        print(f"[worker stdout] {raw!r}", file=sys.stderr)
+        return None
+
+
+class _StdoutLines:
+    """Sammelt Worker-stdout bis zum Zeilenende und dekodiert erst dann."""
+
+    def __init__(self, raw):
+        self._raw = raw
+        self._pending = bytearray()
+
+    def _pull(self) -> bytes:
+        # Genau ein Read. Ein auffüllendes read() würde blockieren, sobald der
+        # Worker nach der Zeile auf die nächste Anfrage wartet.
+        buf = bytearray(4096)
+        n = self._raw.readinto(buf)
+        if not n:
+            return b""
+        return bytes(buf[:n])
+
+    def readline(self) -> str | None:
+        """Eine UTF-8-Zeile, '' bei Dateiende, None bei einer Zeile ohne gültiges UTF-8."""
+        while True:
+            newline_at = self._pending.find(b"\n")
+            if newline_at == -1:
+                chunk = self._pull()
+                if not chunk:
+                    if not self._pending:
+                        return ""
+                    raw = bytes(self._pending)
+                    self._pending.clear()
+                    return _decode_stdout_line(raw)
+                self._pending.extend(chunk)
+                continue
+            raw = bytes(self._pending[:newline_at + 1])
+            del self._pending[:newline_at + 1]
+            return _decode_stdout_line(raw)
+
+
 class EngineClient:
     def __init__(self, cmd: Sequence[str], cwd: str | Path | None = None, env: Mapping[str, str] | None = None):
         env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1", **(env or {}))
+        # Binär und ungepuffert. errors="replace" auf dem Text-Stream darf eine
+        # unvollständige UTF-8-Sequenz nicht als U+FFFD in eine JSON-Zeile setzen.
         self._proc = subprocess.Popen(
-            list(cmd), stdin=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, env=env,
-            text=True, encoding="utf-8", errors="replace", bufsize=1,
+            list(cmd), stdin=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, env=env, bufsize=0,
         )
+        self._stdout_lines = _StdoutLines(self._proc.stdout)
         try:
             hello = self._read()
             if not hello.get("ready"):
@@ -54,7 +115,9 @@ class EngineClient:
 
     def _read(self) -> dict:
         for _ in range(_MAX_NOISE_LINES):
-            line = self._proc.stdout.readline()
+            line = self._stdout_lines.readline()
+            if line is None:
+                continue
             if not line:
                 raise EngineError(f"Worker beendet (Exit-Code {self._proc.poll()})")
             line = line.strip()
@@ -75,7 +138,7 @@ class EngineClient:
 
     def synth(self, req: SynthRequest) -> SynthResponse:
         try:
-            self._proc.stdin.write(req.to_json() + "\n")
+            self._proc.stdin.write((req.to_json() + "\n").encode("utf-8"))
             self._proc.stdin.flush()
         except OSError as e:
             raise EngineError(f"Worker nimmt keine Anfragen mehr an: {e}") from e
