@@ -115,7 +115,7 @@ cd generator
 .venv/Scripts/drova-voice emote --npc Adela
 .venv/Scripts/drova-voice synth --npc Adela      # schickt den Text an Fish
 .venv/Scripts/drova-voice encode --npc Adela
-.venv/Scripts/drova-voice install --npc Adela    # kopiert ins Spiel
+.venv/Scripts/drova-voice install --npc Adela    # kopiert ins Spiel (--prune löscht verwaiste OGG)
 .venv/Scripts/drova-voice report --npc Adela
 ```
 

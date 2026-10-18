@@ -26,6 +26,8 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 
 `synth` hat `--engine` (Standard `fish`; `fake` für Tests ohne Netz), `--workers` (Standard 8) und `--limit N` (nur die ersten N Aufträge, zum Ausprobieren).
 
+`install --prune` löscht im Zielordner OGG-Dateien, die danach kein Indexeintrag mehr nennt. Ohne die Option bleiben sie liegen. `install --dry-run` listet dieselben Dateien und löscht nichts; zusammen mit `--prune` gilt der Dry-Run. Beides ist standardmäßig aus.
+
 ## Casting und Vollauf (Plan 5)
 
 | Schritt | Befehl | Ergebnis |

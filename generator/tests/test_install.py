@@ -122,3 +122,95 @@ def test_null_entries_are_rebuilt_instead_of_crashing(tmp_path):
     result = install_audio([], audio, target, "de")
     assert (result.copied, result.entries, result.errors) == (0, 0, [])
     assert read_index(target)["entries"] == {}
+
+
+def test_non_string_file_field_is_dropped_without_crashing(tmp_path):
+    audio, target = tmp_path / "audio", tmp_path / "Audio" / "de"
+    audio.mkdir()
+    (target / "dialog").mkdir(parents=True)
+    (target / "dialog" / "aaaa.ogg").write_bytes(b"OggS-keep")
+    (target / "dialog" / "bad.ogg").write_bytes(b"OggS-bad")
+    index = {"version": 1, "language": "de", "entries": {
+        "T|P|Plh_1": {"file": "dialog/aaaa.ogg", "duration": 1},
+        "T|P|Plh_2": {"file": 12, "duration": 1},
+        "T|P|Plh_3": {"file": None, "duration": 1},
+        "T|P|Plh_4": {"file": ["dialog/bad.ogg"], "duration": 1},
+        "T|P|Plh_5": {"duration": 1},
+    }}
+    (target / "index.json").write_text(json.dumps(index), encoding="utf-8")
+    result = install_audio([], audio, target, "de")
+    assert (result.copied, result.entries, result.errors, result.pruned) == (0, 1, [], [])
+    assert list(read_index(target)["entries"]) == ["T|P|Plh_1"]
+    assert (target / "dialog" / "bad.ogg").read_bytes() == b"OggS-bad"
+
+
+def test_unreadable_index_is_rebuilt_instead_of_crashing(tmp_path):
+    audio, target = tmp_path / "audio", tmp_path / "Audio" / "de"
+    audio.mkdir()
+    target.mkdir(parents=True)
+    (target / "index.json").write_bytes(b"\xff\xfe{")
+    result = install_audio([], audio, target, "de")
+    assert (result.copied, result.entries, result.errors) == (0, 0, [])
+    assert read_index(target)["entries"] == {}
+
+
+def _seed_keep_and_orphan(tmp_path):
+    audio, target = tmp_path / "audio", tmp_path / "Audio" / "de"
+    make_audio(audio, "dialog/keep.ogg", b"KEEP")
+    make_audio(audio, "dialog/drop.ogg", b"DROP")
+    install_audio([row("T|P|Plh_1", "dialog/keep.ogg"), row("T|P|Plh_2", "dialog/drop.ogg")], audio, target, "de")
+    stray = target / "bark" / "stray.ogg"
+    stray.parent.mkdir()
+    stray.write_bytes(b"STRAY")
+    (target / "bark" / "note.txt").write_text("bleiben", encoding="utf-8")
+    return audio, target
+
+
+def test_without_prune_orphan_oggs_stay(tmp_path):
+    audio, target = _seed_keep_and_orphan(tmp_path)
+    result = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, target, "de")
+    assert result.pruned == []
+    assert (target / "dialog" / "drop.ogg").read_bytes() == b"DROP"
+    assert (target / "bark" / "stray.ogg").is_file()
+    assert sorted(read_index(target)["entries"]) == ["T|P|Plh_1"]
+
+
+def test_prune_deletes_only_unreferenced_oggs(tmp_path):
+    audio, target = _seed_keep_and_orphan(tmp_path)
+    result = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, target, "de", prune=True)
+    assert result.pruned == ["bark/stray.ogg", "dialog/drop.ogg"]
+    assert result.errors == [] and result.entries == 1
+    assert (target / "dialog" / "keep.ogg").read_bytes() == b"KEEP"
+    assert not (target / "dialog" / "drop.ogg").exists()
+    assert not (target / "bark" / "stray.ogg").exists()
+    assert (target / "bark" / "note.txt").is_file()
+    assert (audio / "dialog" / "drop.ogg").read_bytes() == b"DROP"
+
+
+def test_prune_dry_run_lists_orphans_and_keeps_them(tmp_path):
+    audio, target = _seed_keep_and_orphan(tmp_path)
+    result = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, target, "de", prune=True, dry_run=True)
+    assert result.pruned == ["bark/stray.ogg", "dialog/drop.ogg"]
+    assert (target / "dialog" / "drop.ogg").is_file() and (target / "bark" / "stray.ogg").is_file()
+    assert sorted(read_index(target)["entries"]) == ["T|P|Plh_1"]
+
+
+def test_dry_run_without_prune_lists_orphans(tmp_path):
+    audio, target = _seed_keep_and_orphan(tmp_path)
+    result = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, target, "de", dry_run=True)
+    assert result.pruned == ["bark/stray.ogg", "dialog/drop.ogg"]
+    assert (target / "dialog" / "keep.ogg").is_file() and (target / "dialog" / "drop.ogg").is_file()
+
+
+def test_backslash_file_field_still_protects_the_ogg(tmp_path):
+    audio, target = tmp_path / "audio", tmp_path / "Audio" / "de"
+    audio.mkdir()
+    (target / "dialog").mkdir(parents=True)
+    (target / "dialog" / "keep.ogg").write_bytes(b"KEEP")
+    index = {"version": 1, "language": "de", "entries": {
+        "T|P|Plh_1": {"file": "dialog\\keep.ogg", "duration": 1.0},
+    }}
+    (target / "index.json").write_text(json.dumps(index), encoding="utf-8")
+    result = install_audio([], audio, target, "de", prune=True)
+    assert result.pruned == [] and result.entries == 1
+    assert (target / "dialog" / "keep.ogg").read_bytes() == b"KEEP"
