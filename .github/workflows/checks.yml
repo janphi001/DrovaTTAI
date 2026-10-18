@@ -8,7 +8,7 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Commit messages
@@ -21,3 +21,31 @@ jobs:
         run: python3 tools/checks/player_choice_silent.py
       - name: Fish key
         run: python3 tools/checks/fish_key.py
+
+  generator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install generator
+        working-directory: generator
+        run: python -m pip install -e '.[dev]'
+      - name: Pytest
+        working-directory: generator
+        run: python -m pytest -q -ra
+
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: |
+            6.0.x
+            8.0.x
+      - name: Test DrovaVoice.Core
+        run: dotnet test mod/DrovaVoice.Core.Tests/DrovaVoice.Core.Tests.csproj -c Release --verbosity minimal
