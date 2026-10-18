@@ -4,7 +4,7 @@ Die Mod spielt die vom Generator erzeugten Stimmen im Spiel ab. Grundlage: `docs
 
 ## So funktioniert es
 
-1. Beim Start liest die Mod `Mods/DrovaVoice/Audio/<AudioLanguage>/index.json`. Fehlt sie oder passt Version oder Sprache nicht, bleibt die Vertonung aus und das Spiel läuft unverändert.
+1. Beim Start liest die Mod `Mods/DrovaVoice/Audio/<AudioLanguage>/index.json`. Fehlt sie oder passt Version oder Sprache nicht, bleibt die Vertonung aus und das Spiel läuft unverändert. Danach prüft sie etwa einmal pro Sekunde (alle 60 Frames) Länge und Schreibzeit. Hat sich eines davon geändert, liest sie den Index neu, leert den Clip-Cache und vergisst Zeilen, die bisher fehlgeschlagen sind. Dieselbe Prüfung erzwingt eine leere Datei `Mods/DrovaVoice/reload.trigger` (die Mod löscht sie). Schlägt das Lesen fehl, steht der Grund einmal im Log; ein schon geladener Index bleibt aktiv. Zwei weitere Versuche, etwa alle fünf Sekunden und ohne neue Meldung, holen eine Datei nach, die beim ersten Mal gerade ersetzt wurde.
 2. Sobald das Spiel in einer Welt ist (`WorldEventSystemManager.Instance` existiert), ersetzt die Mod den Audio-Connector der Modding API durch den eigenen. Vorher nicht: Im Hauptmenü scheitert `AudioManager` und bliebe die ganze Sitzung kaputt.
 3. Führt das Spiel eine Aussage aus, fragt die API den Connector (nur wenn die Zeile noch keinen Clip hat). Der Connector bildet die Zeilen-ID (Baum, Loca-Pfad, Schlüssel), sucht sie im Index, dekodiert die OGG-Datei (NVorbis), wendet die Lautstärke an und hängt den `AudioClip` an die Zeile. Abgespielt wird er vom Spiel; die Untertitel laufen passend zur Cliplänge.
 4. Bei Auswahlknoten, die die Auswahl sprechen (`saySelection`), lädt ein Harmony-Prefix auf `DS_MultipleChoiceNode.OnExecute` die Clips aller Optionen (ID mit `|c<Index>`), damit die gewählte Option gesprochen wird. Er ist erst aktiv, nachdem der Connector ersetzt wurde. Verschiebt das Spiel die Optionsliste, findet die Mod die Option über ihren Schlüssel.
@@ -37,15 +37,20 @@ Die Dateien sind auf −16 LUFS normiert; wie laut das im Verhältnis zu Musik u
 | Meldung | Bedeutung |
 |---|---|
 | `Index: N Zeilen (M übersprungen) …` | Index gelesen; M = Einträge mit kaputtem Format oder unsicherem Pfad |
-| `Kein index.json unter …` / `Index nicht nutzbar …` | Vertonung bleibt aus; Pfad, Version, Sprache prüfen |
+| `Index neu geladen: N Zeilen …` | index.json hat sich geändert oder `reload.trigger` lag; Cache und gemerkte Ladefehler sind leer |
+| `Kein index.json unter …` / `Index nicht nutzbar …` | Vertonung bleibt aus; Pfad, Version, Sprache prüfen. Die Meldung kommt einmal, bis die Datei sich ändert |
+| `index.json fehlt unter …; der bisherige Index bleibt.` / `Index nicht neu geladen …` | Nachladen ist fehlgeschlagen; die schon geladenen Zeilen bleiben |
+| `DrovaTTS ist geladen …` | DrovaTTS ist ebenfalls installiert; eine der beiden Mods bleibt stumm (siehe README, Kompatibilität) |
 | `Audio-Connector der Modding API ersetzt.` | Wiedergabe aktiv (erscheint erst in der Welt, innerhalb eines Frames nach `WorldEventSystemManager.Instance`) |
 | `Connector konnte nicht ersetzt werden …` | `AudioManager` ist kaputt (z. B. durch einen zu frühen Zugriff einer anderen Mod); Vertonung bleibt aus |
-| `Zeile bleibt stumm (…): <ID>` | Datei fehlt oder ist defekt; nur einmal pro ID |
+| `Zeile bleibt stumm (…): <ID>` | Datei fehlt oder ist defekt; nur einmal pro ID, bis der Index neu geladen wird |
 | `Laden dauerte N ms (Ruckler möglich): <ID>` | Zeile wurde trotzdem abgespielt; typisch nur bei der allerersten Zeile (JIT, kalter Dateicache) |
 | `[Zeile] Option … -> … (Index der Option hat sich verschoben)` | Das Spiel hat die Optionsliste verändert; der Eintrag wurde über den Schlüssel gefunden (nur `Diagnostics`) |
 | `[Zeile] Auswahlknoten … spricht die Auswahl nicht (saySelection aus)` | Der Knoten bleibt wie im Original ohne Spielerstimme (nur `Diagnostics`) |
 | `Export im Hauptmenü: …` | Ein Export im Hauptmenü macht die Vertonung in dieser Sitzung wirkungslos; Spiel neu starten |
 | `[Zeile] geladen: <ID> …` / `[Zeile] ohne Eintrag: <ID>` | nur mit `Diagnostics = true` |
+
+Ob die DrovaTTS-Warnung im Log steht und ob eine nachgeladene Zeile hörbar ist, zeigt nur ein laufendes Spiel. Wann nachgeladen und wann geloggt wird, prüfen die Tests in `mod/DrovaVoice.Core.Tests`.
 
 ## Abnahme-Checkliste (im Spiel)
 

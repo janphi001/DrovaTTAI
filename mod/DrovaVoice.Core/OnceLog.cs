@@ -18,5 +18,8 @@ namespace DrovaVoice.Core
             _seen.Add(key);
             return true;
         }
+
+        /// <summary>Nach einem Index-Reload, damit ein erneuter Ladefehler derselben Zeile wieder im Log steht.</summary>
+        public void Clear() => _seen.Clear();
     }
 }
