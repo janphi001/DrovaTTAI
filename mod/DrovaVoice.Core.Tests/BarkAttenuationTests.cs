@@ -29,5 +29,16 @@ namespace DrovaVoice.Core.Tests
             Assert.Equal(1f, BarkAttenuation.Gain(10f, 10f, 10f));
             Assert.Equal(0f, BarkAttenuation.Gain(10.1f, 10f, 10f));
         }
+
+        [Fact]
+        public void NonFiniteRangeStaysAudibleAndInsideZeroToOne()
+        {
+            Assert.Equal(1f, BarkAttenuation.Gain(40f, float.NaN, 120f));
+            Assert.Equal(1f, BarkAttenuation.Gain(40f, 15f, float.NaN));
+            Assert.Equal(1f, BarkAttenuation.Gain(40f, float.PositiveInfinity, 120f));
+            Assert.Equal(0f, BarkAttenuation.Gain(float.PositiveInfinity, 15f, 120f));
+            float gain = BarkAttenuation.Gain(20f, 15f, 120f);
+            Assert.InRange(gain, 0f, 1f);
+        }
     }
 }

@@ -29,13 +29,27 @@ namespace DrovaVoice.Core
         public static void Apply(float[] samples, int percent)
         {
             float f = Factor(percent);
-            if (f == 1f) return;
-            if (f < 1f)
+            if (f == 1f)
             {
-                for (int i = 0; i < samples.Length; i++) samples[i] *= f;
+                for (int i = 0; i < samples.Length; i++)
+                    if (!float.IsFinite(samples[i])) samples[i] = 0f;
                 return;
             }
-            for (int i = 0; i < samples.Length; i++) samples[i] = Limit(samples[i] * f);
+            if (f < 1f)
+            {
+                for (int i = 0; i < samples.Length; i++)
+                {
+                    float y = samples[i];
+                    // 0 * unendlich ist NaN. Eine kaputte Datei darf bei Lautstärke 0 keine NaN-Samples hinterlassen.
+                    samples[i] = float.IsFinite(y) ? y * f : 0f;
+                }
+                return;
+            }
+            for (int i = 0; i < samples.Length; i++)
+            {
+                float y = samples[i];
+                samples[i] = float.IsFinite(y) ? Limit(y * f) : 0f;
+            }
         }
     }
 }

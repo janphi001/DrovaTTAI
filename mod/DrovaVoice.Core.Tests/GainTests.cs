@@ -98,6 +98,30 @@ namespace DrovaVoice.Core.Tests
 
         [Fact]
         public void EmptyArrayIsFine() => Gain.Apply(Array.Empty<float>(), 150);
+
+        [Fact]
+        public void HundredPercentClearsNonFiniteSamplesAndKeepsFiniteOnes()
+        {
+            var samples = new[] { 0.25f, float.NaN, -0.5f, float.PositiveInfinity, float.NegativeInfinity };
+            Gain.Apply(samples, 100);
+            Assert.Equal(0.25f, samples[0]);
+            Assert.Equal(0f, samples[1]);
+            Assert.Equal(-0.5f, samples[2]);
+            Assert.Equal(0f, samples[3]);
+            Assert.Equal(0f, samples[4]);
+        }
+
+        [Fact]
+        public void AttenuationDoesNotTurnInfinityIntoNaN()
+        {
+            var silent = new[] { float.PositiveInfinity, float.NaN, 0.5f };
+            Gain.Apply(silent, 0);
+            Assert.Equal(new[] { 0f, 0f, 0f }, silent);
+            var half = new[] { float.NegativeInfinity, 0.4f };
+            Gain.Apply(half, 50);
+            Assert.Equal(0f, half[0]);
+            Assert.Equal(0.2f, half[1], 5);
+        }
     
         [Fact]
         public void LimiterIsSymmetricForNegativeValues()
