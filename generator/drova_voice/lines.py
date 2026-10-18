@@ -11,7 +11,7 @@ from drova_voice.ids import VARIANT_SEP, choice_id, normalize_loca_path, stateme
 from drova_voice.jsonl import read_jsonl, write_jsonl
 from drova_voice.loc import parse_loc
 from drova_voice.player_name import NAME_VAR, make_name_variants
-from drova_voice.speech_text import GVAR_RE, build_speech_text
+from drova_voice.speech_text import GVAR_RE, Lexicon, build_speech_text, compile_lexicon
 
 SKIP_GVAR_NAME = "gvar_name"    # nur der Spielername, aber keine neutrale Fassung ohne ihn
 SKIP_GVAR_VALUE = "gvar_value"  # Quest- oder Geldwerte (oder Name zusammen mit Werten): nicht vorab vertonbar
@@ -68,7 +68,12 @@ def load_lexicon(path: Path) -> dict[str, str]:
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(raw, dict):
         raise ValueError(f"{path}: Lexikon muss aus 'Wort: Aussprache'-Zeilen bestehen")
-    return {str(k): str(v) for k, v in raw.items()}
+    mapping = {str(k): str(v) for k, v in raw.items()}
+    try:
+        compile_lexicon(mapping)
+    except ValueError as exc:
+        raise ValueError(f"{path}: {exc}") from None
+    return mapping
 
 
 def _expected_id(row: Mapping) -> str:
@@ -79,6 +84,9 @@ def _expected_id(row: Mapping) -> str:
 
 def build_lines(manifest: Mapping, loc_texts: Mapping[tuple[str, str], str],
                 lexicon: Mapping[str, str] | None = None) -> list[Line]:
+    compiled: Lexicon | None = compile_lexicon(lexicon or {})
+    if compiled.pattern is None:
+        compiled = None
     seen: set[tuple[str, bool]] = set()
     out: list[tuple[str, Line]] = []
     for row in manifest.get("lines", []):
@@ -103,7 +111,7 @@ def build_lines(manifest: Mapping, loc_texts: Mapping[tuple[str, str], str],
                 skip = SKIP_GVAR_VALUE
             else:
                 neutral = make_name_variants(raw).neutral
-                st = build_speech_text(neutral, None, lexicon) if neutral is not None else None
+                st = build_speech_text(neutral, None, compiled) if neutral is not None else None
                 if neutral is None:
                     skip = SKIP_GVAR_NAME
                 elif st.is_speakable:
@@ -112,7 +120,7 @@ def build_lines(manifest: Mapping, loc_texts: Mapping[tuple[str, str], str],
                 else:
                     skip = SKIP_UNSPEAKABLE
         else:
-            st = build_speech_text(raw, None, lexicon)
+            st = build_speech_text(raw, None, compiled)
             if st.is_speakable:
                 speech, stage = st.text, tuple({"text": s.text, "pos": s.pos} for s in st.stage)
             else:

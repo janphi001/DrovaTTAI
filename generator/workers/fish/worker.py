@@ -1,6 +1,7 @@
 """Fish-Audio-Worker: ruft die Cloud-API auf. Nur Standardbibliothek, kein venv nötig."""
 from __future__ import annotations
 
+import html
 import http.client
 import json
 import math
@@ -9,6 +10,7 @@ import struct
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import wave
 from pathlib import Path
@@ -19,6 +21,7 @@ from worker_loop import serve  # noqa: E402
 API_URL = "https://api.fish.audio/v1/tts"
 MODEL = os.environ.get("FISH_MODEL", "s2.1-pro-free")
 _RETRY_STATUS = {429, 500, 502, 503, 504}
+_MAX_ERROR_BODY = 4096
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -59,15 +62,44 @@ def load() -> dict:
         raise RuntimeError("FISH_API_KEY enthält ungültige Zeichen (Leerzeichen oder Zeilenumbruch?)")
     return {
         "key": key,
-        "url": os.environ.get("FISH_API_URL", API_URL),
+        "url": _check_url(os.environ.get("FISH_API_URL", API_URL), key),
         "model": os.environ.get("FISH_MODEL", MODEL),
         "attempts": max(1, _int_env("FISH_MAX_ATTEMPTS", "5")),
         "backoff": _float_env("FISH_BACKOFF_S", "2.0"),
     }
 
 
+def _check_url(url: str, key: str) -> str:
+    # Die Adresse nicht in die Meldung schreiben: sie kann den Schlüssel enthalten.
+    encoded = urllib.parse.quote(key, safe="")
+    if key in url or (encoded != key and encoded in url):
+        raise RuntimeError("FISH_API_URL darf den Schlüssel nicht enthalten")
+    if urllib.parse.urlsplit(url).scheme not in ("http", "https"):
+        raise RuntimeError("FISH_API_URL muss http oder https sein")
+    return url
+
+
+def _masked_forms(key: str) -> tuple[str, ...]:
+    forms = (
+        urllib.parse.quote(key, safe=""),
+        urllib.parse.quote(key, safe="/"),
+        html.escape(key, quote=True),
+    )
+    return tuple(dict.fromkeys(form for form in forms if form != key))
+
+
 def _clean(cfg: dict, text: str) -> str:
-    return text.replace(cfg["key"], "***")
+    key = cfg["key"]
+    hidden = text.replace(key, "***")
+    for form in _masked_forms(key):
+        hidden = hidden.replace(form, "***")
+    return hidden
+
+
+def _error_detail(cfg: dict, err: urllib.error.HTTPError) -> str:
+    # Erst begrenzen, dann maskieren, dann kürzen: ein Schlüssel über der Kürzungsgrenze bleibt sonst als Präfix stehen.
+    raw = err.read(_MAX_ERROR_BODY)
+    return _clean(cfg, raw.decode("utf-8", "replace"))[:200]
 
 
 def _retry_after(headers, default: float) -> float:
@@ -93,8 +125,7 @@ def _post(cfg: dict, body: dict) -> bytes:
         except urllib.error.HTTPError as e:
             if 300 <= e.code < 400:
                 raise RuntimeError(f"Fish leitet um (HTTP {e.code}); nicht gefolgt") from None
-            # Erst maskieren, dann kürzen: sonst bleibt ein Schlüssel, der über die Kürzungsgrenze reicht, als Präfix stehen.
-            detail = _clean(cfg, e.read().decode("utf-8", "replace"))[:200]
+            detail = _error_detail(cfg, e)
             if e.code not in _RETRY_STATUS:
                 raise RuntimeError(f"Fish lehnt die Anfrage ab (HTTP {e.code}): {detail}") from None
             last, wait = f"HTTP {e.code}", _retry_after(e.headers, wait)

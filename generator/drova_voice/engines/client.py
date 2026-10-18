@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -12,6 +13,7 @@ from drova_voice.engines.protocol import SynthRequest, SynthResponse
 _MAX_NOISE_LINES = 1000
 _READY_MARKER = '{"ready"'
 _CLOSE_TIMEOUT_S = 30
+_ENGINE_NAME = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
 
 
 class EngineError(RuntimeError):
@@ -104,6 +106,9 @@ class EngineClient:
 
 
 def worker_command(workers_dir: Path, engine: str) -> list[str]:
+    # Nur ein Ordnername: kein Pfad, damit die Engine nicht außerhalb von workers/ startet.
+    if not isinstance(engine, str) or _ENGINE_NAME.fullmatch(engine) is None:
+        raise EngineError("Unbekannte Engine")
     wdir = Path(workers_dir) / engine
     script = wdir / "worker.py"
     if not script.exists():

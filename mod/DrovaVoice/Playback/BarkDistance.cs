@@ -24,7 +24,7 @@ namespace DrovaVoice.Playback
         public const string BarkClipPrefix = ClipLoader.ClipNamePrefix + "bark/";
         private const float TimeoutSeconds = 1.5f;   // Zeit statt Frames: unabhängig von der Bildrate
 
-        private sealed class Tracked { public AudioSource Source = null!; public float OriginalVolume; }
+        private sealed class Tracked { public AudioSource Source = null!; public float OriginalVolume; public int ClipId; }
         private sealed class Pending { public DS_Statement Statement = null!; public AudioClip Clip = null!; public float Since; public string Name = ""; }
 
         private float _min, _max;
@@ -75,7 +75,7 @@ namespace DrovaVoice.Playback
                     var clip = source.clip;
                     if (clip.name == null || !clip.name.StartsWith(BarkClipPrefix, StringComparison.Ordinal)) continue;
                     if (!_ids.Add(source.GetInstanceID())) continue;
-                    _tracked.Add(new Tracked { Source = source, OriginalVolume = source.volume });
+                    _tracked.Add(new Tracked { Source = source, OriginalVolume = source.volume, ClipId = clip.GetInstanceID() });
                     if (_verbose) _log.Msg($"[Bark] Entfernungsregelung für {clip.name} (Lautstärke vorher {source.volume:0.00})");
                 }
             });
@@ -114,8 +114,24 @@ namespace DrovaVoice.Playback
             {
                 var t = _tracked[i];
                 var source = t.Source;
-                bool done = source == null || !source.isPlaying || source.clip == null
-                            || source.clip.name == null || !source.clip.name.StartsWith(BarkClipPrefix, StringComparison.Ordinal);
+                AudioClip? clip = null;
+                if (source != null && source.isPlaying) clip = source.clip;
+                bool done = true;
+                if (clip != null)
+                {
+                    // Name nur, wenn der Clip wechselt. Dieselbe Instanz bleibt ohne neue Zeichenkette geregelt.
+                    int clipId = clip.GetInstanceID();
+                    if (BarkTrack.SameClip(t.ClipId, clipId)) done = false;
+                    else
+                    {
+                        string name = clip.name ?? "";
+                        if (name.StartsWith(BarkClipPrefix, StringComparison.Ordinal))
+                        {
+                            t.ClipId = clipId;
+                            done = false;
+                        }
+                    }
+                }
                 if (done)
                 {
                     if (source != null) { source.volume = t.OriginalVolume; _ids.Remove(source.GetInstanceID()); }

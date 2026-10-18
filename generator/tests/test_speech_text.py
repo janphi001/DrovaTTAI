@@ -49,6 +49,10 @@ def test_lexicon_whole_words_only():
     assert apply_lexicon("Zorvana und Zorvanaia", {"Zorvana": "Zorvanna"}) == "Zorvanna und Zorvanaia"
 
 
+def test_lexicon_does_not_rescan_a_pronunciation():
+    assert apply_lexicon("Zorgrad und Sorgrad", {"Zorgrad": "Sorgrad", "Sorgrad": "Torgrad"}) == "Sorgrad und Torgrad"
+
+
 def _filler(n: int) -> str:
     # Invented words, exactly n characters, ends on a letter (no edge whitespace).
     return ("ruhig und still " * 40)[:n]
