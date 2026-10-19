@@ -54,7 +54,12 @@ from drova_voice.lines import (
     select_npc,
     write_lines,
 )
-from drova_voice.pools import expand_pool_lines, load_pools
+from drova_voice.pools import (
+    expand_pool_lines,
+    expand_teacher_lines,
+    load_pools,
+    load_teachers,
+)
 from drova_voice.preview import write_preview
 from drova_voice.profiles import (
     LOW_CONFIDENCE,
@@ -114,6 +119,7 @@ def batches_path(cfg: Config) -> Path:
 def _selected(cfg: Config, args: argparse.Namespace, expand_pool: bool = True) -> list[Line] | None:
     """Zeilen aus data/lines.jsonl, gefiltert nach --npc (ganze Bäume), --sample (eine Zeile je Sprecher) und
     --batch N (Etappe) und --category; Zeilen generischer Sprecher werden je Poolstimme erweitert (casting/pools.yaml),
+    Lehrerzeilen zusätzlich je Lehrer (casting/teachers.yaml),
     außer bei `emote` (Emotionen gelten für die Basiszeile). None (mit Meldung), wenn die Auswahl nicht möglich ist."""
     path = lines_path(cfg)
     if not path.is_file():
@@ -147,10 +153,11 @@ def _selected(cfg: Config, args: argparse.Namespace, expand_pool: bool = True) -
                 cfg.casting_dir / "pools.yaml",
                 load_catalog(cfg.casting_dir / "fish_voices.yaml").known(),
             )
+            teachers = load_teachers(cfg.casting_dir / "teachers.yaml")
         except (OSError, ValueError) as e:
             _fail(str(e))
             return None
-        lines = expand_pool_lines(lines, pools)
+        lines = expand_teacher_lines(expand_pool_lines(lines, pools), lines, teachers)
     return lines
 
 

@@ -107,5 +107,22 @@ namespace DrovaVoice.Core.Tests
             Assert.StartsWith("DT_G|P|1#vm", PoolVoice.Resolve(index, "DT_G|P|1", null)!);
             Assert.Null(PoolVoice.Resolve(index, null, null));
         }
+
+        [Fact]
+        public void ResolvePrefersTheTeacherVariantOfTheSpeakingFigureOverThePool()
+        {
+            const string json = @"{""version"":1,""language"":""de"",""entries"":{
+              ""DT_T|P|1#vw1"": {""file"": ""dialog/aaaaaaaaaaaaaaaa.ogg"", ""duration"": 1.0},
+              ""DT_T|P|1#t_mira"": {""file"": ""dialog/bbbbbbbbbbbbbbbb.ogg"", ""duration"": 1.0}}}";
+            var index = AudioIndex.Parse(json, "de");
+            Assert.Equal("DT_T|P|1#t_mira", PoolVoice.Resolve(index, "DT_T|P|1", new FigureInfo('w', "g", "Mira")));
+            // ein Lehrer ohne eigene Variante und eine Figur ohne Loca-Schlüssel bekommen die Poolstimme
+            Assert.Equal("DT_T|P|1#vw1", PoolVoice.Resolve(index, "DT_T|P|1", new FigureInfo('w', "g", "Tadhg")));
+            Assert.Equal("DT_T|P|1#vw1", PoolVoice.Resolve(index, "DT_T|P|1", new FigureInfo('w', "g")));
+            // ein unzulässiger Loca-Schlüssel wirft nicht
+            Assert.Equal("DT_T|P|1#vw1", PoolVoice.Resolve(index, "DT_T|P|1", new FigureInfo('w', "g", "a#b")));
+            // die Lehrervariante ist keine Poolstimme
+            Assert.Equal(new[] { "vw1" }, index.PoolVariants("DT_T|P|1"));
+        }
     }
 }

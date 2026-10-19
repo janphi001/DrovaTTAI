@@ -35,7 +35,7 @@ namespace DrovaVoice.Playback
 
         /// <summary>Schlüssel vorläufig die GUID; die Probe-Auswertung (docs/decisions/2026-10-bark-figur-probe.md) kann das ändern.</summary>
         public static FigureInfo? ToInfo(FigureSnapshot? s) =>
-            s == null ? null : new FigureInfo(PoolVoice.GenderFromBodyType(s.BodyType), s.Guid);
+            s == null ? null : new FigureInfo(PoolVoice.GenderFromBodyType(s.BodyType), s.Guid, s.EntityKey);
 
         private static float? Distance(DS_DialogueActor actor)
         {

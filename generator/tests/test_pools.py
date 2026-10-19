@@ -3,7 +3,7 @@ import pytest
 from drova_voice.casting import load_casting
 from drova_voice.fish_voices import FishVoice
 from drova_voice.lines import Line, emotion_id
-from drova_voice.pools import expand_pool_lines, load_pools
+from drova_voice.pools import expand_pool_lines, expand_teacher_lines, load_pools, load_teachers
 
 VOICES = {
     "lena": FishVoice("lena", "a" * 32, "Lena", "f", "de"),
@@ -95,3 +95,49 @@ def test_emotion_id_is_the_base_id_for_pool_lines():
     pool_line = expand_pool_lines([line()], {"vm1": "leon"})[0]
     assert emotion_id(pool_line) == "DT_W|Dialog/W|Plh_1"
     assert emotion_id(line("Plh_9", variant="neutral")) == "DT_W|Dialog/W|Plh_9#neutral"
+
+
+def write_teachers(tmp_path, text):
+    path = tmp_path / "teachers.yaml"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_load_teachers_lowercases_and_drops_duplicates(tmp_path):
+    assert load_teachers(write_teachers(tmp_path, "teachers: [Mira, tadhg, mira]\n")) == ["mira", "tadhg"]
+
+
+def test_missing_teachers_file_means_no_teachers(tmp_path):
+    assert load_teachers(tmp_path / "gibtsnicht.yaml") == []
+
+
+def test_a_teacher_name_with_a_separator_is_a_clear_error(tmp_path):
+    with pytest.raises(ValueError, match="a#b"):
+        load_teachers(write_teachers(tmp_path, "teachers: ['a#b']\n"))
+
+
+def test_teacher_lines_get_one_variant_per_teacher_next_to_the_pool_variants():
+    teach = line("Plh_5", actor="Teacher", category="dialog")
+    other = line("Plh_6", actor="NPC", category="dialog")
+    out = expand_teacher_lines(expand_pool_lines([teach, other], {"vw1": "lena"}), [teach, other], ["mira", "tadhg"])
+    assert [l.id for l in out] == [
+        "DT_W|Dialog/W|Plh_5#vw1", "DT_W|Dialog/W|Plh_6#vw1",
+        "DT_W|Dialog/W|Plh_5#t_mira", "DT_W|Dialog/W|Plh_5#t_tadhg",
+    ]
+    assert out[2].pool == "t_mira"
+
+
+def test_named_and_skipped_teacher_lines_get_no_teacher_variants():
+    named = line("Plh_7", actor="Teacher", generic=False)
+    skipped = line("Plh_8", actor="Teacher", skip="unspeakable")
+    assert expand_teacher_lines([named, skipped], [named, skipped], ["mira"]) == [named, skipped]
+
+
+def test_teacher_variant_speaks_with_the_teachers_own_voice(tmp_path):
+    (tmp_path / "casting.yaml").write_text("default_player: leon\nspeakers:\n  mira: {voice: lena}\n", encoding="utf-8")
+    casting = load_casting(tmp_path / "casting.yaml", VOICES)
+    teach = line("Plh_5", actor="Teacher", category="dialog")
+    mira, ghost = expand_teacher_lines([], [teach], ["mira", "ghost"])
+    assert casting.voice_for(mira) == "lena"
+    assert casting.voice_for(ghost) is None   # Lehrer ohne Besetzung: Lücke wie bei jedem unbesetzten Sprecher
+    assert emotion_id(mira) == "DT_W|Dialog/W|Plh_5"

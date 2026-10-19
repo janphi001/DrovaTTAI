@@ -141,6 +141,8 @@ namespace DrovaVoice
             {
                 try { NpcExporter.Export(Path.Combine(ModDir, "Export", ExportLanguageFolder()), LoggerInstance); }
                 catch (Exception e) { LoggerInstance.Error($"NPC-Export fehlgeschlagen: {e}"); }
+                try { TeacherExporter.Export(Path.Combine(ModDir, "Export", _language!.Value), LoggerInstance); }
+                catch (Exception e) { LoggerInstance.Error($"Lehrer-Export fehlgeschlagen: {e}"); }
             }
         }
 

@@ -52,3 +52,39 @@ def expand_pool_lines(lines: Sequence[Line], pools: Mapping[str, str]) -> list[L
         for tag in sorted(pools):
             out.append(replace(line, id=with_variant(line.id, tag), pool=tag))
     return out
+
+
+TEACHER_ACTOR = "Teacher"
+TEACHER_PREFIX = "t_"
+
+
+def load_teachers(path: Path) -> list[str]:
+    """casting/teachers.yaml -> Sprecherschlüssel der Lehrer (klein, ohne Doppelte). Fehlt die Datei, gibt es keine."""
+    path = Path(path)
+    if not path.is_file():
+        return []
+    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    names = raw.get("teachers") if isinstance(raw, dict) else None
+    if not isinstance(names, list):
+        raise ValueError(f"{path}: 'teachers:' mit einer Liste von Sprechern fehlt")
+    result: list[str] = []
+    for name in names:
+        key = str(name).lower()
+        if not key or VARIANT_SEP in key or "|" in key:
+            raise ValueError(f"{path}: Unzulässiger Lehrername '{name}'")
+        if key not in result:
+            result.append(key)
+    return result
+
+
+def expand_teacher_lines(expanded: Sequence[Line], base: Sequence[Line], teachers: Sequence[str]) -> list[Line]:
+    """Hängt an `expanded` je sprechbarer generischer Lehrerzeile (Sprecher „Teacher“) aus `base` eine Variante je
+    Lehrer an (`<ID>#t_<lehrer>`); die Mod spielt sie, wenn die Figur dieser Lehrer ist, sonst die Poolstimme."""
+    out = list(expanded)
+    for line in base:
+        if line.actor != TEACHER_ACTOR or not line.generic or line.skip or line.pool or VARIANT_SEP in line.id:
+            continue
+        for name in teachers:
+            tag = TEACHER_PREFIX + name
+            out.append(replace(line, id=with_variant(line.id, tag), pool=tag))
+    return out

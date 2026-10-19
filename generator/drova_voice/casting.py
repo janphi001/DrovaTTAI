@@ -9,7 +9,7 @@ import yaml
 
 from drova_voice.jsonl import replace_with_retry
 from drova_voice.lines import Line
-from drova_voice.pools import load_pools
+from drova_voice.pools import TEACHER_PREFIX, load_pools
 
 AUTO_HEADER = (
     "# ERZEUGT von `drova-voice cast --propose`. Nicht von Hand ändern: Korrekturen gehören in\n"
@@ -27,6 +27,8 @@ class Casting:
     pools: Mapping[str, str] = field(default_factory=dict)  # Poolstimme (vm1 …) -> Stimmenschlüssel
 
     def voice_for(self, line: Line) -> str | None:
+        if line.pool and line.pool.startswith(TEACHER_PREFIX):
+            return self.speakers.get(line.pool[len(TEACHER_PREFIX):])
         if line.pool:
             return self.pools.get(line.pool)
         if line.category == "player":

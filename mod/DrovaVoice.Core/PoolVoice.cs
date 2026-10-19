@@ -48,10 +48,22 @@ namespace DrovaVoice.Core
             return best;
         }
 
-        /// <summary>Die ID, die gespielt werden soll: die Basis-ID, wenn sie einen Eintrag hat, sonst die gewählte Poolvariante.</summary>
+        /// <summary>Präfix der Lehrervarianten (#t_carima): generische Lehrerzeilen in der Stimme der lehrenden Figur.</summary>
+        public const string TeacherPrefix = "t_";
+
+        /// <summary>
+        /// Die ID, die gespielt werden soll: die Basis-ID, wenn sie einen Eintrag hat, sonst die Lehrervariante der
+        /// sprechenden Figur, wenn es sie gibt, sonst die gewählte Poolvariante.
+        /// </summary>
         public static string? Resolve(AudioIndex index, string? id, FigureInfo? figure)
         {
             if (string.IsNullOrEmpty(id) || index.TryGet(id, out _)) return id;
+            string? speaker = figure?.Speaker;
+            if (!string.IsNullOrEmpty(speaker) && speaker!.IndexOf(LineIds.Separator) < 0 && speaker.IndexOf(LineIds.VariantSeparator) < 0)
+            {
+                string teacher = LineIds.WithVariant(id!, TeacherPrefix + speaker.ToLowerInvariant());
+                if (index.TryGet(teacher, out _)) return teacher;
+            }
             string? tag = Pick(index.PoolVariants(id), figure?.Gender, figure?.Key, id!);
             return tag == null ? id : LineIds.WithVariant(id!, tag);
         }

@@ -1,0 +1,54 @@
+# Figuren, die im Spiel etwas lehren (aus dem Lehrer-Export teachers.json: Talente und Tagebuch; Schlüssel = Loca-Schlüssel
+# der Figur, klein). Für ihre generischen Lehrerzeilen (Sprecher „Teacher“) erzeugt der Generator je Lehrer eine
+# Variante #t_<name> in dessen Stimme; die Mod wählt sie über den Loca-Schlüssel der sprechenden Figur.
+teachers:
+  - ada
+  - aidan
+  - amella
+  - angus
+  - asmus
+  - babsi
+  - bady
+  - banner
+  - bardok
+  - birka
+  - blaan
+  - boris
+  - carima
+  - caspara
+  - chunnaic
+  - cord
+  - diemo
+  - dylan
+  - elnea
+  - eugen
+  - faol
+  - farina
+  - farlan
+  - fester
+  - frithjof
+  - fulk
+  - gerdwin
+  - gra
+  - gradan
+  - henik
+  - humbert
+  - jean
+  - jendrik
+  - joris
+  - junali
+  - karotte
+  - kati
+  - kerr
+  - kilian
+  - larea
+  - liandra
+  - lio
+  - locke
+  - margitte
+  - muc
+  - owain
+  - reija
+  - rura
+  - taron
+  - zoltan
