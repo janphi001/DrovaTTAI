@@ -113,6 +113,33 @@ namespace DrovaVoice.Core.Tests
             Assert.Equal(1, index.Skipped);
         }
 
+        [Theory]
+        [InlineData("1e9999")]
+        [InlineData("-1e9999")]
+        public void SkipsANonFiniteDurationAndKeepsTheSibling(string literal)
+        {
+            string json = "{\"version\":1,\"language\":\"de\",\"entries\":{"
+                + "\"DT_X|A|Bad\":{\"file\":\"dialog/aaaaaaaaaaaaaaaa.ogg\",\"duration\":" + literal + "},"
+                + "\"DT_X|A|Ok\":{\"file\":\"dialog/bbbbbbbbbbbbbbbb.ogg\",\"duration\":1.5}}}";
+            var index = AudioIndex.Parse(json, "de");
+            Assert.False(index.TryGet("DT_X|A|Bad", out _));
+            Assert.True(index.TryGet("DT_X|A|Ok", out var ok));
+            Assert.Equal(1.5, ok.Duration, 3);
+            Assert.Equal(1, index.Count);
+            Assert.Equal(1, index.Skipped);
+        }
+
+        [Fact]
+        public void KeepsALargeFiniteDuration()
+        {
+            const string json = "{\"version\":1,\"language\":\"de\",\"entries\":{"
+                + "\"DT_X|A|Ok\":{\"file\":\"dialog/aaaaaaaaaaaaaaaa.ogg\",\"duration\":1000000.5}}}";
+            var index = AudioIndex.Parse(json, "de");
+            Assert.True(index.TryGet("DT_X|A|Ok", out var ok));
+            Assert.Equal(1000000.5, ok.Duration, 3);
+            Assert.Equal(0, index.Skipped);
+        }
+
         [Fact]
         public void SkipsEntriesWithoutFileOrOfWrongShape()
         {

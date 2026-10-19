@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using DrovaVoice.Core;
 using MelonLoader;
 using UnityEngine;
 
@@ -21,6 +22,7 @@ namespace DrovaVoice.Playback
 
         private readonly bool _verbose;
         private readonly Dictionary<int, int> _idleScans = new Dictionary<int, int>();
+        private readonly OnceLog _faults = new OnceLog();
 
         public StaleAudioProbe(MelonLogger.Instance log, bool verbose) { _log = log; _verbose = verbose; }
 
@@ -30,7 +32,11 @@ namespace DrovaVoice.Playback
             if (scan.Generation == _seenGeneration) return;
             _seenGeneration = scan.Generation;
             try { Scan(scan.Sources); }
-            catch (Exception e) { _log.Warning($"Audio-Sonde: {e.GetType().Name}: {e.Message}"); }
+            catch (Exception e)
+            {
+                if (_faults.ShouldLog(e.GetType().Name))
+                    _log.Warning($"Audio-Sonde: {e.GetType().Name}: {e.Message}");
+            }
         }
 
         private void Scan(AudioSource[] sources)
@@ -59,15 +65,10 @@ namespace DrovaVoice.Playback
                 foreach (int id in _idleScans.Keys) if (!seen.Contains(id)) stale.Add(id);
                 foreach (int id in stale) _idleScans.Remove(id);
             }
-            if (_verbose && _lastState.Count > seen.Count)
+            foreach (int id in TrackedIds.Missing(_lastState.Keys, seen))
             {
-                var gone = new List<int>();
-                foreach (int id in _lastState.Keys) if (!seen.Contains(id)) gone.Add(id);
-                foreach (int id in gone)
-                {
-                    _log.Msg($"[Sonde] Quelle {id} hält den Clip nicht mehr ({_lastState[id]})");
-                    _lastState.Remove(id);
-                }
+                if (_verbose) _log.Msg($"[Sonde] Quelle {id} hält den Clip nicht mehr ({_lastState[id]})");
+                _lastState.Remove(id);
             }
         }
 

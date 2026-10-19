@@ -121,40 +121,45 @@ namespace DrovaVoice.Playback
         private void Apply()
         {
             bool havePlayer = TryPlayerPosition(out Vector2 player);
-            for (int i = _tracked.Count - 1; i >= 0; i--)
-            {
-                var t = _tracked[i];
-                var source = t.Source;
-                AudioClip? clip = null;
-                if (source != null && source.isPlaying) clip = source.clip;
-                bool done = true;
-                if (clip != null)
-                {
-                    // Name nur, wenn der Clip wechselt. Dieselbe Instanz bleibt ohne neue Zeichenkette geregelt.
-                    int clipId = clip.GetInstanceID();
-                    if (BarkTrack.SameClip(t.ClipId, clipId)) done = false;
-                    else
-                    {
-                        string name = clip.name ?? "";
-                        if (name.StartsWith(BarkClipPrefix, StringComparison.Ordinal))
-                        {
-                            t.ClipId = clipId;
-                            done = false;
-                        }
-                    }
-                }
-                if (done)
-                {
-                    if (source != null) { source.volume = t.OriginalVolume; _ids.Remove(source.GetInstanceID()); }
-                    _tracked.RemoveAt(i);
-                    continue;
-                }
-                if (!havePlayer) continue;   // Spieler unbekannt: nicht neu regeln; der Bark behält den zuletzt gesetzten Wert
-                var pos = source.transform.position;
-                float distance = Vector2.Distance(player, new Vector2(pos.x, pos.y));
-                source.volume = t.OriginalVolume * BarkAttenuation.Gain(distance, _min, _max);
-            }
+            BarkPass.Run(
+                _tracked,
+                havePlayer,
+                t => ReadSample(t, havePlayer, player),
+                Drop,
+                (t, distance) => t.Source.volume = t.OriginalVolume * BarkAttenuation.Gain(distance, _min, _max));
             if (_tracked.Count == 0) _ids.Clear();
+        }
+
+        private static BarkSample ReadSample(Tracked t, bool havePlayer, Vector2 player)
+        {
+            var source = t.Source;
+            if (source == null) return new BarkSample();
+            var clip = source.isPlaying ? source.clip : null;
+            bool bark = false;
+            if (clip != null)
+            {
+                // Name nur, wenn der Clip wechselt. Dieselbe Instanz bleibt ohne neue Zeichenkette geregelt.
+                int clipId = clip.GetInstanceID();
+                if (BarkTrack.SameClip(t.ClipId, clipId)) bark = true;
+                else if ((clip.name ?? "").StartsWith(BarkClipPrefix, StringComparison.Ordinal))
+                {
+                    t.ClipId = clipId;
+                    bark = true;
+                }
+            }
+            if (!bark || !havePlayer) return new BarkSample { Active = bark };
+            var pos = source.transform.position;
+            float distance = Vector2.Distance(player, new Vector2(pos.x, pos.y));
+            return new BarkSample { Active = true, Distance = distance };
+        }
+
+        private void Drop(Tracked t)
+        {
+            var source = t.Source;
+            if (source == null) return;
+            int id = source.GetInstanceID();
+            try { source.volume = t.OriginalVolume; }
+            finally { _ids.Remove(id); }
         }
 
         private bool TryPlayerPosition(out Vector2 position)

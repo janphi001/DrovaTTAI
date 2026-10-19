@@ -137,7 +137,12 @@ namespace DrovaVoice.Core
                     { skipped++; continue; }
                     string file = fileEl.GetString() ?? "";
                     if (!IsSafeRelativePath(file)) { skipped++; continue; }
-                    double duration = value.TryGetProperty("duration", out var d) && d.ValueKind == JsonValueKind.Number ? d.GetDouble() : 0.0;
+                    double duration = 0.0;
+                    if (value.TryGetProperty("duration", out var d) && d.ValueKind == JsonValueKind.Number)
+                    {
+                        if (!d.TryGetDouble(out duration) || !double.IsFinite(duration))
+                        { skipped++; continue; }
+                    }
                     map[prop.Name] = new IndexEntry(file, duration, CategoryOf(file));
                 }
                 return new AudioIndex(map, skipped);
