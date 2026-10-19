@@ -33,7 +33,8 @@ def has_trailer(text: str) -> bool:
 
 def git(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["git", *args], cwd=ROOT, text=True, capture_output=True, check=False,
+        ["git", *args], cwd=ROOT, text=True, encoding="utf-8", errors="replace",
+        capture_output=True, check=False,
     )
 
 

@@ -61,7 +61,6 @@ from drova_voice.pools import (
     load_teachers,
 )
 from drova_voice.preview import write_preview
-from drova_voice.release import build_package
 from drova_voice.profiles import (
     LOW_CONFIDENCE,
     Profile,
@@ -70,6 +69,7 @@ from drova_voice.profiles import (
     read_profiles,
     write_profiles,
 )
+from drova_voice.release import build_package
 from drova_voice.report import (
     build_report,
     build_speaker_report,
