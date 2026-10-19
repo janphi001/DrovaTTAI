@@ -23,5 +23,14 @@ namespace DrovaVoice.Core.Tests
             Assert.False(log.ShouldLog("c"));
             Assert.False(log.ShouldLog("a"));
         }
+
+        [Fact]
+        public void ClearMakesTheSameKeyLogAgain()
+        {
+            var log = new OnceLog();
+            Assert.True(log.ShouldLog("a"));
+            log.Clear();
+            Assert.True(log.ShouldLog("a"));
+        }
     }
 }
