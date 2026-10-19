@@ -22,6 +22,14 @@ class StageDirection:
 
 
 @dataclass(frozen=True)
+class Lexicon:
+    """Einmal gebaute Wortliste. Die Aussprache wird nicht erneut durchsucht."""
+
+    pattern: re.Pattern[str] | None
+    spoken: Mapping[str, str]
+
+
+@dataclass(frozen=True)
 class SpeechText:
     text: str
     stage: tuple[StageDirection, ...] = ()
@@ -57,11 +65,27 @@ def _numbers_to_words(text: str) -> str:
     return _NUM_RE.sub(lambda m: num2words(int(m.group(0)), lang="de"), text)
 
 
-def apply_lexicon(text: str, lexicon: Mapping[str, str]) -> str:
-    for word, spoken in lexicon.items():
-        # Lambda statt Ersatztext: re wertet Backslashes im Ersatz sonst als Escapes aus.
-        text = re.sub(rf"\b{re.escape(word)}\b", lambda m: spoken, text)
-    return text
+def compile_lexicon(lexicon: Mapping[str, str]) -> Lexicon:
+    items: list[tuple[str, str]] = []
+    for key, spoken in lexicon.items():
+        word = str(key)
+        if word == "":
+            raise ValueError("Lexikon-Schlüssel darf nicht leer sein")
+        items.append((word, str(spoken)))
+    if not items:
+        return Lexicon(None, {})
+    pattern = re.compile("|".join(rf"\b{re.escape(word)}\b" for word, _ in items))
+    return Lexicon(pattern, dict(items))
+
+
+def apply_lexicon(text: str, lexicon: Mapping[str, str] | Lexicon) -> str:
+    compiled = lexicon if isinstance(lexicon, Lexicon) else compile_lexicon(lexicon)
+    pattern = compiled.pattern
+    if pattern is None:
+        return text
+    # Lambda statt Ersatztext: re wertet Backslashes im Ersatz sonst als Escapes aus.
+    spoken = compiled.spoken
+    return pattern.sub(lambda match: spoken[match.group(0)], text)
 
 
 def _tidy(text: str) -> str:
@@ -86,7 +110,7 @@ def extract_stage_directions(text: str) -> tuple[str, tuple[StageDirection, ...]
 def build_speech_text(
     raw: str,
     gvar_values: Mapping[str, str] | None = None,
-    lexicon: Mapping[str, str] | None = None,
+    lexicon: Mapping[str, str] | Lexicon | None = None,
 ) -> SpeechText:
     text, unresolved = substitute_gvars(raw, gvar_values or {})
     text = _replace_br(text)

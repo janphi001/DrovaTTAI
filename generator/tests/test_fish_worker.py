@@ -1,7 +1,11 @@
+import html
+import importlib.util
 import io
 import json
 import struct
 import threading
+import urllib.error
+import urllib.parse
 import wave
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -284,6 +288,69 @@ def test_truncated_streaming_wav_drops_the_dangling_byte(tmp_path, guarded):
     assert resp.ok and resp.duration == pytest.approx(11024 / 22050, abs=1e-6)
     with wave.open(str(tmp_path / "a.wav"), "rb") as w:
         assert w.getnframes() == 11024
+
+
+def test_percent_encoded_and_html_escaped_key_are_masked(tmp_path, guarded):
+    key = "sk-test+ab/cd=&x"
+    encoded = urllib.parse.quote(key, safe="")
+    slash_kept = urllib.parse.quote(key, safe="/")
+    escaped = html.escape(key, quote=True)
+    body = f"{encoded} {slash_kept} {escaped}".encode()
+    with FakeFish([(400, body)]) as fake:
+        client = _client(guarded, fake, FISH_API_KEY=key)
+        try:
+            resp = guarded(lambda: client.synth(_req(tmp_path)))
+        finally:
+            client.close()
+    assert not resp.ok
+    assert key not in resp.error and encoded not in resp.error
+    assert slash_kept not in resp.error and escaped not in resp.error and "%2B" not in resp.error
+
+
+def test_error_body_read_is_capped_before_the_message_is_cut(monkeypatch):
+    spec = importlib.util.spec_from_file_location("fish_worker_cap", WORKERS / "fish" / "worker.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    class Limited:
+        def __init__(self):
+            self.sizes = []
+
+        def read(self, size=-1):
+            self.sizes.append(size)
+            if size is None or size < 0:
+                return b"Y" * 100_000
+            return b"Y" * size
+
+        def close(self):
+            return None
+
+    body = Limited()
+
+    def fail_open(request, timeout=180):
+        raise urllib.error.HTTPError("http://127.0.0.1/v1/tts", 400, "bad", urllib.error.HTTPError.__mro__ and __import__("email").message.Message(), body)
+
+    monkeypatch.setattr(module._OPENER, "open", fail_open)
+    cfg = {"key": KEY, "url": "http://127.0.0.1/v1/tts", "model": "s2.1-pro-free", "attempts": 1, "backoff": 0.0}
+    with pytest.raises(RuntimeError, match="HTTP 400"):
+        module._post(cfg, {"text": "x"})
+    assert body.sizes == [module._MAX_ERROR_BODY]
+
+
+def test_url_with_the_key_is_rejected_without_echoing_it(tmp_path, guarded):
+    with FakeFish([]) as fake:
+        with pytest.raises(EngineError, match="Schlüssel") as info:
+            _client(guarded, fake, FISH_API_URL=f"{fake.url}?token={KEY}")
+    assert KEY not in str(info.value) and not fake.requests
+
+
+def test_non_http_url_is_rejected_without_echoing_the_address(tmp_path, guarded):
+    target = tmp_path / "out.bin"
+    with FakeFish([]) as fake:
+        with pytest.raises(EngineError, match="http oder https") as info:
+            _client(guarded, fake, FISH_API_URL=target.as_uri())
+    text = str(info.value)
+    assert "file:" not in text and KEY not in text and not target.exists() and not fake.requests
 
 
 def test_wav_with_empty_data_chunk_is_an_error_and_the_file_is_removed(tmp_path, guarded):

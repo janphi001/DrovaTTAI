@@ -49,6 +49,17 @@ def test_worker_command_unknown_engine():
         worker_command(WORKERS, "nope")
 
 
+def test_worker_command_rejects_a_path_outside_the_workers_dir(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "worker.py").write_text("raise SystemExit(0)\n", encoding="utf-8")
+    workers = tmp_path / "workers"
+    workers.mkdir()
+    for engine in ("../outside", "outside/../../outside", "fish/../../outside", "/tmp/outside", "a b"):
+        with pytest.raises(EngineError, match="^Unbekannte Engine$"):
+            worker_command(workers, engine)
+
+
 def test_worker_command_missing_venv(tmp_path):
     wdir = tmp_path / "heavy"
     wdir.mkdir()

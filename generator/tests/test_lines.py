@@ -1,3 +1,5 @@
+import pytest
+
 from drova_voice.ids import choice_id, statement_id
 from drova_voice.lines import (SKIP_GVAR_NAME, SKIP_GVAR_VALUE, SKIP_ID_MISMATCH, SKIP_PLAYER_CHOICE, SKIP_UNSPEAKABLE, Line, build_lines, load_lexicon,
                                load_loc_texts, read_lines, select_npc, write_lines)
@@ -36,6 +38,22 @@ def test_stage_directions_are_split_off():
 def test_lexicon_is_applied():
     (line,) = build_lines(manifest(mline("Plh_1")), {(PATH, "Plh_1"): "Willkommen in Zorgrad."}, {"Zorgrad": "Sorgrad"})
     assert line.speech == "Willkommen in Sorgrad."
+
+
+def test_lexicon_replaces_each_listed_word_once():
+    (line,) = build_lines(manifest(mline("Plh_1")), {}, {"Zorgrad": "Sorgrad", "Sorgrad": "Torgrad"})
+    assert line.speech == "Text aus dem Manifest."
+    (line,) = build_lines(
+        manifest(mline("Plh_1", text="Zorgrad und Sorgrad bleiben stehen.")),
+        {},
+        {"Zorgrad": "Sorgrad", "Sorgrad": "Torgrad"},
+    )
+    assert line.speech == "Sorgrad und Torgrad bleiben stehen."
+
+
+def test_empty_lexicon_key_is_rejected_before_lines_are_built():
+    with pytest.raises(ValueError, match="leer"):
+        build_lines(manifest(mline("Plh_1")), {}, {"": "Sorgrad"})
 
 
 NAME = "$GVAR:EVars_Player.Name$"
@@ -151,6 +169,9 @@ def test_load_lexicon_missing_or_empty(tmp_path):
     assert load_lexicon(tmp_path / "lex.yaml") == {}
     (tmp_path / "lex.yaml").write_text("Zorgrad: Sorgrad\n", encoding="utf-8")
     assert load_lexicon(tmp_path / "lex.yaml") == {"Zorgrad": "Sorgrad"}
+    (tmp_path / "lex.yaml").write_text('"": Sorgrad\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="leer"):
+        load_lexicon(tmp_path / "lex.yaml")
 
 
 def test_valid_line_wins_over_an_earlier_mismatched_duplicate_id():
