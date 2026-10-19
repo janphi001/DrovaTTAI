@@ -138,8 +138,7 @@ class EngineClient:
 
     def synth(self, req: SynthRequest) -> SynthResponse:
         try:
-            self._proc.stdin.write((req.to_json() + "\n").encode("utf-8"))
-            self._proc.stdin.flush()
+            _write_all(self._proc.stdin, (req.to_json() + "\n").encode("utf-8"))
         except OSError as e:
             raise EngineError(f"Worker nimmt keine Anfragen mehr an: {e}") from e
         resp = SynthResponse.from_dict(self._read())
@@ -182,3 +181,13 @@ def worker_command(workers_dir: Path, engine: str) -> list[str]:
     if (wdir / "requirements.txt").exists():
         raise EngineError(f"venv für '{engine}' fehlt: {py}. Siehe {wdir / 'README.md'}")
     return [sys.executable, str(script)]
+
+
+def _write_all(pipe, data: bytes) -> None:
+    """Schreibt alles. Die Pipe ist ungepuffert (bufsize=0), write() darf dort kürzer ausfallen."""
+    view = memoryview(data)
+    while view:
+        written = pipe.write(view)
+        if written is None:
+            raise OSError("Pipe nimmt gerade nichts an")
+        view = view[written:]
