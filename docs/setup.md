@@ -15,3 +15,4 @@ Empfehlung: vor der Installation eine Kopie des ganzen Spielordners anlegen (z. 
 ein Abgleich mit `robocopy <Backup> <Spielordner> /MIR /L` zeigt als Trockenlauf, was zurückgebaut würde.
 
 Export: siehe docs/export.md.
+Die Python-Umgebung des Generators steht im README, Abschnitt „Generator einrichten“.

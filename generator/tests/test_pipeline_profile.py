@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from drova_voice.cli import main
 from drova_voice.profiles import read_profiles
 
@@ -27,6 +29,15 @@ def test_set_needs_gender_and_age(pipeline_repo, capsys):
     run(pipeline_repo, "extract")
     assert run(pipeline_repo, "profile", "--set", "mira") == 2
     assert "--gender" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("size", ["0", "-3"])
+def test_prepare_rejects_a_non_positive_size(pipeline_repo, capsys, size):
+    run(pipeline_repo, "extract")
+    assert run(pipeline_repo, "profile", "--prepare", "--size", size) == 2
+    err = capsys.readouterr().err
+    assert "FEHLER:" in err and "--size" in err and "Traceback" not in err
+    assert not (pipeline_repo.repo / "out" / "subagent" / "profile").exists()
 
 
 def test_prepare_writes_packets_for_speakers_without_profile(pipeline_repo, capsys):

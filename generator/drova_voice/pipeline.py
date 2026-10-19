@@ -14,6 +14,7 @@ from drova_voice.casting_sheet import write_casting_sheet
 from drova_voice.config import Config
 from drova_voice.emote import import_llm_emotions, merge_emotions, prepare_emote_packets, read_emotions, write_emotions
 from drova_voice.encode import run_encode
+from drova_voice.export_report import locate_manifest
 from drova_voice.engines.client import EngineClient, EngineError, cache_env, worker_command
 from drova_voice.fish_model import free_tier_warning, guard_fish_model, resolve_fish_profile, write_model_stamp
 from drova_voice.fish_voices import load_catalog
@@ -38,7 +39,7 @@ def _fail(message: str) -> int:
     return 2
 
 
-def _read_json_object(path: Path, what: str) -> dict | None:
+def read_json_object(path: Path, what: str) -> dict | None:
     """JSON-Objekt lesen. None (mit Meldung), wenn die Datei unlesbar oder kein Objekt ist."""
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8-sig"))
@@ -100,12 +101,14 @@ def _selected(cfg: Config, args: argparse.Namespace, expand_pool: bool = True) -
 
 
 def _extract(cfg: Config, args: argparse.Namespace) -> int:
-    manifest_path = args.manifest or (cfg.data_dir / "export" / cfg.language / "manifest.json")
-    if not Path(manifest_path).is_file():
-        return _fail(f"Manifest nicht gefunden: {manifest_path} (Export im Spiel auslösen, siehe docs/export.md)")
+    manifest_path, notice = locate_manifest(cfg.data_dir / "export" / cfg.language, args.manifest)
+    if manifest_path is None:
+        return _fail(notice or "Manifest nicht gefunden")
     if not cfg.loc_dir.is_dir():
         return _fail(f"Lokalisierungsordner nicht gefunden: {cfg.loc_dir} (game_dir in config.yaml prüfen)")
-    manifest = _read_json_object(Path(manifest_path), "Manifest")
+    if notice:
+        print(notice)
+    manifest = read_json_object(manifest_path, "Manifest")
     if manifest is None:
         return 2
     if not isinstance(manifest.get("lines", []), list):
@@ -276,6 +279,8 @@ def _emote(cfg: Config, args: argparse.Namespace) -> int:
     except ValueError as e:
         return _fail(str(e))
     if args.prepare:
+        if args.size < 1:
+            return _fail("--size muss mindestens 1 sein")
         packets = prepare_emote_packets(lines, profiles, args.size)
         out = cfg.out_dir / "subagent" / "emote"
         out.mkdir(parents=True, exist_ok=True)
@@ -355,7 +360,9 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     except (OSError, ValueError) as e:
         return _fail(str(e))
     jobs, skipped = build_jobs(lines, casting, catalog.synth_table(), emotions, args.engine)
-    if args.limit:
+    if args.limit is not None:
+        if args.limit < 0:
+            return _fail("--limit muss 0 oder größer sein")
         jobs = jobs[: args.limit]
     cache_dir = cfg.cache_dir / "synth"
     model_alias = None
@@ -513,7 +520,7 @@ def _report(cfg: Config, args: argparse.Namespace) -> int:
     index_path = cfg.install_dir / "index.json"
     entries: dict = {}
     if index_path.is_file():
-        index = _read_json_object(index_path, "index.json")
+        index = read_json_object(index_path, "index.json")
         if index is None:
             return 2
         entries = index.get("entries", {})
@@ -583,6 +590,8 @@ def _profile(cfg: Config, args: argparse.Namespace) -> int:
         return _fail(f"{path} fehlt (zuerst `drova-voice extract` ausführen)")
     lines = read_lines(path)
     if args.prepare:
+        if args.size < 1:
+            return _fail("--size muss mindestens 1 sein")
         packets = prepare_packets(lines, profiles, args.size, include_known=args.all)
         out = cfg.out_dir / "subagent" / "profile"
         out.mkdir(parents=True, exist_ok=True)
@@ -660,7 +669,7 @@ def add_parsers(sub) -> None:
     sy.add_argument("--accept-model-change", action="store_true",
                     help="Wechsel von Modell, Sprache, Latenz oder Sampling bestätigen (vorhandener Fish-Cache gilt dann als Fehltreffer)")
     sy.add_argument("--workers", type=int, default=8, help="parallele Anfragen (Standard 8, gemessen ohne 429 bis 16)")
-    sy.add_argument("--limit", type=int, help="nur die ersten N Aufträge (zum Ausprobieren)")
+    sy.add_argument("--limit", type=int, help="nur die ersten N Aufträge (0 sendet nichts)")
     sy.add_argument("--max-utf8-bytes", type=int,
                     help="höchstens so viele UTF-8-Bytes neu senden, danach abbrechen (Cache zählt nicht)")
     _add_selection(sy)

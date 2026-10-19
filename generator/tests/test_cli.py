@@ -179,6 +179,15 @@ def test_missing_config_file_is_a_german_error_with_exit_2(tmp_path, capsys, arg
     assert "Traceback" not in err
 
 
+def test_config_that_is_not_utf8_names_the_file(tmp_path, capsys):
+    _, cfg, _ = _setup(tmp_path)
+    cfg.write_bytes(b"\xffgame_dir")
+    assert main(["--config", str(cfg), "bakeoff", "select"]) == 2
+    err = capsys.readouterr().err
+    assert "FEHLER:" in err and "UTF-8" in err and cfg.name in err
+    assert "Traceback" not in err
+
+
 @pytest.mark.parametrize("argv", [["bakeoff", "select"], ["smoke", "fake"]])
 def test_config_path_that_cannot_be_read_returns_2(tmp_path, capsys, argv):
     folder = tmp_path / "konfig"

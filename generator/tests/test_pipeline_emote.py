@@ -1,7 +1,18 @@
 import json
 
+import pytest
+
 from drova_voice.cli import main
 from drova_voice.emote import read_emotions
+
+
+@pytest.mark.parametrize("size", ["0", "-2"])
+def test_emote_prepare_rejects_a_non_positive_size(pipeline_repo, capsys, size):
+    main(["--config", str(pipeline_repo.cfg), "extract"])
+    assert main(["--config", str(pipeline_repo.cfg), "emote", "--prepare", "--size", size]) == 2
+    err = capsys.readouterr().err
+    assert "FEHLER:" in err and "--size" in err and "Traceback" not in err
+    assert not (pipeline_repo.repo / "out" / "subagent" / "emote").exists()
 
 
 def test_emote_writes_stage_rows(pipeline_repo, capsys):

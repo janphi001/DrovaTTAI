@@ -34,6 +34,12 @@ def test_missing_pools_file_is_an_empty_pool(tmp_path):
     assert load_pools(tmp_path / "gibtsnicht.yaml", VOICES) == {}
 
 
+def test_a_single_voice_instead_of_a_list_is_rejected(tmp_path):
+    with pytest.raises(ValueError, match="Liste") as caught:
+        load_pools(write(tmp_path, "pools:\n  m: leon\n"), VOICES)
+    assert "l" not in str(caught.value).split("Liste")[-1]
+
+
 def test_unknown_voice_and_bad_gender_are_clear_errors(tmp_path):
     with pytest.raises(ValueError, match="gibtsnicht"):
         load_pools(write(tmp_path, "pools:\n  m: [gibtsnicht]\n"), VOICES)

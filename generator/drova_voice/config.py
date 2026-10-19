@@ -8,6 +8,22 @@ import yaml
 
 from drova_voice.fish_model import resolve_fish_model
 
+_DRIVE = re.compile(r"^[A-Za-z]:")
+
+
+def _rooted(text: str) -> bool:
+    return text[:1] in "/\\" or bool(_DRIVE.match(text))
+
+
+def _path_from_config(text: str, base: Path) -> Path:
+    # Ein Laufwerksbuchstabe ist unter Linux kein absoluter Pfad. resolve() würde ihn an
+    # das Arbeitsverzeichnis hängen. Relative Angaben gehören zur Konfigurationsdatei.
+    path = Path(text)
+    if _rooted(text):
+        return path.resolve() if path.is_absolute() else path
+    return (base / text).resolve()
+
+
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.yaml"
 # Dieselbe Ordnerregel wie AudioLanguage in der Mod (VoiceSettings.CleanFolderName): 1–16 Zeichen,
 # nur Buchstaben, Ziffern, '_' und '-'. Punkte und Schrägstriche würden install --prune aus dem Sprachordner heben.
@@ -58,8 +74,13 @@ class Config:
 
 
 def load_config(path: Path) -> Config:
+    config_path = Path(path)
     try:
-        raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        text = config_path.read_text(encoding="utf-8")
+    except UnicodeError as e:
+        raise ValueError(f"{path}: Konfiguration ist kein UTF-8 ({e})") from e
+    try:
+        raw = yaml.safe_load(text)
     except yaml.scanner.ScannerError as e:
         # Typisch: Windows-Pfad mit Backslash in doppelten Anführungszeichen, z. B. "C:\Games" (\G ist ungültig).
         raise ValueError(
@@ -78,10 +99,11 @@ def load_config(path: Path) -> Config:
     if not isinstance(game_dir, str) or not game_dir.strip():
         raise ValueError(f"{path}: 'game_dir' muss ein nicht-leerer Text sein")
     root_raw = raw.get("repo_root")
+    base = config_path.resolve().parent
     if root_raw is None or root_raw == "":
-        repo_root = Path(path).resolve().parent.parent
+        repo_root = base.parent
     elif isinstance(root_raw, str):
-        repo_root = Path(root_raw)
+        repo_root = _path_from_config(root_raw, base)
     else:
         raise ValueError(f"{path}: 'repo_root' muss ein Text sein")
     language = _language_folder(raw.get("language", "de"), path)
@@ -96,9 +118,9 @@ def load_config(path: Path) -> Config:
     fish_temperature = _optional_unit(raw, path, "fish_temperature")
     fish_top_p = _optional_unit(raw, path, "fish_top_p")
     return Config(
-        game_dir=Path(game_dir),
+        game_dir=_path_from_config(game_dir, base),
         language=language,
-        repo_root=repo_root.resolve(),
+        repo_root=repo_root,
         fish_model=fish_model,
         fish_latency=fish_latency,
         fish_temperature=fish_temperature,

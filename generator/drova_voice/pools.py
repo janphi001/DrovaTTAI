@@ -25,7 +25,11 @@ def load_pools(path: Path, voices: Mapping[str, object]) -> dict[str, str]:
     for gender, keys in pools.items():
         if str(gender) not in GENDERS:
             raise ValueError(f"{path}: Unbekanntes Geschlecht '{gender}' (erlaubt: m, w)")
-        for number, key in enumerate(keys or [], start=1):
+        if keys is None:
+            keys = []
+        elif not isinstance(keys, list):
+            raise ValueError(f"{path}: Pool '{gender}' muss eine Liste von Stimmen sein")
+        for number, key in enumerate(keys, start=1):
             voice = str(key).lower()
             if voice not in voices:
                 raise ValueError(f"{path}: Unbekannte Stimme '{voice}' im Pool '{gender}' (Schlüssel aus casting/fish_voices.yaml)")
