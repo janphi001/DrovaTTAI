@@ -8,14 +8,14 @@ namespace DrovaVoice.Core.Tests
     public class OggFileTests
     {
         [Fact]
-        public void ReadShareIncludesDeleteSoInstallCanReplaceTheFile()
+        public void ReadShareIncludesDeleteSoPruneCanRemoveTheFile()
         {
             Assert.True(OggFile.ReadShare.HasFlag(FileShare.ReadWrite));
             Assert.True(OggFile.ReadShare.HasFlag(FileShare.Delete));
         }
 
         [Fact]
-        public void OpenReadHoldsTheFileAndReleasesItOnDispose()
+        public void OpenReadLetsPruneDeleteTheOpenFile()
         {
             string dir = Path.Combine(Path.GetTempPath(), "ogg-share-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);
@@ -30,12 +30,11 @@ namespace DrovaVoice.Core.Tests
                     {
                         using var blocked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
                     });
-                    string replacement = path + ".new";
-                    File.WriteAllBytes(replacement, new byte[] { 9 });
-                    File.Move(replacement, path, true);
+                    // Windows erlaubt kein Umbenennen über eine offene Datei, auch nicht mit FileShare.Delete.
+                    // Löschen geht: die Datei verschwindet spätestens, wenn der Strom schließt.
+                    File.Delete(path);
                 }
-                using var after = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
-                Assert.Equal(1, after.Length);
+                Assert.False(File.Exists(path));
             }
             finally
             {
