@@ -12,7 +12,7 @@ namespace DrovaVoice.Playback
     /// sieht davon nichts. Die Sonde liest die gemeinsame Suche (<see cref="AudioSourceScan"/>, alle 0,25 s) und achtet auf
     /// AudioSources, die einen Clip der Mod halten (Clipname beginnt mit <see cref="ClipLoader.ClipNamePrefix"/>). Sie meldet
     /// jede Zustandsänderung: beginnt zu spielen, hört auf, hält den Clip im Leerlauf. Ein Leerlauf-Halter mit playOnAwake
-    /// oder ein Start ohne Gespräch ist der Beleg. Leerlauf zählt je Suche, nicht je Frame (zwei Suchen sind etwa 0,5 s).
+    /// oder ein Start ohne Gespräch ist der Beleg. Leerlauf zählt nach Zeit (<see cref="IdleClipPolicy"/>), eine Pause (time &gt; 0) nicht.
     /// </summary>
     internal sealed class StaleAudioProbe
     {
@@ -21,7 +21,7 @@ namespace DrovaVoice.Playback
         private int _seenGeneration;
 
         private readonly bool _verbose;
-        private readonly Dictionary<int, int> _idleScans = new Dictionary<int, int>();
+        private readonly IdleClipPolicy _idle = new IdleClipPolicy();
         private readonly OnceLog _faults = new OnceLog();
 
         public StaleAudioProbe(MelonLogger.Instance log, bool verbose) { _log = log; _verbose = verbose; }
@@ -31,7 +31,7 @@ namespace DrovaVoice.Playback
         {
             if (scan.Generation == _seenGeneration) return;
             _seenGeneration = scan.Generation;
-            try { Scan(scan.Sources); }
+            try { Scan(scan.Sources, Time.unscaledTime); }
             catch (Exception e)
             {
                 if (_faults.ShouldLog(e.GetType().Name))
@@ -39,7 +39,7 @@ namespace DrovaVoice.Playback
             }
         }
 
-        private void Scan(AudioSource[] sources)
+        private void Scan(AudioSource[] sources, float now)
         {
             var seen = new HashSet<int>();
             foreach (var source in sources)
@@ -51,7 +51,7 @@ namespace DrovaVoice.Playback
                 if (!name.StartsWith(ClipLoader.ClipNamePrefix, StringComparison.Ordinal)) continue;
                 int id = source.GetInstanceID();
                 seen.Add(id);
-                if (CleanIdle(source, id)) continue;
+                if (CleanIdle(source, id, now)) continue;
                 if (!_verbose) continue;
                 string state = source.isPlaying ? "spielt" : "haelt";
                 string key = state + "|" + name;
@@ -59,12 +59,7 @@ namespace DrovaVoice.Playback
                 _lastState[id] = key;
                 _log.Msg($"[Sonde] {state}: {name} auf {PathOf(source.transform)} (playOnAwake={source.playOnAwake}, loop={source.loop}, zeit={source.time:0.00}/{clip.length:0.00} s, volume={source.volume:0.00}, aktiv={source.gameObject.activeInHierarchy})");
             }
-            if (_idleScans.Count > seen.Count)
-            {
-                var stale = new List<int>();
-                foreach (int id in _idleScans.Keys) if (!seen.Contains(id)) stale.Add(id);
-                foreach (int id in stale) _idleScans.Remove(id);
-            }
+            _idle.ForgetUnseen(seen);
             foreach (int id in TrackedIds.Missing(_lastState.Keys, seen))
             {
                 if (_verbose) _log.Msg($"[Sonde] Quelle {id} hält den Clip nicht mehr ({_lastState[id]})");
@@ -74,14 +69,12 @@ namespace DrovaVoice.Playback
 
         /// <summary>
         /// Das Spiel lässt den Clip nach dem Abspielen an der AudioSource (playOnAwake=True) stehen; wird der NPC später neu
-        /// aktiviert, spielt die Quelle ihn erneut ab. Steht die Quelle in zwei Läufen hintereinander still, wird der Clip abgenommen.
+        /// aktiviert, spielt die Quelle ihn erneut ab. <see cref="IdleClipPolicy"/> nimmt ihn nach einer halben Sekunde Leerlauf ab.
+        /// Eine pausierte Quelle (time &gt; 0) behält den Clip.
         /// </summary>
-        private bool CleanIdle(AudioSource source, int id)
+        private bool CleanIdle(AudioSource source, int id, float now)
         {
-            if (source.isPlaying) { _idleScans.Remove(id); return false; }
-            _idleScans.TryGetValue(id, out int n);
-            if (n + 1 < 2) { _idleScans[id] = n + 1; return false; }
-            _idleScans.Remove(id);
+            if (!_idle.ShouldStrip(id, source.isPlaying, source.time, now)) return false;
             if (_verbose) _log.Msg($"[Sonde] Clip abgenommen: {source.clip.name} auf {PathOf(source.transform)}");
             source.clip = null;
             _lastState.Remove(id);
