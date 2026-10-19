@@ -1,7 +1,6 @@
 # Discord-Beitrag
 
-Unter 2.000 Zeichen (Discord-Grenze ohne Nitro). `<LINK>` durch den Download-Link ersetzen.
-Das ZIP ist rund 600 MB groß und passt nicht als Discord-Anhang; ein GitHub-Release erlaubt Dateien bis 2 GB.
+Unter 2.000 Zeichen (Discord-Grenze ohne Nitro). Der Link zeigt immer auf das neueste GitHub-Release. Das ZIP ist rund 550 MB groß und passt nicht als Discord-Anhang.
 
 ---
 
@@ -26,7 +25,7 @@ Ich habe eine Mod gebaut, die Drova auf Deutsch vertont. Die Figuren sprechen ih
 **Installation**
 Du brauchst MelonLoader 0.7.3 und die Drova Modding API 0.5.4. Danach die Ordner `Mods` und `UserLibs` aus dem ZIP in deinen Spielordner kopieren. Die genaue Anleitung steht in der README im ZIP.
 
-📦 Download (ca. 600 MB): <LINK>
+📦 Download (ca. 550 MB): https://github.com/janphi001/DrovaTTAI/releases/latest
 
 **Wichtig zu wissen**
 Ich habe das Spiel mit der Mod noch nicht komplett durchgespielt. Die Stimmen wurden den Figuren anhand der Spieldaten zugeteilt, deshalb kann es sein, dass manche Figuren mit dem falschen Geschlecht sprechen oder eine unpassende Stimme haben. Es ist außerdem KI, also passt nicht jede Betonung perfekt, gerade bei Namen.

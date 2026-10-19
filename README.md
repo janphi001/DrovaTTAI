@@ -7,7 +7,9 @@ Das Projekt besteht aus zwei Teilen:
 - **Generator** (`generator/`, Python, Befehl `drova-voice`): liest die Dialogtexte aus deiner eigenen Spielinstallation und erzeugt daraus Sprachdateien.
 - **Mod** (`mod/`, C#, MelonLoader): spielt diese Dateien im Spiel ab.
 
-Dieses Repo enthält **keine Spieltexte und kein Audio**. Beides entsteht lokal auf deinem Rechner aus deiner Spielkopie und liegt nicht im Git (`data/`, `cache/`, `out/` sind ausgeschlossen). Wer die Stimmen nutzen will, erzeugt sie selbst, mit der Anleitung unten.
+**Nur spielen?** Das fertige Paket mit Mod und allen Sprachdateien gibt es unter [Releases](https://github.com/janphi001/DrovaTTAI/releases/latest). Die Anleitung steht in der `README.txt` im ZIP. **Alle Stimmen sind KI-generiert.**
+
+Dieses Repo selbst enthält **keine Spieltexte und kein Audio**. Beides entsteht lokal auf deinem Rechner aus deiner Spielkopie und liegt nicht im Git (`data/`, `cache/`, `out/` sind ausgeschlossen). Die Anleitung unten ist für alle, die die Stimmen selbst erzeugen wollen.
 
 Stand: Alle 245 benannten Sprecher haben eine Stimme, im Spiel sind rund 13.800 Zeilen vertont (41 Stimmen plus 7 Abwandlungen wie alte Frau, Riese, Zwerg). Dazu kommen Barks (Zurufe in der Welt, mit eigener Lautstärke und laufend leiser mit der Entfernung) und Zeilen generischer Figuren (`NPC`, Wache …): Dort wählt die Mod je Figur eine feste Stimme aus einem kleinen Pool nach Geschlecht. Nicht vertont sind die Antwortoptionen des Spielers (wie im Original), Briefe und Zeilen mit Quest- oder Geldwerten; Zeilen mit dem Spielernamen werden ohne den Namen gesprochen.
 
@@ -21,7 +23,7 @@ Wichtig zu wissen:
 
 - Fish ist ein **Cloud-Dienst**. Der Sprechtext jeder Zeile wird an `api.fish.audio` gesendet. Es gelten die Bedingungen von Fish.
 - Du brauchst ein eigenes Fish-Konto und einen **API-Schlüssel**. Der Schlüssel gehört nie in eine Datei oder ins Git. Der Generator liest ihn nur aus der Umgebungsvariable `FISH_API_KEY`.
-- Die Stimmen in `casting/fish_voices.yaml` sind offizielle deutsche Fish-Stimmen und Stimmen aus der öffentlichen Fish-Bibliothek. **Bibliotheksstimmen von Community-Autoren sind nur für private, nicht-kommerzielle Nutzung gedacht.** Veröffentliche die erzeugten Audio-Dateien deshalb nicht und verkaufe sie nicht.
+- Die Stimmen in `casting/fish_voices.yaml` sind offizielle deutsche Fish-Stimmen und Stimmen aus der öffentlichen Fish-Bibliothek. **Bibliotheksstimmen von Community-Autoren sind nur für nicht-kommerzielle Nutzung gedacht.** Die erzeugten Audio-Dateien dürfen nicht verkauft werden.
 - Eine lokale Notlösung (Kitten TTS) ist als Rückfallebene vorbereitet, klingt aber deutlich schlechter. Begründung: `docs/decisions/2026-10-tts-engine.md`.
 
 ## Voraussetzungen
