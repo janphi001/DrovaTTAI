@@ -1,4 +1,3 @@
-using System;
 using DrovaVoice.Core;
 using HarmonyLib;
 using Il2CppNodeCanvas.DialogueTrees;
@@ -23,7 +22,7 @@ namespace DrovaVoice.Playback
         {
             var service = Service;
             if (service == null) return;
-            try
+            PatchGuard.Run(() =>
             {
                 var tree = __instance.DLGTree;
                 if (!__instance.saySelection)
@@ -35,25 +34,24 @@ namespace DrovaVoice.Playback
                 for (int k = 0; k < choices.Count; k++)
                 {
                     string? id = null;
-                    try   // je Option: ein Fehler lässt die übrigen Optionen nicht aus
+                    int index = k;
+                    PatchGuard.Run(() =>
                     {
-                        var statement = choices[k].statement;
-                        if (statement.audio != null) continue;
+                        var statement = choices[index].statement;
+                        if (statement.audio != null) return;
                         string locaPath = LineIds.ResolveLocaPath(statement.useGlobalLoca, statement.GlobalLocaPath, tree.LocaPath);
                         if (!LineIds.TryStatement(tree.name, locaPath, statement.locaKey, out string statementId)
-                            || !LineIds.TryChoice(tree.name, locaPath, statement.locaKey, k, out string choiceId))
+                            || !LineIds.TryChoice(tree.name, locaPath, statement.locaKey, index, out string choiceId))
                         {
                             service.Diag("bad|" + tree.name + "|" + statement.locaKey, $"[Zeile] keine gültige ID (Baum '{tree.name}', Schlüssel '{statement.locaKey}')");
-                            continue;
+                            return;
                         }
                         id = choiceId;
                         var clip = service.GetChoiceClip(statementId, choiceId);
                         if (clip != null) statement.audio = clip;
-                    }
-                    catch (Exception e) { service.LogError("ChoiceHook", id, e); }
+                    }, e => service.LogError("ChoiceHook", id, e));
                 }
-            }
-            catch (Exception e) { service.LogError("ChoiceHook", null, e); }
+            }, e => service.LogError("ChoiceHook", null, e));
         }
     }
 }

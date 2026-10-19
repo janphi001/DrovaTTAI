@@ -149,14 +149,37 @@ namespace DrovaVoice.Core
             : file.StartsWith("bark/", StringComparison.Ordinal) ? VoiceCategory.Bark
             : VoiceCategory.Dialog;
 
-        /// <summary>Relativ, mit '/', ohne '..', ohne Laufwerk, ohne Rückwärtsstrich.</summary>
+        /// <summary>Relativ, mit '/', ohne '..', ohne Laufwerk, ohne Rückwärtsstrich, ohne Windows-Gerätenamen.</summary>
         public static bool IsSafeRelativePath(string file)
         {
             if (string.IsNullOrEmpty(file)) return false;
             if (file.IndexOf('\\') >= 0 || file.IndexOf(':') >= 0 || file[0] == '/') return false;
             foreach (string part in file.Split('/'))
+            {
                 if (part.Length == 0 || part == "." || part == "..") return false;
+                // CON, AUX und COM1 blockieren auf Windows beim Öffnen den Thread. Ein Punkt oder Leerzeichen am Ende
+                // wird dort abgeschnitten, der geöffnete Name ist dann ein anderer.
+                if (IsReservedDevice(part)) return false;
+            }
             return true;
+        }
+
+        private static bool IsReservedDevice(string segment)
+        {
+            if (segment[segment.Length - 1] == '.' || segment[segment.Length - 1] == ' ') return true;
+            int dot = segment.IndexOf('.');
+            string stem = dot >= 0 ? segment.Substring(0, dot) : segment;
+            if (stem.Length == 0) return true;
+            if (stem.Equals("CON", StringComparison.OrdinalIgnoreCase)
+                || stem.Equals("PRN", StringComparison.OrdinalIgnoreCase)
+                || stem.Equals("AUX", StringComparison.OrdinalIgnoreCase)
+                || stem.Equals("NUL", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (stem.Length != 4) return false;
+            if (!stem.StartsWith("COM", StringComparison.OrdinalIgnoreCase)
+                && !stem.StartsWith("LPT", StringComparison.OrdinalIgnoreCase))
+                return false;
+            return stem[3] >= '1' && stem[3] <= '9';
         }
 
         public static string? ResolvePath(string root, string file) =>

@@ -1,4 +1,3 @@
-using System;
 using DrovaVoice.Core;
 using Drova_Modding_API.Systems.Audio;
 using Il2CppNodeCanvas.DialogueTrees;
@@ -20,7 +19,7 @@ namespace DrovaVoice.Playback
         public void OnWorldDialogueStatement(DS_StatementNode statementNode)
         {
             string? id = null;
-            try
+            PatchGuard.Run(() =>
             {
                 var statement = statementNode.statement;
                 var tree = statementNode.DLGTree;
@@ -48,8 +47,7 @@ namespace DrovaVoice.Playback
                     // geteilten Aussagen, neue Lautstärke aus dem Optionsmenü käme nie an). Nach dem Abspielstart wieder freigeben.
                     _service.BarkDistance?.Watch(statement, clip);
                 }
-            }
-            catch (Exception e) { _service.LogError("OnWorldDialogueStatement", id, e); }
+            }, e => _service.LogError("OnWorldDialogueStatement", id, e));
         }
     }
 }

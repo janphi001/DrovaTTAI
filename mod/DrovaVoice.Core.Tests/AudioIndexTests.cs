@@ -97,6 +97,14 @@ namespace DrovaVoice.Core.Tests
         [InlineData("C:/x.ogg")]
         [InlineData("a\\b.ogg")]
         [InlineData("")]
+        [InlineData("con.ogg")]
+        [InlineData("dialog/AUX.ogg")]
+        [InlineData("dialog/nul.txt")]
+        [InlineData("player/COM1.ogg")]
+        [InlineData("player/lpt9.ogg")]
+        [InlineData("dialog/prn")]
+        [InlineData("dialog/a.ogg ")]
+        [InlineData("dialog/a.ogg.")]
         public void SkipsUnsafePaths(string file)
         {
             string json = @"{""version"":1,""language"":""de"",""entries"":{""DT_X|A|K"":{""file"":""" + file.Replace("\\", "\\\\") + @""",""duration"":1}}}";
@@ -119,6 +127,17 @@ namespace DrovaVoice.Core.Tests
             Assert.Equal(3, index.Skipped);
             Assert.True(index.TryGet("A|B|4", out var e));
             Assert.Equal(0.0, e.Duration);
+        }
+
+        [Fact]
+        public void OrdinaryClipNamesStayInTheIndex()
+        {
+            string json = @"{""version"":1,""language"":""de"",""entries"":{
+              ""DT_X|A|K"":{""file"":""dialog/0123456789abcdef.ogg"",""duration"":1},
+              ""DT_X|A|L"":{""file"":""dialog/comedy.ogg"",""duration"":1}}}";
+            var index = AudioIndex.Parse(json, "de");
+            Assert.Equal(2, index.Count);
+            Assert.Equal(0, index.Skipped);
         }
 
         [Fact]
