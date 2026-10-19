@@ -90,6 +90,7 @@ def build_lines(
     manifest: Mapping,
     loc_texts: Mapping[tuple[str, str], str],
     lexicon: Mapping[str, str] | None = None,
+    language: str = "de",
 ) -> list[Line]:
     built = compile_lexicon(lexicon or {})
     compiled: Lexicon | None = built if built.pattern is not None else None
@@ -118,7 +119,11 @@ def build_lines(
                 skip = SKIP_GVAR_VALUE
             else:
                 neutral = make_name_variants(raw).neutral
-                st = build_speech_text(neutral, None, compiled) if neutral is not None else None
+                st = (
+                    build_speech_text(neutral, None, compiled, language)
+                    if neutral is not None
+                    else None
+                )
                 if st is None:
                     skip = SKIP_GVAR_NAME
                 elif st.is_speakable:
@@ -127,7 +132,7 @@ def build_lines(
                 else:
                     skip = SKIP_UNSPEAKABLE
         else:
-            st = build_speech_text(raw, None, compiled)
+            st = build_speech_text(raw, None, compiled, language)
             if st.is_speakable:
                 speech, stage = st.text, tuple({"text": s.text, "pos": s.pos} for s in st.stage)
             else:
