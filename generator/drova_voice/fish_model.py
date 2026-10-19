@@ -22,8 +22,9 @@ PAID_SUCCESSOR = "s2.1-pro"
 KNOWN_FISH_MODELS = ("s2.1-pro-free", "s2.1-pro", "s2-pro", "s1", "drama-3")
 PAID_TTS_MODELS = ("s2.1-pro", "s2-pro", "s1")
 STAMP_NAME = "fish-model.txt"
-# Cache, der vor dem Stempel entstanden ist: nur der Modell-Alias, Parameter leer.
+# Cache, der vor dem Stempel entstand: Standardprofil, also nur der Modell-Alias.
 HISTORICAL_CACHE_MODEL = f"fish-audio/{DEFAULT_FISH_MODEL}"
+DEFAULT_LANGUAGE = "de"
 DEFAULT_LATENCY = "normal"
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_TOP_P = 0.7
@@ -49,19 +50,23 @@ class FishProfile:
         return cache_model_name(self.model_id)
 
     def params(self) -> dict:
-        return {
-            "language": self.language,
-            "latency": self.latency,
-            "temperature": self.temperature,
-            "top_p": self.top_p,
-        }
+        """Nur Abweichungen vom Standard. Der Standard ist genau das, womit der vorhandene Cache entstand
+        (temperature und top_p 0.7, Latenz normal, Sprache de); so bleiben dessen Schlüssel gültig."""
+        sampling: dict = {}
+        if self.language != DEFAULT_LANGUAGE:
+            sampling["language"] = self.language
+        if self.latency != DEFAULT_LATENCY:
+            sampling["latency"] = self.latency
+        if self.temperature != DEFAULT_TEMPERATURE:
+            sampling["temperature"] = self.temperature
+        if self.top_p != DEFAULT_TOP_P:
+            sampling["top_p"] = self.top_p
+        return sampling
 
     def stamp(self) -> str:
-        sampling = self.params()
-        return (
-            f"{self.cache_model()} language={sampling['language']} latency={sampling['latency']} "
-            f"temperature={_num(sampling['temperature'])} top_p={_num(sampling['top_p'])}"
-        )
+        parts = [f"{name}={_num(value) if isinstance(value, float) else value}"
+                 for name, value in sorted(self.params().items())]
+        return " ".join([self.cache_model(), *parts])
 
     def worker_env(self) -> dict[str, str]:
         return {

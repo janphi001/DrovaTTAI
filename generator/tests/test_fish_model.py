@@ -14,10 +14,13 @@ def _profile(**kw):
 def test_defaults_and_env_override():
     profile = _profile()
     assert profile.model_id == DEFAULT_FISH_MODEL
-    assert profile.params() == {"language": "de", "latency": "normal", "temperature": 0.7, "top_p": 0.7}
-    assert profile.stamp().startswith("fish-audio/s2.1-pro-free language=de ")
+    # Standard = womit der vorhandene Cache entstand: nichts zusätzlich im Schlüssel
+    assert profile.params() == {}
+    assert profile.stamp() == HISTORICAL_CACHE_MODEL
     other = _profile(model="s2.1-pro", env={"FISH_TEMPERATURE": "0.4", "FISH_LATENCY": "low"})
     assert other.model_id == "s2.1-pro" and other.temperature == 0.4 and other.latency == "low"
+    assert other.params() == {"latency": "low", "temperature": 0.4}
+    assert other.stamp() == "fish-audio/s2.1-pro latency=low temperature=0.4"
     assert other.worker_env()["FISH_LANGUAGE"] == "de"
 
 
@@ -36,9 +39,15 @@ def test_unknown_model_and_bad_sampling_are_rejected():
         raise AssertionError("top_p")
 
 
-def test_existing_cache_without_a_stamp_blocks_the_new_key_until_accepted(tmp_path):
+def test_existing_cache_without_a_stamp_stays_valid_for_the_default_profile(tmp_path):
     (tmp_path / "alt.wav").write_bytes(b"RIFF")
-    profile = _profile()
+    proceed, message = guard_fish_model(tmp_path, _profile().stamp(), accept=False)
+    assert proceed and message == ""
+
+
+def test_existing_cache_without_a_stamp_blocks_a_changed_profile_until_accepted(tmp_path):
+    (tmp_path / "alt.wav").write_bytes(b"RIFF")
+    profile = _profile(env={"FISH_TEMPERATURE": "0.4"})
     proceed, message = guard_fish_model(tmp_path, profile.stamp(), accept=False)
     assert not proceed and "Cache-Schlüssel" in message and "accept-model-change" in message
     assert HISTORICAL_CACHE_MODEL in message
@@ -47,6 +56,13 @@ def test_existing_cache_without_a_stamp_blocks_the_new_key_until_accepted(tmp_pa
     write_model_stamp(tmp_path, profile.stamp())
     again, quiet = guard_fish_model(tmp_path, profile.stamp(), accept=False)
     assert again and quiet == ""
+
+
+def test_default_profile_keeps_the_historical_cache_key():
+    from drova_voice.synth import make_key
+    old = make_key("fish", HISTORICAL_CACHE_MODEL, "voice-1", "Ein kurzer Satz.", {})
+    profile = _profile()
+    assert make_key("fish", profile.cache_model(), "voice-1", "Ein kurzer Satz.", {**profile.params()}) == old
 
 
 def test_sampling_change_is_its_own_cache_change(tmp_path):

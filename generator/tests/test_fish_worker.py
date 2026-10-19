@@ -334,7 +334,8 @@ def test_error_body_read_is_capped_before_the_message_is_cut(monkeypatch):
         raise urllib.error.HTTPError("http://127.0.0.1/v1/tts", 400, "bad", urllib.error.HTTPError.__mro__ and __import__("email").message.Message(), body)
 
     monkeypatch.setattr(module._OPENER, "open", fail_open)
-    cfg = {"key": KEY, "url": "http://127.0.0.1/v1/tts", "model": "s2.1-pro-free", "attempts": 1, "backoff": 0.0}
+    cfg = {"key": KEY, "url": "http://127.0.0.1/v1/tts", "model": "s2.1-pro-free", "attempts": 1, "backoff": 0.0,
+           "deadline": 60.0}
     with pytest.raises(RuntimeError, match="HTTP 400"):
         module._post(cfg, {"text": "x"})
     assert body.sizes == [module._MAX_ERROR_BODY]

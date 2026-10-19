@@ -59,8 +59,9 @@ def test_synth_limit(pipeline_repo, guarded):
 
 def test_fish_synth_refuses_a_new_cache_key_until_the_change_is_accepted(pipeline_repo, monkeypatch, capsys):
     monkeypatch.delenv("FISH_API_KEY", raising=False)
-    for name in ("FISH_MODEL", "FISH_LATENCY", "FISH_TEMPERATURE", "FISH_TOP_P"):
+    for name in ("FISH_MODEL", "FISH_LATENCY", "FISH_TOP_P"):
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("FISH_TEMPERATURE", "0.4")  # Standardprofil träfe den alten Cache, eine Änderung nicht
     run(pipeline_repo, "extract")
     cache = pipeline_repo.repo / "cache" / "synth"
     cache.mkdir(parents=True)
