@@ -14,7 +14,8 @@ from drova_voice.casting_sheet import write_casting_sheet
 from drova_voice.config import Config
 from drova_voice.emote import import_llm_emotions, merge_emotions, prepare_emote_packets, read_emotions, write_emotions
 from drova_voice.encode import run_encode
-from drova_voice.engines.client import EngineClient, cache_env, worker_command
+from drova_voice.engines.client import EngineClient, EngineError, cache_env, worker_command
+from drova_voice.fish_model import free_tier_warning, guard_fish_model, resolve_fish_profile, write_model_stamp
 from drova_voice.fish_voices import load_catalog
 from drova_voice.ids import VARIANT_SEP, with_variant
 from drova_voice.install import install_audio
@@ -26,7 +27,8 @@ from drova_voice.profiles import LOW_CONFIDENCE, Profile, merge_import, prepare_
 from drova_voice.report import build_report, build_speaker_report, format_report, format_speaker_report
 from drova_voice.selection import (DEFAULT_BATCH_CHARS, batch_lines, plan_batches, read_batches, sample_lines,
                                    speaker_stats, write_batches)
-from drova_voice.synth import SynthStatus, build_jobs, run_synth
+from drova_voice.synth import SynthJob, SynthStatus, build_jobs, run_synth
+from drova_voice.voice_check import SKIPPED, api_key, query_voices, summarize, used_voices
 
 WORKERS_DIR = Path(__file__).resolve().parents[1] / "workers"
 
@@ -128,6 +130,8 @@ def _load_casting(cfg: Config):
 
 
 def _cast(cfg: Config, args: argparse.Namespace) -> int:
+    if args.check_voices:
+        return _cast_check_voices(cfg)
     if args.propose:
         return _cast_propose(cfg, args)
     if args.listen:
@@ -187,6 +191,33 @@ def _cast_propose(cfg: Config, args: argparse.Namespace) -> int:
     speakers_by_voice.update(result.voices.values())
     print("Stimmen (Sprecher): " + ", ".join(f"{v}: {n}" for v, n in sorted(speakers_by_voice.items())))
     return 1 if result.open else 0
+
+
+def _cast_check_voices(cfg: Config) -> int:
+    """Fish-IDs der Besetzung prüfen. Ohne Schlüssel kein Aufruf und Exit 0."""
+    if not api_key():
+        print(SKIPPED)
+        return 0
+    try:
+        catalog, casting = _load_casting(cfg)
+    except (OSError, ValueError) as e:
+        return _fail(str(e))
+    rows = used_voices(catalog, casting)
+    if not rows:
+        print("Stimmenprüfung: keine genutzten Stimmen.")
+        return 0
+    table = catalog.synth_table()
+    ids = {row.voice_id for row in rows}
+    for target in catalog.fallbacks.values():
+        if target in table:
+            ids.add(table[target].id)
+    try:
+        found = query_voices(WORKERS_DIR, sorted(ids))
+    except EngineError as e:
+        return _fail(str(e))
+    lines, code = summarize(rows, {item.get("id"): item for item in found if isinstance(item, dict)}, catalog)
+    print("\n".join(lines))
+    return code
 
 
 def _cast_listen(cfg: Config) -> int:
@@ -305,9 +336,12 @@ def usage_path(cfg: Config) -> Path:
     return cfg.data_dir / "synth" / "usage.jsonl"
 
 
-def _client_factory(cfg: Config):
+def _client_factory(cfg: Config, fish_env: dict[str, str] | None):
     def make(engine: str) -> EngineClient:
-        return EngineClient(worker_command(WORKERS_DIR, engine), env=cache_env(cfg.cache_dir))
+        env = dict(cache_env(cfg.cache_dir))
+        if engine == "fish" and fish_env:
+            env.update(fish_env)  # dieselbe ID, Sprache und Sampling wie im Cache-Schlüssel
+        return EngineClient(worker_command(WORKERS_DIR, engine), env=env)
     return make
 
 
@@ -324,6 +358,27 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     if args.limit:
         jobs = jobs[: args.limit]
     cache_dir = cfg.cache_dir / "synth"
+    model_alias = None
+    fish_env = None
+    if args.engine == "fish":
+        try:
+            profile = resolve_fish_profile(
+                cfg.language, cfg.fish_model, cfg.fish_latency, cfg.fish_temperature, cfg.fish_top_p)
+        except ValueError as e:
+            return _fail(str(e))
+        jobs = [SynthJob(j.id, j.text, j.speech_len, j.voice, {**j.params, **profile.params()}) for j in jobs]
+        model_alias = profile.cache_model()
+        proceed, notice = guard_fish_model(cache_dir, profile.stamp(), args.accept_model_change)
+        if notice:
+            print(notice, file=sys.stderr)
+        if not proceed:
+            return 2
+        write_model_stamp(cache_dir, profile.stamp())
+        expired = free_tier_warning(profile.model_id)
+        if expired:
+            print(expired, file=sys.stderr)
+        print(f"Cache-Schlüssel: {profile.stamp()}")
+        fish_env = profile.worker_env()
     path = synth_results_path(cfg)
     status = SynthStatus()
     budget = getattr(args, "max_utf8_bytes", None)
@@ -332,9 +387,9 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     recorded: list[dict] = []
     # Auch bei Abbruch (Strg+C, zu viele Fehler) landet, was bis dahin fertig war, in results.jsonl.
     try:
-        results = run_synth(jobs, args.engine, _client_factory(cfg), cache_dir, args.workers,
+        results = run_synth(jobs, args.engine, _client_factory(cfg, fish_env), cache_dir, args.workers,
                             on_result=lambda r: recorded.append(r.to_dict()), status=status,
-                            max_utf8_bytes=budget)
+                            max_utf8_bytes=budget, model=model_alias)
     finally:
         record_synth_results(path, recorded)
     done = [r for r in results if r.ok]
@@ -345,16 +400,18 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     detail = ", ".join(f"{k}: {n}" for k, n in sorted(reasons.items())) or "keine"
     print(f"{len(done)} erzeugt ({len(done) - len(new)} aus dem Cache, {len(new)} neu erzeugt), {len(failed)} Fehler, "
           f"{len(flagged)} auffällige Dauer; übersprungen: {detail}")
-    unique_new = {r.key: r for r in new}  # Zeilen mit neuem Ton; Anfragen und Bytes stehen in status
+    unique_new = {r.key: r for r in new}  # Zeilen mit neuem Ton; Zeichen und Bytes stehen in status
+    # HTTP-POSTs inklusive Worker-Wiederholungen. Ohne Worker-Zählung ist es die Zahl der Aufrufe.
+    requests = sum({r.key: r.attempts for r in results if r.attempts > 0}.values())
     append_jsonl(usage_path(cfg), {"at": datetime.now().isoformat(timespec="seconds"), "engine": args.engine,
-                                   "lines": len(unique_new), "requests": status.sent_requests,
+                                   "lines": len(unique_new), "requests": requests,
                                    "chars": status.sent_chars, "utf8_bytes": status.sent_bytes})
     history = [row for row in read_jsonl_lenient(usage_path(cfg)) if row.get("engine") == args.engine]
     total_chars = sum(row.get("chars", 0) for row in history)
     # Ältere Zeilen haben nur `chars`. Die sind eine Untergrenze der UTF-8-Bytes.
     total_bytes = sum(row["utf8_bytes"] if "utf8_bytes" in row else row.get("chars", 0) for row in history)
     print(f"Zeichen neu an {args.engine} gesendet: {status.sent_chars} "
-          f"({status.sent_bytes} UTF-8-Bytes, {status.sent_requests} Anfragen); "
+          f"({status.sent_bytes} UTF-8-Bytes, {requests} Anfragen); "
           f"insgesamt bisher: {total_chars} ({total_bytes} UTF-8-Bytes)")
     for r in failed[:10]:
         print(f"FEHLER {r.id}: {r.error}", file=sys.stderr)
@@ -585,6 +642,8 @@ def add_parsers(sub) -> None:
     ex.add_argument("--manifest", type=Path, help="Standard: data/export/<Sprache>/manifest.json")
     cast = sub.add_parser("cast", help="Besetzung prüfen (--check) oder aus Steckbriefen vorschlagen (--propose)")
     cast.add_argument("--check", action="store_true", help="nur prüfen (Standard und einzige Betriebsart in Plan 3)")
+    cast.add_argument("--check-voices", action="store_true",
+                      help="genutzte Fish-IDs gegen die API prüfen (ohne FISH_API_KEY übersprungen)")
     cast.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
     cast.add_argument("--propose", action="store_true", help="Stimmen aus den Steckbriefen zuteilen (casting/casting_auto.yaml)")
     cast.add_argument("--listen", action="store_true", help="Hörseite out/casting/index.html (nach synth/encode --sample)")
@@ -598,6 +657,8 @@ def add_parsers(sub) -> None:
     em.add_argument("--import", dest="import_files", nargs="+", type=Path, metavar="DATEI", help="JSONL-Ergebnisse der Subagents einlesen")
     sy = sub.add_parser("synth", help="Sprache erzeugen (Cache unter cache/synth, wiederaufnehmbar)")
     sy.add_argument("--engine", default="fish")
+    sy.add_argument("--accept-model-change", action="store_true",
+                    help="Wechsel von Modell, Sprache, Latenz oder Sampling bestätigen (vorhandener Fish-Cache gilt dann als Fehltreffer)")
     sy.add_argument("--workers", type=int, default=8, help="parallele Anfragen (Standard 8, gemessen ohne 429 bis 16)")
     sy.add_argument("--limit", type=int, help="nur die ersten N Aufträge (zum Ausprobieren)")
     sy.add_argument("--max-utf8-bytes", type=int,

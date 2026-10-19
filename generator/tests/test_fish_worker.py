@@ -104,6 +104,9 @@ def test_success_writes_wav_and_sends_voice_text_and_headers(tmp_path, guarded):
     # urllib schreibt Header-Namen groß ("Model"); HTTP-Header sind ohnehin nicht groß-/kleinschreibungsabhängig.
     assert sent["headers"]["authorization"] == f"Bearer {KEY}" and sent["headers"]["model"] == "s2.1-pro-free"
     assert sent["body"]["text"] == "[sad] Hallo." and sent["body"]["reference_id"] == "abc123" and sent["body"]["format"] == "wav"
+    assert sent["body"]["language"] == "de" and sent["body"]["latency"] == "normal"
+    assert sent["body"]["temperature"] == 0.7 and sent["body"]["top_p"] == 0.7
+    assert resp.http_attempts == 1
 
 
 def test_busy_server_is_retried_with_backoff_until_it_succeeds(tmp_path, guarded):
@@ -331,7 +334,8 @@ def test_error_body_read_is_capped_before_the_message_is_cut(monkeypatch):
         raise urllib.error.HTTPError("http://127.0.0.1/v1/tts", 400, "bad", urllib.error.HTTPError.__mro__ and __import__("email").message.Message(), body)
 
     monkeypatch.setattr(module._OPENER, "open", fail_open)
-    cfg = {"key": KEY, "url": "http://127.0.0.1/v1/tts", "model": "s2.1-pro-free", "attempts": 1, "backoff": 0.0}
+    cfg = {"key": KEY, "url": "http://127.0.0.1/v1/tts", "model": "s2.1-pro-free", "attempts": 1, "backoff": 0.0,
+           "deadline": 60.0}
     with pytest.raises(RuntimeError, match="HTTP 400"):
         module._post(cfg, {"text": "x"})
     assert body.sizes == [module._MAX_ERROR_BODY]
@@ -351,6 +355,50 @@ def test_non_http_url_is_rejected_without_echoing_the_address(tmp_path, guarded)
             _client(guarded, fake, FISH_API_URL=target.as_uri())
     text = str(info.value)
     assert "file:" not in text and KEY not in text and not target.exists() and not fake.requests
+
+
+def test_http_500_is_retried_and_the_response_counts_every_post(tmp_path, guarded):
+    with FakeFish([(500, b"weg"), (500, b"weg"), (200, _wav_bytes())]) as fake:
+        client = _client(guarded, fake, FISH_MAX_ATTEMPTS="3")
+        try:
+            resp = guarded(lambda: client.synth(_req(tmp_path)))
+        finally:
+            client.close()
+    assert resp.ok and resp.http_attempts == 3 and len(fake.requests) == 3
+
+
+def test_attempt_cap_stops_at_three_posts_even_if_the_env_asks_for_more(tmp_path, guarded):
+    with FakeFish([(503, b"busy")] * 6) as fake:
+        client = _client(guarded, fake, FISH_MAX_ATTEMPTS="5")
+        try:
+            resp = guarded(lambda: client.synth(_req(tmp_path)))
+        finally:
+            client.close()
+    assert not resp.ok and "nach 3 Versuchen" in resp.error and len(fake.requests) == 3
+
+
+def test_deadline_skips_a_retry_whose_backoff_would_exceed_it(tmp_path, guarded):
+    with FakeFish([(503, b"busy")] * 4) as fake:
+        client = _client(guarded, fake, FISH_MAX_ATTEMPTS="3", FISH_DEADLINE_S="0.05", FISH_BACKOFF_S="30")
+        try:
+            resp = guarded(lambda: client.synth(_req(tmp_path)))
+        finally:
+            client.close()
+    assert not resp.ok and "nach 1 Versuchen" in resp.error and len(fake.requests) == 1
+
+
+def test_request_params_override_sampling_language_and_latency(tmp_path, guarded):
+    with FakeFish([(200, _wav_bytes())]) as fake:
+        client = _client(guarded, fake, FISH_TEMPERATURE="0.9", FISH_LANGUAGE="en")
+        try:
+            resp = guarded(lambda: client.synth(_req(
+                tmp_path, params={"language": "de", "latency": "low", "temperature": 0.4, "top_p": 0.5})))
+        finally:
+            client.close()
+    assert resp.ok
+    body = fake.requests[0]["body"]
+    assert body["language"] == "de" and body["latency"] == "low"
+    assert body["temperature"] == 0.4 and body["top_p"] == 0.5
 
 
 def test_wav_with_empty_data_chunk_is_an_error_and_the_file_is_removed(tmp_path, guarded):

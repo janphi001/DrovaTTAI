@@ -51,6 +51,7 @@ class Candidate:
 class Catalog:
     voices: dict[str, FishVoice]
     variants: dict[str, FishVariant]
+    fallbacks: dict[str, str]  # Stimmenschlüssel -> Ersatz, wenn die Fish-ID fehlt (synth wechselt nicht von selbst)
 
     def synth_table(self) -> dict[str, FishVoice]:
         """Schlüssel -> Stimme, mit der Fish aufgerufen wird (Varianten nutzen die Basisstimme)."""
@@ -130,10 +131,50 @@ def load_fish_voices(path: Path) -> dict[str, FishVoice]:
     return _voices(_read(path), Path(path))
 
 
+def _fallbacks(raw: dict, voices: dict[str, FishVoice], variants: dict[str, FishVariant], path: Path) -> dict[str, str]:
+    known = set(voices) | set(variants)
+    out: dict[str, str] = {}
+    for key, spec in (raw.get("voices") or {}).items():
+        if not isinstance(spec, dict):
+            continue
+        target = spec.get("fallback")
+        if target is None or target == "":
+            continue
+        out[str(key).lower()] = str(target).lower()
+    section = raw.get("fallbacks") or {}
+    if not isinstance(section, dict):
+        raise ValueError(f"{path}: Abschnitt 'fallbacks' muss aus 'Stimme: Ersatz'-Zeilen bestehen")
+    for key, target in section.items():
+        name = str(key).lower()
+        if name in out:
+            raise ValueError(f"{path}: Fallback für '{key}' steht doppelt (Feld fallback und Abschnitt fallbacks)")
+        if target is None or str(target).strip() == "":
+            raise ValueError(f"{path}: Fallback für '{key}' ist leer")
+        out[name] = str(target).lower()
+    for key, target in out.items():
+        if key not in known:
+            raise ValueError(f"{path}: Fallback für unbekannte Stimme '{key}'")
+        if target not in known:
+            raise ValueError(f"{path}: Fallback '{target}' für '{key}' steht nicht in fish_voices.yaml")
+        if target == key:
+            raise ValueError(f"{path}: Fallback für '{key}' zeigt auf sich selbst")
+    for start in out:
+        seen: set[str] = set()
+        current: str | None = start
+        while current in out:
+            if current in seen:
+                raise ValueError(f"{path}: Fallback-Kreis ab '{start}'")
+            seen.add(current)
+            current = out[current]
+    return out
+
+
 def load_catalog(path: Path) -> Catalog:
     raw = _read(path)
-    voices = _voices(raw, Path(path))
-    return Catalog(voices, _variants(raw, voices, Path(path)))
+    file = Path(path)
+    voices = _voices(raw, file)
+    variants = _variants(raw, voices, file)
+    return Catalog(voices, variants, _fallbacks(raw, voices, variants, file))
 
 
 def resolve_fish_voice(table: dict[str, FishVoice], name_or_id: str) -> FishVoice:

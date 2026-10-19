@@ -25,6 +25,7 @@ class SynthResponse:
     sample_rate: int | None = None
     duration: float | None = None
     error: str | None = None
+    http_attempts: int | None = None  # POSTs des Fish-Workers; andere Engines lassen das leer
 
     @classmethod
     def from_dict(cls, d: dict) -> "SynthResponse":

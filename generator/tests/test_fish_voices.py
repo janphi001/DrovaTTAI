@@ -113,6 +113,15 @@ def test_variant_key_must_not_clash_with_a_voice(tmp_path):
         _catalog(tmp_path, body)
 
 
+def test_fallback_must_name_a_known_voice_and_must_not_cycle(tmp_path):
+    body = VARIANTS_BODY + "fallbacks:\n  lena: leon\n"
+    assert _catalog(tmp_path, body).fallbacks == {"lena": "leon"}
+    with pytest.raises(ValueError, match="Kreis"):
+        _catalog(tmp_path, VARIANTS_BODY + "fallbacks:\n  lena: leon\n  leon: lena\n")
+    with pytest.raises(ValueError, match="unbekannte Stimme|steht nicht"):
+        _catalog(tmp_path, VARIANTS_BODY + "fallbacks:\n  niemand: lena\n")
+
+
 def test_invalid_voice_age_is_rejected(tmp_path):
     with pytest.raises(ValueError, match="age"):
         _table(tmp_path, f"voices:\n  x: {{id: '{ID_A}', label: X, gender: f, region: de, age: uralt}}\n")
@@ -124,3 +133,4 @@ def test_real_table_variants_carry_age_and_type():
     assert c.variants["knabe"].age == "kind" and c.variants["riese"].type == "riese" and c.variants["zwerg"].type == "zwerg"
     assert c.variants["alte_frau"].gender == "f" and c.variants["alte_frau"].age == "alt"
     assert c.voices["kind_von_oben_578878"].age == "kind"
+    assert c.fallbacks == {}

@@ -35,6 +35,8 @@ MIN_SECONDS = 0.25
 SHORT_EXPECTED_SECONDS = 1.0  # darunter gilt nur die Obergrenze
 SHORT_MAX_SECONDS = 5.0
 MAX_ATTEMPTS = 3
+# Der Fish-Worker wiederholt Transporte selbst und meldet die POSTs. Diese Fehler nicht nochmal vervielfachen.
+_WORKER_GAVE_UP = "nicht erreichbar"
 ABORT_AFTER = 5  # so viele Aufträge in Folge mit Guthaben-/Limit-/Anmeldefehler stoppen den Lauf
 _FATAL = (("HTTP 402", "Guthaben aufgebraucht"), ("HTTP 401", "Anmeldung abgelehnt (API-Schlüssel prüfen)"),
           ("HTTP 403", "Zugriff verweigert"), ("HTTP 429", "Ratenlimit erreicht"),
@@ -110,6 +112,10 @@ def wav_resumable(path: str | Path) -> bool:
 
 
 def make_key(engine: str, model: str | None, voice: str | None, text: str, params: Mapping) -> str:
+    """Schlüssel über Engine, Modell, Stimme, Text und Parameter. Das Modell steht explizit darin.
+
+    Ein anderes Modell (bei Fish der Alias `fish-audio/<id>`) trifft keine vorhandene WAV.
+    """
     payload = json.dumps([engine, model, voice, text, dict(params)], ensure_ascii=False, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:32]
 
@@ -183,6 +189,8 @@ def synth_one(client, job: SynthJob, key: str, cache_dir: Path, max_attempts: in
     duration: float | None = None  # Dauer der Datei, die gerade unter dem endgültigen Namen liegt
     error: str | None = None
     sent = 0
+    posts = 0
+    saw_http = False
     for attempt in range(1, max_attempts + 1):
         # Vor dem Aufruf: auch ein Fehlversuch und jede Wiederholung ist eine gesendete Anfrage.
         # Wirft der Client, bleibt die Zählung stehen (der Text wurde bereits übergeben).
@@ -196,17 +204,26 @@ def synth_one(client, job: SynthJob, key: str, cache_dir: Path, max_attempts: in
                 break
         sent = attempt
         resp = client.synth(SynthRequest(id=job.id, text=job.text, out_path=str(part), voice=job.voice, params=job.params))
+        reported = resp.http_attempts
+        if reported is None or reported <= 0:
+            posts += 1  # Engine ohne POST-Zählung, oder die Anfrage scheiterte vor dem ersten POST
+        else:
+            posts += reported  # Worker-Wiederholungen zählen mit, nicht nur dieser Aufruf
+            saw_http = True
         if not resp.ok:
             error = resp.error or "unbekannter Fehler"
             part.unlink(missing_ok=True)
+            if _WORKER_GAVE_UP in error:
+                break
             continue
         replace_with_retry(part, wav)  # brauchbaren Ton sofort sichern, auch wenn ein späterer Versuch scheitert
         duration, error = resp.duration, None
         if plausible(duration, job.speech_len):
             break
+    counted = posts if saw_http else sent
     if duration is None:
-        return SynthResult(job.id, key, None, None, False, sent, False, error)
-    return SynthResult(job.id, key, str(wav), duration, True, sent, not plausible(duration, job.speech_len), None)
+        return SynthResult(job.id, key, None, None, False, counted, False, error)
+    return SynthResult(job.id, key, str(wav), duration, True, counted, not plausible(duration, job.speech_len), None)
 
 
 def _acquire(idle: "queue.Queue", alive: list[int], lock: threading.Lock):
@@ -223,7 +240,8 @@ def run_synth(jobs: Sequence[SynthJob], engine: str, client_factory: Callable[[s
               cache_dir: Path, workers: int = 8,
               on_result: Callable[[SynthResult], None] | None = None,
               status: SynthStatus | None = None,
-              max_utf8_bytes: int | None = None) -> list[SynthResult]:
+              max_utf8_bytes: int | None = None,
+              model: str | None = None) -> list[SynthResult]:
     jobs = list(jobs)
     if not jobs:
         return []
@@ -231,7 +249,14 @@ def run_synth(jobs: Sequence[SynthJob], engine: str, client_factory: Callable[[s
     lock = threading.Lock()
     with contextlib.ExitStack() as stack:
         clients = [stack.enter_context(client_factory(engine)) for _ in range(max(1, min(workers, len(jobs))))]
-        model = getattr(clients[0], "model", None)
+        reported = getattr(clients[0], "model", None)
+        if model is None:
+            model = reported
+        elif reported != model:
+            raise EngineError(
+                f"Worker meldet Modell {reported!r}, konfiguriert ist {model!r}. "
+                "Kein Auftrag gestartet, damit der Cache-Schlüssel nicht vom Worker abweicht."
+            )
         keys = {j.id: make_key(engine, model, j.voice, j.text, j.params) for j in jobs}
         first_by_key: dict[str, SynthJob] = {}
         followers: dict[str, list[SynthJob]] = {}

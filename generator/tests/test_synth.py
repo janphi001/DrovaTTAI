@@ -71,6 +71,28 @@ def test_build_jobs_renders_emotion_for_fish_and_ignores_voice_for_fake():
     assert j2.voice is None and j2.text == "Der Weg nach Norden ist weit."
 
 
+def test_worker_posts_are_counted_and_a_given_up_worker_is_not_called_again(tmp_path):
+    calls = []
+
+    class Client:
+        model = "stub-1"
+
+        def synth(self, req):
+            calls.append(req.id)
+            return SynthResponse(req.id, False, error="Fish nicht erreichbar nach 2 Versuchen (zuletzt HTTP 500)",
+                                 http_attempts=2)
+
+    (r,) = run_synth([job("a")], "fish", lambda engine: contextlib.nullcontext(Client()), tmp_path)
+    assert calls == ["a"] and r.attempts == 2 and not r.ok
+
+
+def test_sampling_and_language_change_the_cache_key():
+    base = {"language": "de", "latency": "normal", "temperature": 0.7, "top_p": 0.7}
+    key = make_key("fish", "fish-audio/s2.1-pro-free", "v", "Text", base)
+    assert key != make_key("fish", "fish-audio/s2.1-pro-free", "v", "Text", {**base, "temperature": 0.5})
+    assert key != make_key("fish", "fish-audio/s2.1-pro-free", "v", "Text", {**base, "language": "en"})
+
+
 def test_make_key_depends_on_every_input():
     base = make_key("fish", "m1", "v1", "Text", {})
     assert base == make_key("fish", "m1", "v1", "Text", {})

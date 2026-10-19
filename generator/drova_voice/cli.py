@@ -15,6 +15,7 @@ from drova_voice.bakeoff import (REF_TEXT, BakeoffResult, Sample, VoiceSpec, loa
 from drova_voice.config import DEFAULT_CONFIG_PATH, load_config
 from drova_voice.emotions import EmotionTag
 from drova_voice.engines.client import EngineClient, EngineError, cache_env, worker_command
+from drova_voice.fish_model import resolve_fish_profile
 from drova_voice.engines.protocol import SynthRequest
 from drova_voice.export_report import compute_coverage, format_report
 from drova_voice import pipeline
@@ -26,10 +27,15 @@ DEFAULT_VOICES = Path(__file__).resolve().parents[1] / "bakeoff_voices.yaml"
 
 
 CACHE_DIR = WORKERS_DIR.parents[1] / "cache"
+# Fish-Umgebung aus der geladenen Konfiguration. Tests, die _client ersetzen, sehen das nicht.
+_fish_worker_env: dict[str, str] = {}
 
 
 def _client(engine: str) -> EngineClient:
-    return EngineClient(worker_command(WORKERS_DIR, engine), env=cache_env(CACHE_DIR))
+    env = dict(cache_env(CACHE_DIR))
+    if engine == "fish":
+        env.update(_fish_worker_env)
+    return EngineClient(worker_command(WORKERS_DIR, engine), env=env)
 
 
 def _merge_results(path: Path, new: list[BakeoffResult]) -> list[BakeoffResult]:
@@ -84,6 +90,14 @@ def _run(args: argparse.Namespace) -> int:
     except ValueError as e:
         print(f"FEHLER: {e}", file=sys.stderr)
         return 2
+    global _fish_worker_env
+    try:
+        profile = resolve_fish_profile(
+            cfg.language, cfg.fish_model, cfg.fish_latency, cfg.fish_temperature, cfg.fish_top_p)
+    except ValueError as e:
+        print(f"FEHLER: {e}", file=sys.stderr)
+        return 2
+    _fish_worker_env = profile.worker_env()
     bake_data = cfg.data_dir / "bakeoff"
     bake_out = cfg.out_dir / "bakeoff"
     samples_path = bake_data / "samples.jsonl"
