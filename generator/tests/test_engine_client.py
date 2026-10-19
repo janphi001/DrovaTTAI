@@ -526,3 +526,20 @@ def test_failing_warmup_does_not_prevent_the_worker_from_becoming_ready(tmp_path
     finally:
         client.close()
     assert resp.ok
+
+
+def test_write_all_finishes_short_writes():
+    from drova_voice.engines.client import _write_all
+
+    class Short:
+        def __init__(self):
+            self.got = b""
+
+        def write(self, data):
+            chunk = bytes(data[:3])
+            self.got += chunk
+            return len(chunk)
+
+    pipe = Short()
+    _write_all(pipe, b"0123456789")
+    assert pipe.got == b"0123456789"

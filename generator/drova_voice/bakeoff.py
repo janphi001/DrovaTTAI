@@ -3,7 +3,9 @@ from __future__ import annotations
 import html
 import random
 import re
+import struct
 import time
+import wave
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable, ContextManager, Sequence
@@ -207,6 +209,64 @@ def _is_finished(wav: Path, text: str) -> bool:
     return wav.exists() and side.exists() and side.read_bytes() == text.encode("utf-8")
 
 
+def _wav_duration(path: Path) -> float:
+    with wave.open(str(path), "rb") as handle:
+        rate = handle.getframerate()
+        if rate <= 0:
+            raise ZeroDivisionError(rate)
+        return handle.getnframes() / rate
+
+
+def _wav_resumable(path: Path) -> bool:
+    """True bei einer fertigen WAV: RIFF-Größe gleich den vorhandenen Bytes, Dauer > 0.
+
+    Eine beim Schreiben abgebrochene Datei hat keinen gültigen Header oder eine
+    RIFF-Größe, die über das Dateiende hinausreicht.
+    """
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return False
+    if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+        return False
+    if struct.unpack_from("<I", data, 4)[0] != len(data) - 8:
+        return False
+    try:
+        return _wav_duration(path) > 0
+    except (wave.Error, EOFError, OSError, ZeroDivisionError):
+        return False
+
+
+def _adopt_orphan_audio(wav: Path, sample_id: str, text: str) -> bool:
+    """Übernimmt fertiges Audio ohne passende Sidecar-Datei, ohne neu anzufragen.
+
+    Absturz nach dem Part-Write und vor `_sidecar`: die Part-Datei liegt noch
+    unter dem Sample-Namen, oder sie wurde schon auf die Wav umbenannt. Beides
+    wird behalten, wenn die Bytes eine fertige WAV sind. Ein Sidecar mit anderem
+    Text bleibt ein Grund, neu zu erzeugen.
+    """
+    side = _sidecar(wav)
+    encoded = text.encode("utf-8")
+    if side.exists() and side.read_bytes() != encoded:
+        return False
+    part = wav.with_name(f"{sample_id}.part.wav")
+    if _wav_resumable(part):
+        wav.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            replace_with_retry(part, wav)
+        except OSError as exc:
+            raise OSError(
+                f"Fertige Part-Datei konnte nicht übernommen werden: {part} ({exc})"
+            ) from exc
+        if not side.exists():
+            side.write_bytes(encoded)
+        return True
+    if not side.exists() and _wav_resumable(wav):
+        side.write_bytes(encoded)
+        return True
+    return False
+
+
 def _synth_one(client, engine: str, v: VoiceSpec, s: Sample, wav: Path, text: str, params: dict) -> BakeoffResult:
     part = wav.with_name(f"{s.sample_id}.part.wav")
     wav.parent.mkdir(parents=True, exist_ok=True)
@@ -247,6 +307,14 @@ def run_bakeoff(
                 wav = Path(out_dir) / engine / v.slug / f"{s.sample_id}.wav"
                 text, params = render_request(engine, s.text, EmotionTag.from_dict(s.emotion))
                 if _is_finished(wav, text):
+                    emit(BakeoffResult(engine, v.slug, s.sample_id, True, str(wav), None, 0.0, None))
+                    continue
+                try:
+                    adopted = _adopt_orphan_audio(wav, s.sample_id, text)
+                except OSError as exc:
+                    emit(BakeoffResult(engine, v.slug, s.sample_id, False, None, None, 0.0, str(exc)))
+                    continue
+                if adopted:
                     emit(BakeoffResult(engine, v.slug, s.sample_id, True, str(wav), None, 0.0, None))
                 else:
                     jobs.append((v, s, wav, text, params))
