@@ -5,8 +5,9 @@ import os
 import re
 import subprocess
 import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Self
 
 from drova_voice.engines.protocol import SynthRequest, SynthResponse
 
@@ -89,18 +90,28 @@ class _StdoutLines:
                     return _decode_stdout_line(raw)
                 self._pending.extend(chunk)
                 continue
-            raw = bytes(self._pending[:newline_at + 1])
-            del self._pending[:newline_at + 1]
+            raw = bytes(self._pending[: newline_at + 1])
+            del self._pending[: newline_at + 1]
             return _decode_stdout_line(raw)
 
 
 class EngineClient:
-    def __init__(self, cmd: Sequence[str], cwd: str | Path | None = None, env: Mapping[str, str] | None = None):
+    def __init__(
+        self,
+        cmd: Sequence[str],
+        cwd: str | Path | None = None,
+        env: Mapping[str, str] | None = None,
+    ):
         env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1", **(env or {}))
         # Binär und ungepuffert. errors="replace" auf dem Text-Stream darf eine
         # unvollständige UTF-8-Sequenz nicht als U+FFFD in eine JSON-Zeile setzen.
         self._proc = subprocess.Popen(
-            list(cmd), stdin=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, env=env, bufsize=0,
+            list(cmd),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            cwd=cwd,
+            env=env,
+            bufsize=0,
         )
         self._stdout_lines = _StdoutLines(self._proc.stdout)
         try:
@@ -149,7 +160,8 @@ class EngineClient:
     def close(self) -> None:
         # Immer: Eingabe schließen, auf Ende warten, notfalls töten, dann Ausgabe schließen (auch bei beendetem Worker).
         try:
-            self._proc.stdin.close()
+            if self._proc.stdin is not None:
+                self._proc.stdin.close()
         except OSError:
             pass
         try:
@@ -158,9 +170,10 @@ class EngineClient:
             self._proc.kill()
             self._proc.wait()
         finally:
-            self._proc.stdout.close()
+            if self._proc.stdout is not None:
+                self._proc.stdout.close()
 
-    def __enter__(self) -> "EngineClient":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *exc) -> None:

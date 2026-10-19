@@ -25,12 +25,16 @@ def test_summarize_covers_a_missing_voice_only_when_the_fallback_is_usable(tmp_p
     catalog = load_catalog_from(
         f"voices:\n  lena: {{id: '{LENA}', label: Lena, gender: f}}\n"
         f"  leon: {{id: '{LEON}', label: Leon, gender: m}}\n"
-        "fallbacks:\n  lena: leon\n", tmp_path)
+        "fallbacks:\n  lena: leon\n",
+        tmp_path,
+    )
     casting = Casting("leon", {"mira": "lena"})
     uses = used_voices(catalog, casting)
     lines, code = summarize(uses, {LENA: {"status": "missing"}, LEON: {"status": "ok"}}, catalog)
     assert code == 0 and any(line.startswith("ERSATZ lena") for line in lines)
-    lines, code = summarize(uses, {LENA: {"status": "missing"}, LEON: {"status": "missing"}}, catalog)
+    lines, code = summarize(
+        uses, {LENA: {"status": "missing"}, LEON: {"status": "missing"}}, catalog
+    )
     assert code == 1 and any(line.startswith("FEHLT lena") for line in lines)
     assert substitute(catalog, "lena", {LENA}) == "leon"
     assert substitute(catalog, "lena", {LENA, LEON}) is None
@@ -38,10 +42,13 @@ def test_summarize_covers_a_missing_voice_only_when_the_fallback_is_usable(tmp_p
 
 def test_retiring_voice_is_reported_and_does_not_fail_the_check(tmp_path):
     catalog = load_catalog_from(
-        f"voices:\n  lena: {{id: '{LENA}', label: Lena, gender: f}}\n", tmp_path)
+        f"voices:\n  lena: {{id: '{LENA}', label: Lena, gender: f}}\n", tmp_path
+    )
     lines, code = summarize(
         used_voices(catalog, Casting("lena", {})),
-        {LENA: {"status": "retiring", "retire_at": "2026-12-01T00:00:00Z"}}, catalog)
+        {LENA: {"status": "retiring", "retire_at": "2026-12-01T00:00:00Z"}},
+        catalog,
+    )
     assert code == 0 and "LÄUFT AB lena" in lines[1] and "2026-12-01" in lines[1]
 
 
@@ -51,7 +58,9 @@ def test_check_voices_skips_without_a_key(pipeline_repo, monkeypatch, capsys):
     assert SKIPPED in capsys.readouterr().out
 
 
-def test_check_voices_reports_a_fake_result_and_does_not_open_a_socket(pipeline_repo, monkeypatch, capsys):
+def test_check_voices_reports_a_fake_result_and_does_not_open_a_socket(
+    pipeline_repo, monkeypatch, capsys
+):
     monkeypatch.setenv("FISH_API_KEY", KEY)
     called = {}
 
@@ -100,19 +109,31 @@ class _GetServer:
 
 
 def test_query_voices_talks_to_the_worker_against_a_local_server_only():
-    found = {f"/model/{LENA}": (200, {"_id": LENA, "state": "trained", "pvc_release_state": "retiring",
-                                      "pvc_retire_effective_at": "2026-12-01T00:00:00Z", "dmca_taken_down": False})}
+    found = {
+        f"/model/{LENA}": (
+            200,
+            {
+                "_id": LENA,
+                "state": "trained",
+                "pvc_release_state": "retiring",
+                "pvc_retire_effective_at": "2026-12-01T00:00:00Z",
+                "dmca_taken_down": False,
+            },
+        )
+    }
     with _GetServer(found) as server:
         env = dict(os.environ)
-        env.update({
-            "FISH_API_KEY": KEY,
-            "FISH_MODEL_API_URL": server.base,
-            "FISH_MODEL": "s2.1-pro-free",
-            "FISH_TEMPERATURE": "0.7",
-            "FISH_TOP_P": "0.7",
-            "FISH_LATENCY": "normal",
-            "FISH_MAX_ATTEMPTS": "2",
-        })
+        env.update(
+            {
+                "FISH_API_KEY": KEY,
+                "FISH_MODEL_API_URL": server.base,
+                "FISH_MODEL": "s2.1-pro-free",
+                "FISH_TEMPERATURE": "0.7",
+                "FISH_TOP_P": "0.7",
+                "FISH_LATENCY": "normal",
+                "FISH_MAX_ATTEMPTS": "2",
+            }
+        )
         rows = query_voices(WORKERS, [LENA, LEON], env)
     by_id = {row["id"]: row for row in rows}
     assert by_id[LENA]["status"] == "retiring" and by_id[LENA]["retire_at"].startswith("2026-12-01")

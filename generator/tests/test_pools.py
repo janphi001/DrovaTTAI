@@ -14,9 +14,21 @@ VOICES = {
 
 def line(key="Plh_1", actor="NPC", category="bark", generic=True, skip=None, variant=None):
     base = f"DT_W|Dialog/W|{key}"
-    return Line(id=base + (f"#{variant}" if variant else ""), tree="DT_W", loca_path="Dialog/W", loca_key=key,
-                node_type="statement", choice_index=None, actor=actor, category=category, generic=generic,
-                raw="x", speech="Hallo", stage=(), skip=skip)
+    return Line(
+        id=base + (f"#{variant}" if variant else ""),
+        tree="DT_W",
+        loca_path="Dialog/W",
+        loca_key=key,
+        node_type="statement",
+        choice_index=None,
+        actor=actor,
+        category=category,
+        generic=generic,
+        raw="x",
+        speech="Hallo",
+        stage=(),
+        skip=skip,
+    )
 
 
 def write(tmp_path, text):
@@ -74,7 +86,9 @@ def test_pool_line_gets_its_voice_from_the_pool(tmp_path):
     casting = load_casting(tmp_path / "casting.yaml", VOICES, pools_path=tmp_path / "pools.yaml")
     pool_line = expand_pool_lines([line()], pools)[0]
     assert casting.voice_for(pool_line) == "jonas"
-    assert casting.voice_for(line()) is None   # ohne Erweiterung bleibt der generische Sprecher unbesetzt
+    assert (
+        casting.voice_for(line()) is None
+    )  # ohne Erweiterung bleibt der generische Sprecher unbesetzt
 
 
 def test_emotion_id_is_the_base_id_for_pool_lines():

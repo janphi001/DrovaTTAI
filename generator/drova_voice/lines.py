@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Mapping, Sequence
 
 import yaml
 
@@ -13,12 +13,16 @@ from drova_voice.loc import read_loc_file
 from drova_voice.player_name import NAME_VAR, make_name_variants
 from drova_voice.speech_text import GVAR_RE, Lexicon, build_speech_text, compile_lexicon
 
-SKIP_GVAR_NAME = "gvar_name"    # nur der Spielername, aber keine neutrale Fassung ohne ihn
-SKIP_GVAR_VALUE = "gvar_value"  # Quest- oder Geldwerte (oder Name zusammen mit Werten): nicht vorab vertonbar
+SKIP_GVAR_NAME = "gvar_name"  # nur der Spielername, aber keine neutrale Fassung ohne ihn
+SKIP_GVAR_VALUE = (
+    "gvar_value"  # Quest- oder Geldwerte (oder Name zusammen mit Werten): nicht vorab vertonbar
+)
 NEUTRAL = "neutral"
 SKIP_UNSPEAKABLE = "unspeakable"
 SKIP_ID_MISMATCH = "id_mismatch"
-SKIP_PLAYER_CHOICE = "player_choice"  # Auswahloptionen spricht das Spiel nicht; der Spieler bleibt dort stumm
+SKIP_PLAYER_CHOICE = (
+    "player_choice"  # Auswahloptionen spricht das Spiel nicht; der Spieler bleibt dort stumm
+)
 
 
 @dataclass(frozen=True)
@@ -42,7 +46,7 @@ class Line:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Line":
+    def from_dict(cls, d: dict) -> Line:
         return cls(**{**d, "stage": tuple(d.get("stage", ()))})
 
 
@@ -82,11 +86,13 @@ def _expected_id(row: Mapping) -> str:
     return statement_id(row["tree"], row["locaPath"], row["locaKey"])
 
 
-def build_lines(manifest: Mapping, loc_texts: Mapping[tuple[str, str], str],
-                lexicon: Mapping[str, str] | None = None) -> list[Line]:
-    compiled: Lexicon | None = compile_lexicon(lexicon or {})
-    if compiled.pattern is None:
-        compiled = None
+def build_lines(
+    manifest: Mapping,
+    loc_texts: Mapping[tuple[str, str], str],
+    lexicon: Mapping[str, str] | None = None,
+) -> list[Line]:
+    built = compile_lexicon(lexicon or {})
+    compiled: Lexicon | None = built if built.pattern is not None else None
     seen: set[tuple[str, bool]] = set()
     out: list[tuple[str, Line]] = []
     for row in manifest.get("lines", []):
@@ -100,7 +106,8 @@ def build_lines(manifest: Mapping, loc_texts: Mapping[tuple[str, str], str],
         seen.add((line_id, id_ok))
         path = normalize_loca_path(row["locaPath"])
         raw = loc_texts.get((path, row["locaKey"]), row.get("text") or "")
-        speech, stage, skip = "", (), None
+        speech, skip = "", None
+        stage: tuple[dict, ...] = ()
         out_id = line_id
         if not id_ok:
             skip = SKIP_ID_MISMATCH
@@ -112,7 +119,7 @@ def build_lines(manifest: Mapping, loc_texts: Mapping[tuple[str, str], str],
             else:
                 neutral = make_name_variants(raw).neutral
                 st = build_speech_text(neutral, None, compiled) if neutral is not None else None
-                if neutral is None:
+                if st is None:
                     skip = SKIP_GVAR_NAME
                 elif st.is_speakable:
                     speech, stage = st.text, tuple({"text": s.text, "pos": s.pos} for s in st.stage)
@@ -125,13 +132,30 @@ def build_lines(manifest: Mapping, loc_texts: Mapping[tuple[str, str], str],
                 speech, stage = st.text, tuple({"text": s.text, "pos": s.pos} for s in st.stage)
             else:
                 skip = SKIP_UNSPEAKABLE
-        out.append((line_id, Line(
-            id=out_id, tree=row["tree"], loca_path=path, loca_key=row["locaKey"], node_type=row["nodeType"],
-            choice_index=row.get("choiceIndex"), actor=row.get("actorName") or "", category=row.get("category") or "dialog",
-            generic=bool(row.get("generic")), raw=raw, speech=speech, stage=stage, skip=skip,
-        )))
+        out.append(
+            (
+                line_id,
+                Line(
+                    id=out_id,
+                    tree=row["tree"],
+                    loca_path=path,
+                    loca_key=row["locaKey"],
+                    node_type=row["nodeType"],
+                    choice_index=row.get("choiceIndex"),
+                    actor=row.get("actorName") or "",
+                    category=row.get("category") or "dialog",
+                    generic=bool(row.get("generic")),
+                    raw=raw,
+                    speech=speech,
+                    stage=stage,
+                    skip=skip,
+                ),
+            )
+        )
     valid_ids = {base for base, l in out if l.skip != SKIP_ID_MISMATCH}
-    return [l for base, l in out if not (l.skip == SKIP_ID_MISMATCH and base in valid_ids)]  # gültige Zeile geht vor
+    return [
+        l for base, l in out if not (l.skip == SKIP_ID_MISMATCH and base in valid_ids)
+    ]  # gültige Zeile geht vor
 
 
 def select_npc(lines: Sequence[Line], npc: str) -> list[Line]:

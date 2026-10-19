@@ -9,15 +9,23 @@ from pathlib import Path
 
 import yaml
 
-from drova_voice.bakeoff import (REF_TEXT, BakeoffResult, Sample, VoiceSpec, load_voice_specs,
-                                 run_bakeoff, select_samples, write_sheet)
+from drova_voice import pipeline
+from drova_voice.bakeoff import (
+    REF_TEXT,
+    BakeoffResult,
+    Sample,
+    VoiceSpec,
+    load_voice_specs,
+    run_bakeoff,
+    select_samples,
+    write_sheet,
+)
 from drova_voice.config import DEFAULT_CONFIG_PATH, load_config
 from drova_voice.emotions import EmotionTag
 from drova_voice.engines.client import EngineClient, EngineError, cache_env, worker_command
-from drova_voice.fish_model import resolve_fish_profile
 from drova_voice.engines.protocol import SynthRequest
 from drova_voice.export_report import compute_coverage, format_report, locate_manifest
-from drova_voice import pipeline
+from drova_voice.fish_model import resolve_fish_profile
 from drova_voice.jsonl import read_jsonl, replace_with_retry, write_jsonl
 from drova_voice.render import render_request
 
@@ -68,7 +76,9 @@ def _parse(argv: list[str] | None) -> argparse.Namespace:
     refs.add_argument("--speaker", action="append", required=True)
     smoke = sub.add_parser("smoke", help="Engine mit einem Testsatz prüfen")
     smoke.add_argument("engine")
-    exp = sub.add_parser("export", help="Export-Ergebnis der Mod prüfen").add_subparsers(dest="ecmd", required=True)
+    exp = sub.add_parser("export", help="Export-Ergebnis der Mod prüfen").add_subparsers(
+        dest="ecmd", required=True
+    )
     rep = exp.add_parser("report", help="Abdeckung des Manifests gegen die .loc-Dateien")
     rep.add_argument("--manifest", type=Path)
     rep.add_argument("--min-coverage", type=float, default=98.0)
@@ -84,7 +94,10 @@ def _run(args: argparse.Namespace) -> int:
         print(f"FEHLER: Konfigurationsdatei nicht gefunden: {args.config}", file=sys.stderr)
         return 2
     except OSError as e:
-        print(f"FEHLER: Konfigurationsdatei nicht lesbar: {args.config} ({e.strerror or e})", file=sys.stderr)
+        print(
+            f"FEHLER: Konfigurationsdatei nicht lesbar: {args.config} ({e.strerror or e})",
+            file=sys.stderr,
+        )
         return 2
     except ValueError as e:
         print(f"FEHLER: {e}", file=sys.stderr)
@@ -92,7 +105,8 @@ def _run(args: argparse.Namespace) -> int:
     global _fish_worker_env
     try:
         profile = resolve_fish_profile(
-            cfg.language, cfg.fish_model, cfg.fish_latency, cfg.fish_temperature, cfg.fish_top_p)
+            cfg.language, cfg.fish_model, cfg.fish_latency, cfg.fish_temperature, cfg.fish_top_p
+        )
     except ValueError as e:
         print(f"FEHLER: {e}", file=sys.stderr)
         return 2
@@ -110,9 +124,15 @@ def _run(args: argparse.Namespace) -> int:
         out = cfg.out_dir / "smoke" / f"{args.engine}.wav"
         out.parent.mkdir(parents=True, exist_ok=True)
         with _client(args.engine) as client:  # zuerst: unbekannte Engine -> EngineError
-            text, params = render_request(args.engine, "Hallo, ich bin ein Test der Sprachausgabe.", EmotionTag())
-            resp = client.synth(SynthRequest(id="smoke", text=text, out_path=str(out), params=params))
-        print(f"{args.engine}: {'OK' if resp.ok else 'FEHLER'} {resp.duration or ''} {resp.error or ''} -> {out}")
+            text, params = render_request(
+                args.engine, "Hallo, ich bin ein Test der Sprachausgabe.", EmotionTag()
+            )
+            resp = client.synth(
+                SynthRequest(id="smoke", text=text, out_path=str(out), params=params)
+            )
+        print(
+            f"{args.engine}: {'OK' if resp.ok else 'FEHLER'} {resp.duration or ''} {resp.error or ''} -> {out}"
+        )
         return 0 if resp.ok else 1
 
     if args.cmd == "export":
@@ -120,14 +140,20 @@ def _run(args: argparse.Namespace) -> int:
         if args.ecmd == "fetch":
             src = cfg.game_dir / "Mods" / "DrovaVoice" / "Export" / cfg.language
             if not src.is_dir():
-                print(f"FEHLER: Export-Ordner nicht gefunden: {src} (Export im Spiel auslösen, siehe docs/export.md)", file=sys.stderr)
+                print(
+                    f"FEHLER: Export-Ordner nicht gefunden: {src} (Export im Spiel auslösen, siehe docs/export.md)",
+                    file=sys.stderr,
+                )
                 return 2
             export_dir.mkdir(parents=True, exist_ok=True)
             shutil.copytree(src, export_dir, dirs_exist_ok=True)
             print(f"{src} -> {export_dir}")
             return 0
         if not cfg.loc_dir.is_dir():
-            print(f"FEHLER: Lokalisierungsordner nicht gefunden: {cfg.loc_dir} (game_dir in config.yaml prüfen)", file=sys.stderr)
+            print(
+                f"FEHLER: Lokalisierungsordner nicht gefunden: {cfg.loc_dir} (game_dir in config.yaml prüfen)",
+                file=sys.stderr,
+            )
             return 2
         manifest_path, notice = locate_manifest(export_dir, args.manifest)
         if manifest_path is None:
@@ -143,7 +169,10 @@ def _run(args: argparse.Namespace) -> int:
             return 2
         cov = compute_coverage(manifest, cfg.loc_dir, cfg.language)
         if cov.total == 0:
-            print(f"FEHLER: Keine .loc-Einträge im Umfang gefunden in {cfg.loc_dir} (game_dir in config.yaml prüfen)", file=sys.stderr)
+            print(
+                f"FEHLER: Keine .loc-Einträge im Umfang gefunden in {cfg.loc_dir} (game_dir in config.yaml prüfen)",
+                file=sys.stderr,
+            )
             return 2
         missing_path = manifest_path.with_name("coverage_missing.txt")
         missing_path.write_text("".join(f"{m}\n" for m in cov.missing), encoding="utf-8")
@@ -169,7 +198,9 @@ def _run(args: argparse.Namespace) -> int:
                 slug = VoiceSpec("xtts", voice=speaker).slug
                 out = target / f"xtts-{slug}.wav"
                 part = out.with_name(f"xtts-{slug}.part.wav")
-                resp = client.synth(SynthRequest(id=slug, text=REF_TEXT, out_path=str(part), voice=speaker))
+                resp = client.synth(
+                    SynthRequest(id=slug, text=REF_TEXT, out_path=str(part), voice=speaker)
+                )
                 if resp.ok:
                     # Kitten braucht den gesprochenen Text zum Klonen (sonst lädt es Whisper, nur Englisch).
                     out.with_suffix(".txt").write_text(REF_TEXT, encoding="utf-8")
@@ -187,15 +218,26 @@ def _run(args: argparse.Namespace) -> int:
         if args.engine:
             voices = [v for v in voices if v.engine in args.engine]
             if not voices:
-                print(f"FEHLER: keine Stimme für Engine(s) {', '.join(args.engine)} in {args.voices}", file=sys.stderr)
+                print(
+                    f"FEHLER: keine Stimme für Engine(s) {', '.join(args.engine)} in {args.voices}",
+                    file=sys.stderr,
+                )
                 return 2
 
         missing = []
         for v in voices:
             if v.reference and not Path(v.reference).is_file():
-                missing.append(f"Referenz fehlt: {v.reference} (erzeugen mit `drova-voice bakeoff refs --speaker ...`)")
-            elif v.reference and v.engine == "kitten" and not Path(v.reference).with_suffix(".txt").is_file():
-                missing.append(f"Referenztext fehlt: {Path(v.reference).with_suffix('.txt')} (Kitten braucht den gesprochenen Text zum Klonen)")
+                missing.append(
+                    f"Referenz fehlt: {v.reference} (erzeugen mit `drova-voice bakeoff refs --speaker ...`)"
+                )
+            elif (
+                v.reference
+                and v.engine == "kitten"
+                and not Path(v.reference).with_suffix(".txt").is_file()
+            ):
+                missing.append(
+                    f"Referenztext fehlt: {Path(v.reference).with_suffix('.txt')} (Kitten braucht den gesprochenen Text zum Klonen)"
+                )
         if missing:
             for line in missing:
                 print(f"FEHLER: {line}", file=sys.stderr)
@@ -203,7 +245,9 @@ def _run(args: argparse.Namespace) -> int:
 
         def persist(r: BakeoffResult) -> None:
             try:
-                _merge_results(results_path, [r])  # sofort sichern, damit ein Abbruch nichts verliert
+                _merge_results(
+                    results_path, [r]
+                )  # sofort sichern, damit ein Abbruch nichts verliert
             except OSError as e:  # z. B. Datei kurz gesperrt: der Endabgleich holt es nach
                 print(f"WARNUNG: Zwischenstand nicht gesichert: {e}", file=sys.stderr)
 
@@ -213,7 +257,11 @@ def _run(args: argparse.Namespace) -> int:
         for r in failed:
             print(f"FEHLER {r.engine}/{r.voice_slug}/{r.sample_id}: {r.error}", file=sys.stderr)
     else:  # sheet
-        results = [BakeoffResult.from_dict(d) for d in read_jsonl(results_path)] if results_path.exists() else []
+        results = (
+            [BakeoffResult.from_dict(d) for d in read_jsonl(results_path)]
+            if results_path.exists()
+            else []
+        )
 
     page = write_sheet(samples, results, bake_out)
     print(f"Hörseite: {page}")

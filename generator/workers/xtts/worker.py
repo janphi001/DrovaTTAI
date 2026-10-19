@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "_common"))
-from worker_loop import serve  # noqa: E402
+from worker_loop import serve
 
 MODEL = "tts_models/multilingual/multi-dataset/xtts_v2"
 
@@ -15,6 +15,7 @@ def load():
         raise RuntimeError("CPML nicht bestätigt: COQUI_TOS_AGREED=1 setzen (siehe README)")
     import torch
     from TTS.api import TTS
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     return TTS(MODEL).to(device)
 

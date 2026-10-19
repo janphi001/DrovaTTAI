@@ -7,7 +7,6 @@ from pathlib import Path
 from drova_voice.ids import normalize_loca_path
 from drova_voice.loc import read_loc_file
 
-
 MAX_EXAMPLES = 5
 TOP_COMBINATIONS = 15
 MAX_LABEL = 40
@@ -15,13 +14,18 @@ FULL_MANIFEST = "manifest.json"
 LOADED_MANIFEST = "manifest-loaded.json"
 
 
-def locate_manifest(directory: Path, explicit: Path | None = None) -> tuple[Path | None, str | None]:
+def locate_manifest(
+    directory: Path, explicit: Path | None = None
+) -> tuple[Path | None, str | None]:
     """(Pfad, Hinweis). None und die Fehlermeldung, wenn die Datei fehlt. Der Hinweis steht nur beim Ausweichen auf manifest-loaded.json."""
     if explicit is not None:
         path = Path(explicit)
         if path.is_file():
             return path, None
-        return None, f"Manifest nicht gefunden: {path} (Export im Spiel auslösen, siehe docs/export.md)"
+        return (
+            None,
+            f"Manifest nicht gefunden: {path} (Export im Spiel auslösen, siehe docs/export.md)",
+        )
     directory = Path(directory)
     full, loaded = directory / FULL_MANIFEST, directory / LOADED_MANIFEST
     if full.is_file():
@@ -50,8 +54,7 @@ def in_scope(rel: Path) -> bool:
 def loca_path_of(file: Path, loc_dir: Path, language: str) -> str:
     rel = file.relative_to(loc_dir).with_suffix("").as_posix()
     suffix = f"_{language}"
-    if rel.endswith(suffix):
-        rel = rel[: -len(suffix)]
+    rel = rel.removesuffix(suffix)
     return normalize_loca_path(rel)
 
 
@@ -66,12 +69,16 @@ class Coverage:
     # Nur Information, ohne Einfluss auf Prozent und Exit-Code.
     text_checked: int = 0  # Manifest-Zeilen mit .loc-Eintrag, deren Text verglichen wurde
     text_mismatch: int = 0
-    text_mismatch_examples: tuple[str, ...] = ()  # höchstens MAX_EXAMPLES Bezeichnungen "pfad:schlüssel", nie Text
+    text_mismatch_examples: tuple[
+        str, ...
+    ] = ()  # höchstens MAX_EXAMPLES Bezeichnungen "pfad:schlüssel", nie Text
     gvar_checked: int = 0  # abgedeckte Manifest-Zeilen, deren .loc-Text $GVAR: enthält
     gvar_missing: int = 0  # davon mit leerer gvars-Liste im Manifest
     lines_total: int = 0
     by_category: dict[str, int] = field(default_factory=dict)
-    by_actor: tuple[tuple[tuple[str, str, str], int], ...] = ()  # ((actorName, nodeType, category), Anzahl), die häufigsten
+    by_actor: tuple[
+        tuple[tuple[str, str, str], int], ...
+    ] = ()  # ((actorName, nodeType, category), Anzahl), die häufigsten
     player_lines: int = 0
 
     @property
@@ -80,7 +87,9 @@ class Coverage:
 
 
 def compute_coverage(manifest: dict, loc_dir: Path, language: str) -> Coverage:
-    in_manifest = {(normalize_loca_path(l["locaPath"]), l["locaKey"]) for l in manifest.get("lines", [])}
+    in_manifest = {
+        (normalize_loca_path(l["locaPath"]), l["locaKey"]) for l in manifest.get("lines", [])
+    }
     wanted: set[tuple[str, str]] = set()
     folder_of: dict[tuple[str, str], str] = {}
     loc_text: dict[tuple[str, str], str] = {}
@@ -98,7 +107,10 @@ def compute_coverage(manifest: dict, loc_dir: Path, language: str) -> Coverage:
             loc_text[(path, entry.key)] = entry.text
         for line in result.errors:  # unlesbar = nicht abgedeckt, zählt in Zähler und Nenner
             unreadable.append((folder, f"{path}:unlesbar, Zeile {line}"))
-    missing = tuple([f"{p}:{k}" for p, k in sorted(wanted - in_manifest)] + sorted(label for _, label in unreadable))
+    missing = tuple(
+        [f"{p}:{k}" for p, k in sorted(wanted - in_manifest)]
+        + sorted(label for _, label in unreadable)
+    )
     by_folder: dict[str, tuple[int, int]] = {}
     for item in wanted:
         total, covered = by_folder.get(folder_of[item], (0, 0))
@@ -148,19 +160,42 @@ def compute_coverage(manifest: dict, loc_dir: Path, language: str) -> Coverage:
 
 
 def format_report(cov: Coverage, missing_path: Path) -> str:
-    lines = [f"Abdeckung: {cov.percent:.2f} % ({cov.covered} von {cov.total} Einträgen im Manifest)",
-             f"Zeilen im Manifest ohne .loc-Eintrag: {cov.extra}",
-             f"Unlesbare Einträge (zählen als fehlend): {cov.unreadable}"]
+    lines = [
+        f"Abdeckung: {cov.percent:.2f} % ({cov.covered} von {cov.total} Einträgen im Manifest)",
+        f"Zeilen im Manifest ohne .loc-Eintrag: {cov.extra}",
+        f"Unlesbare Einträge (zählen als fehlend): {cov.unreadable}",
+    ]
     for folder, (total, covered) in sorted(cov.by_folder.items()):
         lines.append(f"  {folder}: {covered} von {total}")
     lines.append(f"Fehlende Einträge ({len(cov.missing)}): {missing_path}")
-    examples = f" (Beispiele: {', '.join(cov.text_mismatch_examples)})" if cov.text_mismatch_examples else ""
-    lines.append(f"Text weicht von der .loc ab: {cov.text_mismatch} von {cov.text_checked}{examples}")
-    lines.append(f"$GVAR: in der .loc, aber leere gvars im Manifest: {cov.gvar_missing} von {cov.gvar_checked}")
+    examples = (
+        f" (Beispiele: {', '.join(cov.text_mismatch_examples)})"
+        if cov.text_mismatch_examples
+        else ""
+    )
+    lines.append(
+        f"Text weicht von der .loc ab: {cov.text_mismatch} von {cov.text_checked}{examples}"
+    )
+    lines.append(
+        f"$GVAR: in der .loc, aber leere gvars im Manifest: {cov.gvar_missing} von {cov.gvar_checked}"
+    )
     if cov.lines_total:
         share = 100.0 * cov.player_lines / cov.lines_total
-        lines.append(f"Manifest-Zeilen: {cov.lines_total}, davon player: {cov.player_lines} ({share:.1f} %)")
-        lines.append("Je Kategorie: " + ", ".join(f"{c} {n}" for c, n in sorted(cov.by_category.items(), key=lambda kv: (-kv[1], kv[0]))))
-        lines.append(f"Häufigste Kombinationen (Sprecher | Knotentyp | Kategorie), {len(cov.by_actor)} von maximal {TOP_COMBINATIONS}:")
-        lines.extend(f"  {n:>7}  {actor} | {node_type} | {category}" for (actor, node_type, category), n in cov.by_actor)
+        lines.append(
+            f"Manifest-Zeilen: {cov.lines_total}, davon player: {cov.player_lines} ({share:.1f} %)"
+        )
+        lines.append(
+            "Je Kategorie: "
+            + ", ".join(
+                f"{c} {n}"
+                for c, n in sorted(cov.by_category.items(), key=lambda kv: (-kv[1], kv[0]))
+            )
+        )
+        lines.append(
+            f"Häufigste Kombinationen (Sprecher | Knotentyp | Kategorie), {len(cov.by_actor)} von maximal {TOP_COMBINATIONS}:"
+        )
+        lines.extend(
+            f"  {n:>7}  {actor} | {node_type} | {category}"
+            for (actor, node_type, category), n in cov.by_actor
+        )
     return "\n".join(lines)

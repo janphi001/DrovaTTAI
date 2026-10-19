@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import os
 import time
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 
 def replace_with_retry(tmp: Path, path: Path, attempts: int = 40, delay: float = 0.25) -> None:
@@ -27,8 +27,7 @@ def write_jsonl(path: Path, rows: Iterable[dict]) -> None:
     tmp = path.with_name(path.name + ".tmp")
     try:
         with open(tmp, "w", encoding="utf-8", newline="\n") as f:
-            for row in rows:
-                f.write(json.dumps(row, ensure_ascii=False) + "\n")
+            f.writelines(json.dumps(row, ensure_ascii=False) + "\n" for row in rows)
             f.flush()
             os.fsync(f.fileno())
         replace_with_retry(tmp, path)
@@ -41,7 +40,11 @@ def read_jsonl(path: Path) -> list[dict]:
     # utf-8-sig toleriert ein BOM am Dateianfang.
     # Nur "\n" als Trennzeichen: str.splitlines() würde auch U+2028/U+2029/U+0085 splitten,
     # die json.dumps(ensure_ascii=False) roh schreibt.
-    return [json.loads(line) for line in Path(path).read_text(encoding="utf-8-sig").split("\n") if line.strip()]
+    return [
+        json.loads(line)
+        for line in Path(path).read_text(encoding="utf-8-sig").split("\n")
+        if line.strip()
+    ]
 
 
 def append_jsonl(path: Path, row: dict) -> None:
@@ -53,7 +56,9 @@ def append_jsonl(path: Path, row: dict) -> None:
         f.seek(0, os.SEEK_END)
         if f.tell() > 0:
             f.seek(-1, os.SEEK_END)
-            if f.read(1) != b"\n":  # halbe Zeile eines abgebrochenen Laufs: beenden, damit die neue Zeile gültig bleibt
+            if (
+                f.read(1) != b"\n"
+            ):  # halbe Zeile eines abgebrochenen Laufs: beenden, damit die neue Zeile gültig bleibt
                 data = b"\n" + data
         f.write(data)
 

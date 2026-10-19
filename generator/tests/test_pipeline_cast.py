@@ -9,7 +9,9 @@ def test_cast_check_ok(pipeline_repo, capsys):
 
 
 def test_cast_check_reports_missing_speaker(pipeline_repo, capsys):
-    (pipeline_repo.casting / "casting.yaml").write_text("default_player: leon\nspeakers: {}\n", encoding="utf-8")
+    (pipeline_repo.casting / "casting.yaml").write_text(
+        "default_player: leon\nspeakers: {}\n", encoding="utf-8"
+    )
     main(["--config", str(pipeline_repo.cfg), "extract"])
     assert main(["--config", str(pipeline_repo.cfg), "cast", "--check"]) == 1
     assert "Mira: 2" in capsys.readouterr().out
@@ -25,7 +27,8 @@ def test_broken_casting_yaml_is_a_german_error_without_traceback(pipeline_repo, 
 
 def test_cast_check_unknown_voice_fails_before_running(pipeline_repo, capsys):
     (pipeline_repo.casting / "casting.yaml").write_text(
-        "default_player: leon\nspeakers:\n  mira: {voice: erfunden}\n", encoding="utf-8")
+        "default_player: leon\nspeakers:\n  mira: {voice: erfunden}\n", encoding="utf-8"
+    )
     main(["--config", str(pipeline_repo.cfg), "extract"])
     assert main(["--config", str(pipeline_repo.cfg), "cast", "--check"]) == 2
     assert "erfunden" in capsys.readouterr().err

@@ -30,7 +30,12 @@ def test_gender_is_a_hard_filter_and_age_decides_among_the_rest():
 
 
 def test_type_match_wins_and_plain_speakers_avoid_special_variants():
-    r = assign([S("giant", 20), S("plain", 10)], {"giant": P("giant", type="riese"), "plain": P("plain")}, ALL, {})
+    r = assign(
+        [S("giant", 20), S("plain", 10)],
+        {"giant": P("giant", type="riese"), "plain": P("plain")},
+        ALL,
+        {},
+    )
     assert r.voices["giant"] == "riese" and r.voices["plain"] == "carl"
 
 
@@ -72,8 +77,16 @@ def test_speaker_without_a_profile_stays_open_and_nobody_else_is_affected():
 
 
 def test_emergency_reports_missing_type_and_missing_child_voice():
-    r = assign([S("dwarf", 9), S("girl", 8)], {"dwarf": P("dwarf", type="zwerg"), "girl": P("girl", "f", "kind")}, [CARL, ANNA], {})
-    assert r.emergency == {"dwarf": "Typ 'zwerg' ohne passende Stimme", "girl": "Kind ohne Kinderstimme"}
+    r = assign(
+        [S("dwarf", 9), S("girl", 8)],
+        {"dwarf": P("dwarf", type="zwerg"), "girl": P("girl", "f", "kind")},
+        [CARL, ANNA],
+        {},
+    )
+    assert r.emergency == {
+        "dwarf": "Typ 'zwerg' ohne passende Stimme",
+        "girl": "Kind ohne Kinderstimme",
+    }
     assert mismatch(P("o", "f", "jung"), BERTA) == "Alter weicht stark ab"
     assert mismatch(P("o", "f", "alt"), BERTA) is None
 

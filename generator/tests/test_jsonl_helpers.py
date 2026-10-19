@@ -11,7 +11,9 @@ def test_append_and_read(tmp_path):
 def test_lenient_skips_truncated_last_line_and_missing_file(tmp_path):
     assert read_jsonl_lenient(tmp_path / "gibt-es-nicht.jsonl") == []
     path = tmp_path / "r.jsonl"
-    path.write_text('{"id": "a"}\n{"id": "b", "v": [1, 2', encoding="utf-8")  # Abbruch beim Schreiben
+    path.write_text(
+        '{"id": "a"}\n{"id": "b", "v": [1, 2', encoding="utf-8"
+    )  # Abbruch beim Schreiben
     assert read_jsonl_lenient(path) == [{"id": "a"}]
 
 
@@ -22,7 +24,7 @@ def test_latest_by_id_last_row_wins():
 
 def test_lenient_skips_line_cut_inside_a_multibyte_character(tmp_path):
     path = tmp_path / "r.jsonl"
-    path.write_bytes('{"id": "a"}\n{"id": "b", "v": "kein Worker verf'.encode("utf-8") + "ü".encode("utf-8")[:1])
+    path.write_bytes(b'{"id": "a"}\n{"id": "b", "v": "kein Worker verf' + "ü".encode()[:1])
     assert read_jsonl_lenient(path) == [{"id": "a"}]
 
 

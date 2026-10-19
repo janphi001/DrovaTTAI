@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping, Sequence
 
 from drova_voice.emotions import EmotionTag, from_stage_directions
 from drova_voice.jsonl import write_jsonl
@@ -14,7 +14,9 @@ from drova_voice.speech_text import StageDirection
 KEEP_SOURCES = ("llm", "manual")
 
 
-def merge_emotions(existing: Mapping[str, EmotionTag], lines: Sequence[Line]) -> dict[str, EmotionTag]:
+def merge_emotions(
+    existing: Mapping[str, EmotionTag], lines: Sequence[Line]
+) -> dict[str, EmotionTag]:
     """Regieanweisungen -> Tags für die gewählten Zeilen; llm/manual-Zeilen und alles außerhalb der Auswahl bleibt."""
     selected = {l.id for l in lines}
     result = {i: t for i, t in existing.items() if i not in selected or t.source in KEEP_SOURCES}
@@ -55,8 +57,9 @@ class ImportResult:
     errors: list[str]
 
 
-def prepare_emote_packets(lines: Sequence[Line], profiles: Mapping[str, Profile],
-                          trees_per_packet: int = 20) -> list[list[dict]]:
+def prepare_emote_packets(
+    lines: Sequence[Line], profiles: Mapping[str, Profile], trees_per_packet: int = 20
+) -> list[list[dict]]:
     """Pakete für Subagents: je Dialogbaum alle sprechbaren Zeilen am Stück plus Steckbriefe der Sprecher."""
     if trees_per_packet < 1:
         raise ValueError("Paketgröße muss mindestens 1 sein")
@@ -71,13 +74,27 @@ def prepare_emote_packets(lines: Sequence[Line], profiles: Mapping[str, Profile]
             p = profiles.get(line.actor.lower())
             if p is not None:
                 speakers[p.speaker] = {"gender": p.gender, "age": p.age, "note": p.note}
-        trees.append({"tree": tree, "speakers": speakers,
-                      "lines": [{"id": l.id, "actor": l.actor, "text": l.speech, "stage": [s["text"] for s in l.stage]}
-                                for l in by_tree[tree]]})
-    return [trees[i:i + trees_per_packet] for i in range(0, len(trees), trees_per_packet)]
+        trees.append(
+            {
+                "tree": tree,
+                "speakers": speakers,
+                "lines": [
+                    {
+                        "id": l.id,
+                        "actor": l.actor,
+                        "text": l.speech,
+                        "stage": [s["text"] for s in l.stage],
+                    }
+                    for l in by_tree[tree]
+                ],
+            }
+        )
+    return [trees[i : i + trees_per_packet] for i in range(0, len(trees), trees_per_packet)]
 
 
-def import_llm_emotions(existing: Mapping[str, EmotionTag], rows: Sequence[Mapping], valid_ids: set[str]) -> ImportResult:
+def import_llm_emotions(
+    existing: Mapping[str, EmotionTag], rows: Sequence[Mapping], valid_ids: set[str]
+) -> ImportResult:
     """LLM-Zeilen übernehmen: Quelle wird llm, manual und stage (feste Signale) bleiben, unbekannte IDs werden gemeldet."""
     merged = dict(existing)
     imported = kept = 0

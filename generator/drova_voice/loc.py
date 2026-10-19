@@ -60,7 +60,9 @@ def parse_loc(content: str) -> LocParseResult:
             continue
         buffer = [rest]
         j = i + consumed
-        while j < len(lines) and not _starts_entry(lines, j) and not lines[j].rstrip().endswith("}"):
+        while (
+            j < len(lines) and not _starts_entry(lines, j) and not lines[j].rstrip().endswith("}")
+        ):
             buffer.append(lines[j])
             j += 1
         if j >= len(lines) or _starts_entry(lines, j):
@@ -80,7 +82,9 @@ def read_loc_file(path: Path) -> LocParseResult:
         content = path.read_text(encoding="utf-8-sig")
     except UnicodeError as e:
         # Kein errors=replace: ein einzelnes Latin-1-Byte würde sonst still zu U+FFFD und so vertont.
-        raise ValueError(f"{path}: Datei ist kein gültiges UTF-8 ({e.reason})") from None
+        raise ValueError(
+            f"{path}: Datei ist kein gültiges UTF-8 ({getattr(e, 'reason', e)})"
+        ) from None
     return parse_loc(content)
 
 
@@ -89,4 +93,4 @@ def loc_rel_path(lang_dir: Path, file: Path, language: str) -> str:
     suffix = f"_{language}.loc"
     if rel.endswith(suffix):
         return rel[: -len(suffix)]
-    return rel[: -len(".loc")] if rel.endswith(".loc") else rel
+    return rel.removesuffix(".loc")

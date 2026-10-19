@@ -9,26 +9,54 @@ from pathlib import Path
 import pytest
 
 from drova_voice.emotions import EmotionTag
-from drova_voice.encode import (build_filter, encode_one, ffmpeg_command, find_tools, probe_duration, rel_audio_path,
-                                require_rubberband, run_encode, variant_filter)
+from drova_voice.encode import (
+    build_filter,
+    encode_one,
+    ffmpeg_command,
+    find_tools,
+    probe_duration,
+    rel_audio_path,
+    require_rubberband,
+    run_encode,
+    variant_filter,
+)
 from drova_voice.fish_voices import FishVariant
 from drova_voice.ids import audio_filename
 from drova_voice.lines import Line
 from ffmpeg_marks import needs_rubberband
 
-needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
-                                  reason="ffmpeg/ffprobe nicht installiert")
+needs_ffmpeg = pytest.mark.skipif(
+    shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
+    reason="ffmpeg/ffprobe nicht installiert",
+)
 
 
 def line(key="Plh_1", category="dialog"):
-    return Line(id=f"T|P|{key}", tree="T", loca_path="P", loca_key=key, node_type="statement", choice_index=None,
-                actor="Mira", category=category, generic=False, raw="x", speech="x", stage=(), skip=None)
+    return Line(
+        id=f"T|P|{key}",
+        tree="T",
+        loca_path="P",
+        loca_key=key,
+        node_type="statement",
+        choice_index=None,
+        actor="Mira",
+        category=category,
+        generic=False,
+        raw="x",
+        speech="x",
+        stage=(),
+        skip=None,
+    )
 
 
 def sine_wav(path, seconds=1.0, lead_silence=0.3, rate=22050, trail_silence=0.0):
     frames = []
     for i in range(int(rate * (lead_silence + seconds + trail_silence))):
-        v = 0 if (i < rate * lead_silence or i >= rate * (lead_silence + seconds)) else int(8000 * math.sin(2 * math.pi * 220 * i / rate))
+        v = (
+            0
+            if (i < rate * lead_silence or i >= rate * (lead_silence + seconds))
+            else int(8000 * math.sin(2 * math.pi * 220 * i / rate))
+        )
         frames.append(struct.pack("<h", v))
     with wave.open(str(path), "wb") as w:
         w.setnchannels(1)
@@ -47,7 +75,12 @@ def test_rel_audio_path_by_category():
 
 def test_filter_chain_and_whisper():
     base = build_filter([])
-    assert "silenceremove" in base and "loudnorm=I=-16" in base and ":linear=true" in base and "volume=" not in base
+    assert (
+        "silenceremove" in base
+        and "loudnorm=I=-16" in base
+        and ":linear=true" in base
+        and "volume=" not in base
+    )
     assert "aresample=48000,loudnorm=" in base
     after = base.split("loudnorm", 1)[1].split(",", 1)[1]
     assert after.startswith("aresample=48000")  # aresample bleibt direkt vor und nach loudnorm
@@ -57,7 +90,12 @@ def test_filter_chain_and_whisper():
 
 def test_ffmpeg_command_shape(tmp_path):
     cmd = ffmpeg_command("ffmpeg", tmp_path / "a.wav", tmp_path / "a.ogg", [])
-    assert cmd[0] == "ffmpeg" and "libvorbis" in cmd and cmd[cmd.index("-ac") + 1] == "1" and cmd[-1].endswith("a.ogg")
+    assert (
+        cmd[0] == "ffmpeg"
+        and "libvorbis" in cmd
+        and cmd[cmd.index("-ac") + 1] == "1"
+        and cmd[-1].endswith("a.ogg")
+    )
 
 
 def test_find_tools_reports_ffmpeg_without_vorbis(monkeypatch):
@@ -77,8 +115,21 @@ def test_output_is_48khz_mono_vorbis(tmp_path):
     sine_wav(wav, rate=44100)
     dst = tmp_path / "x.ogg"
     encode_one(ffmpeg, ffprobe, wav, dst, [], "k")
-    info = subprocess.run([ffprobe, "-v", "error", "-show_entries", "stream=codec_name,sample_rate,channels",
-                           "-of", "csv=p=0", str(dst)], capture_output=True, text=True, check=True).stdout.strip()
+    info = subprocess.run(
+        [
+            ffprobe,
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=codec_name,sample_rate,channels",
+            "-of",
+            "csv=p=0",
+            str(dst),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
     assert info == "vorbis,48000,1"
 
 
@@ -110,13 +161,22 @@ def test_run_encode_collects_rows_and_errors(tmp_path):
     wav = tmp_path / "a.wav"
     sine_wav(wav)
     lines = [line("Plh_1"), line("Plh_2"), line("Plh_3")]
-    synth_rows = {"T|P|Plh_1": {"id": "T|P|Plh_1", "ok": True, "wav": str(wav), "key": "k1"},
-                  "T|P|Plh_2": {"id": "T|P|Plh_2", "ok": True, "wav": str(tmp_path / "weg.wav"), "key": "k2"}}
-    rows, errors = run_encode(lines, synth_rows, {"T|P|Plh_1": EmotionTag("neutral", 0.0, source="llm")},
-                              tmp_path / "audio", workers=2)
+    synth_rows = {
+        "T|P|Plh_1": {"id": "T|P|Plh_1", "ok": True, "wav": str(wav), "key": "k1"},
+        "T|P|Plh_2": {"id": "T|P|Plh_2", "ok": True, "wav": str(tmp_path / "weg.wav"), "key": "k2"},
+    }
+    rows, errors = run_encode(
+        lines,
+        synth_rows,
+        {"T|P|Plh_1": EmotionTag("neutral", 0.0, source="llm")},
+        tmp_path / "audio",
+        workers=2,
+    )
     assert [r["id"] for r in rows] == ["T|P|Plh_1"] and rows[0]["rel"] == rel_audio_path(lines[0])
     assert (tmp_path / "audio" / rows[0]["rel"]).is_file()
-    assert len(errors) == 1 and "Plh_2" in errors[0]  # WAV fehlt; Plh_3 hat gar keine Synth-Zeile und zählt nicht als Fehler
+    assert (
+        len(errors) == 1 and "Plh_2" in errors[0]
+    )  # WAV fehlt; Plh_3 hat gar keine Synth-Zeile und zählt nicht als Fehler
 
 
 def variant(pitch=1.0, formant=2.0, tempo=1.0):
@@ -124,8 +184,10 @@ def variant(pitch=1.0, formant=2.0, tempo=1.0):
 
 
 def test_variant_filter_follows_the_recipe():
-    assert variant_filter(variant()) == ("aresample=44100,asetrate=88200,aresample=44100,"
-                                         "rubberband=pitch=0.5:tempo=0.5:formant=preserved")
+    assert variant_filter(variant()) == (
+        "aresample=44100,asetrate=88200,aresample=44100,"
+        "rubberband=pitch=0.5:tempo=0.5:formant=preserved"
+    )
 
 
 def test_filter_with_variant_starts_with_the_recipe():
@@ -157,8 +219,14 @@ def test_run_encode_with_a_variant_checks_rubberband_before_anything_else(tmp_pa
     monkeypatch.setattr("drova_voice.encode.find_tools", lambda: ("ffmpeg", "ffprobe"))
     monkeypatch.setattr("drova_voice.encode.require_rubberband", missing)
     with pytest.raises(ValueError, match="rubberband"):
-        run_encode([line()], {"T|P|Plh_1": {"id": "T|P|Plh_1", "ok": True, "wav": "x.wav", "key": "k"}}, {}, tmp_path, 1,
-                   {"T|P|Plh_1": variant()})
+        run_encode(
+            [line()],
+            {"T|P|Plh_1": {"id": "T|P|Plh_1", "ok": True, "wav": "x.wav", "key": "k"}},
+            {},
+            tmp_path,
+            1,
+            {"T|P|Plh_1": variant()},
+        )
 
 
 @needs_rubberband
@@ -169,7 +237,9 @@ def test_encode_one_applies_the_variant_and_restamps(tmp_path):
     dst = tmp_path / "out" / "x.ogg"
     plain = encode_one(ffmpeg, ffprobe, wav, dst, [], "k")
     before = dst.stat().st_mtime_ns
-    slow = encode_one(ffmpeg, ffprobe, wav, dst, [], "k", variant(pitch=1.0, formant=1.0, tempo=0.5))
+    slow = encode_one(
+        ffmpeg, ffprobe, wav, dst, [], "k", variant(pitch=1.0, formant=1.0, tempo=0.5)
+    )
     assert dst.stat().st_mtime_ns != before  # anderes Rezept -> neu kodiert
     assert slow > plain * 1.5  # Tempo 0.5 dehnt die Zeit
 
@@ -182,7 +252,9 @@ def test_cache_hit_does_not_run_ffprobe(tmp_path, monkeypatch):
     dst = tmp_path / "a.ogg"
     dst.write_bytes(b"OggS")
     recipe = build_filter([])
-    dst.with_suffix(".stamp").write_text(json.dumps({"duration": 1.25, "filter": recipe, "key": "k"}) + "\n", encoding="utf-8")
+    dst.with_suffix(".stamp").write_text(
+        json.dumps({"duration": 1.25, "filter": recipe, "key": "k"}) + "\n", encoding="utf-8"
+    )
 
     def boom(*_a, **_k):
         raise AssertionError("subprocess")
@@ -215,7 +287,9 @@ def test_legacy_text_stamp_is_probed_once(tmp_path, monkeypatch):
     assert len(calls) == 1
 
 
-def test_fresh_encode_applies_measured_linear_loudnorm_and_then_skips_ffprobe(tmp_path, monkeypatch):
+def test_fresh_encode_applies_measured_linear_loudnorm_and_then_skips_ffprobe(
+    tmp_path, monkeypatch
+):
     wav = tmp_path / "in.wav"
     wav.write_bytes(b"RIFF")
     dst = tmp_path / "out" / "a.ogg"
@@ -233,16 +307,14 @@ def test_fresh_encode_applies_measured_linear_loudnorm_and_then_skips_ffprobe(tm
             return Result(stdout="0.42\n")
         audio_filter = cmd[cmd.index("-af") + 1]
         if "print_format=json" in audio_filter:
-            return Result(stderr="\n".join([
-                "{",
-                '  "input_i" : "-20.00",',
-                '  "input_tp" : "-4.00",',
-                '  "input_lra" : "1.00",',
-                '  "input_thresh" : "-30.00",',
-                '  "target_offset" : "0.10"',
-                "}",
-            ]))
-        assert "measured_I=-20.00" in audio_filter and "linear=true" in audio_filter and "apad" not in audio_filter
+            return Result(
+                stderr='{\n  "input_i" : "-20.00",\n  "input_tp" : "-4.00",\n  "input_lra" : "1.00",\n  "input_thresh" : "-30.00",\n  "target_offset" : "0.10"\n}'
+            )
+        assert (
+            "measured_I=-20.00" in audio_filter
+            and "linear=true" in audio_filter
+            and "apad" not in audio_filter
+        )
         assert audio_filter.index("aresample=48000") < audio_filter.index("loudnorm")
         Path(cmd[-1]).write_bytes(b"OggS")
         return Result()
@@ -256,15 +328,19 @@ def test_fresh_encode_applies_measured_linear_loudnorm_and_then_skips_ffprobe(tm
 
 
 def _integrated_lufs(ffmpeg, path):
-    proc = subprocess.run([ffmpeg, "-hide_banner", "-nostats", "-i", str(path), "-af", "ebur128", "-f", "null", "-"],
-                          capture_output=True, text=True)
+    proc = subprocess.run(
+        [ffmpeg, "-hide_banner", "-nostats", "-i", str(path), "-af", "ebur128", "-f", "null", "-"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     text = proc.stderr
     start = text.rfind("Integrated loudness:")
     assert start >= 0, text[-400:]
     for line in text[start:].splitlines():
         if "I:" in line and "LUFS" in line:
             return float(line.split()[1])
-    raise AssertionError(text[start:start + 200])
+    raise AssertionError(text[start : start + 200])
 
 
 @needs_ffmpeg

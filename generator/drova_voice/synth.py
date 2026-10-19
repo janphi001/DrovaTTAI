@@ -7,10 +7,11 @@ import queue
 import struct
 import threading
 import wave
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import AbstractContextManager as ContextManager
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Callable, ContextManager, Mapping, Sequence
 
 from drova_voice.casting import Casting
 from drova_voice.emotions import EmotionTag
@@ -28,6 +29,7 @@ BUDGET_REACHED = "UTF-8-Budget erreicht"
 class BudgetExceeded(Exception):
     """Die nächste Anfrage würde das UTF-8-Budget überschreiten. Es wurde nichts gesendet."""
 
+
 # Fish, Deutsch, gemessen 2026-10-12 (docs/decisions/2026-10-fish-throughput.md): 37.068 Zeichen -> 2.169 s Audio.
 CHARS_PER_SECOND = 17.0
 MIN_RATIO, MAX_RATIO = 0.4, 2.5  # Dauer / erwartete Dauer
@@ -38,9 +40,13 @@ MAX_ATTEMPTS = 3
 # Der Fish-Worker wiederholt Transporte selbst und meldet die POSTs. Diese Fehler nicht nochmal vervielfachen.
 _WORKER_GAVE_UP = "nicht erreichbar"
 ABORT_AFTER = 5  # so viele Aufträge in Folge mit Guthaben-/Limit-/Anmeldefehler stoppen den Lauf
-_FATAL = (("HTTP 402", "Guthaben aufgebraucht"), ("HTTP 401", "Anmeldung abgelehnt (API-Schlüssel prüfen)"),
-          ("HTTP 403", "Zugriff verweigert"), ("HTTP 429", "Ratenlimit erreicht"),
-          ("nicht erreichbar", "Dienst nicht erreichbar"))
+_FATAL = (
+    ("HTTP 402", "Guthaben aufgebraucht"),
+    ("HTTP 401", "Anmeldung abgelehnt (API-Schlüssel prüfen)"),
+    ("HTTP 403", "Zugriff verweigert"),
+    ("HTTP 429", "Ratenlimit erreicht"),
+    ("nicht erreichbar", "Dienst nicht erreichbar"),
+)
 
 
 @dataclass(frozen=True)
@@ -116,7 +122,9 @@ def make_key(engine: str, model: str | None, voice: str | None, text: str, param
 
     Ein anderes Modell (bei Fish der Alias `fish-audio/<id>`) trifft keine vorhandene WAV.
     """
-    payload = json.dumps([engine, model, voice, text, dict(params)], ensure_ascii=False, sort_keys=True)
+    payload = json.dumps(
+        [engine, model, voice, text, dict(params)], ensure_ascii=False, sort_keys=True
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:32]
 
 
@@ -129,8 +137,13 @@ def plausible(duration: float | None, speech_len: int) -> bool:
     return MIN_RATIO <= duration / expected <= MAX_RATIO
 
 
-def build_jobs(lines: Sequence[Line], casting: Casting, fish_table: Mapping[str, FishVoice],
-               emotions: Mapping[str, EmotionTag], engine: str) -> tuple[list[SynthJob], dict[str, str]]:
+def build_jobs(
+    lines: Sequence[Line],
+    casting: Casting,
+    fish_table: Mapping[str, FishVoice],
+    emotions: Mapping[str, EmotionTag],
+    engine: str,
+) -> tuple[list[SynthJob], dict[str, str]]:
     jobs: list[SynthJob] = []
     skipped: dict[str, str] = {}
     for line in lines:
@@ -143,7 +156,9 @@ def build_jobs(lines: Sequence[Line], casting: Casting, fish_table: Mapping[str,
             continue
         voice = fish_table[voice_key].id if engine == "fish" else None
         try:
-            text, params = render_request(engine, line.speech, emotions.get(emotion_id(line), EmotionTag()))
+            text, params = render_request(
+                engine, line.speech, emotions.get(emotion_id(line), EmotionTag())
+            )
         except ValueError:
             skipped[line.id] = SKIP_UNSPEAKABLE
             continue
@@ -170,16 +185,33 @@ def cache_hit(job: SynthJob, key: str, cache_dir: Path) -> SynthResult | None:
                 part.unlink(missing_ok=True)
             except OSError:
                 pass
-            return SynthResult(job.id, key, str(wav), duration, True, 0, not plausible(duration, job.speech_len), None)
+            return SynthResult(
+                job.id,
+                key,
+                str(wav),
+                duration,
+                True,
+                0,
+                not plausible(duration, job.speech_len),
+                None,
+            )
     if wav_resumable(part):
         replace_with_retry(part, wav)
         duration = wav_duration(wav)
-        return SynthResult(job.id, key, str(wav), duration, True, 0, not plausible(duration, job.speech_len), None)
+        return SynthResult(
+            job.id, key, str(wav), duration, True, 0, not plausible(duration, job.speech_len), None
+        )
     return None
 
 
-def synth_one(client, job: SynthJob, key: str, cache_dir: Path, max_attempts: int = MAX_ATTEMPTS,
-              on_sent: Callable[[str], None] | None = None) -> SynthResult:
+def synth_one(
+    client,
+    job: SynthJob,
+    key: str,
+    cache_dir: Path,
+    max_attempts: int = MAX_ATTEMPTS,
+    on_sent: Callable[[str], None] | None = None,
+) -> SynthResult:
     hit = cache_hit(job, key, cache_dir)
     if hit is not None:
         return hit
@@ -203,7 +235,11 @@ def synth_one(client, job: SynthJob, key: str, cache_dir: Path, max_attempts: in
                     raise
                 break
         sent = attempt
-        resp = client.synth(SynthRequest(id=job.id, text=job.text, out_path=str(part), voice=job.voice, params=job.params))
+        resp = client.synth(
+            SynthRequest(
+                id=job.id, text=job.text, out_path=str(part), voice=job.voice, params=job.params
+            )
+        )
         reported = resp.http_attempts
         if reported is None or reported <= 0:
             posts += 1  # Engine ohne POST-Zählung, oder die Anfrage scheiterte vor dem ersten POST
@@ -216,17 +252,28 @@ def synth_one(client, job: SynthJob, key: str, cache_dir: Path, max_attempts: in
             if _WORKER_GAVE_UP in error:
                 break
             continue
-        replace_with_retry(part, wav)  # brauchbaren Ton sofort sichern, auch wenn ein späterer Versuch scheitert
+        replace_with_retry(
+            part, wav
+        )  # brauchbaren Ton sofort sichern, auch wenn ein späterer Versuch scheitert
         duration, error = resp.duration, None
         if plausible(duration, job.speech_len):
             break
     counted = posts if saw_http else sent
     if duration is None:
         return SynthResult(job.id, key, None, None, False, counted, False, error)
-    return SynthResult(job.id, key, str(wav), duration, True, counted, not plausible(duration, job.speech_len), None)
+    return SynthResult(
+        job.id,
+        key,
+        str(wav),
+        duration,
+        True,
+        counted,
+        not plausible(duration, job.speech_len),
+        None,
+    )
 
 
-def _acquire(idle: "queue.Queue", alive: list[int], lock: threading.Lock):
+def _acquire(idle: queue.Queue, alive: list[int], lock: threading.Lock):
     while True:
         try:
             return idle.get(timeout=0.2)
@@ -236,19 +283,27 @@ def _acquire(idle: "queue.Queue", alive: list[int], lock: threading.Lock):
                     return None
 
 
-def run_synth(jobs: Sequence[SynthJob], engine: str, client_factory: Callable[[str], ContextManager],
-              cache_dir: Path, workers: int = 8,
-              on_result: Callable[[SynthResult], None] | None = None,
-              status: SynthStatus | None = None,
-              max_utf8_bytes: int | None = None,
-              model: str | None = None) -> list[SynthResult]:
+def run_synth(
+    jobs: Sequence[SynthJob],
+    engine: str,
+    client_factory: Callable[[str], ContextManager],
+    cache_dir: Path,
+    workers: int = 8,
+    on_result: Callable[[SynthResult], None] | None = None,
+    status: SynthStatus | None = None,
+    max_utf8_bytes: int | None = None,
+    model: str | None = None,
+) -> list[SynthResult]:
     jobs = list(jobs)
     if not jobs:
         return []
     results: list[SynthResult] = []
     lock = threading.Lock()
     with contextlib.ExitStack() as stack:
-        clients = [stack.enter_context(client_factory(engine)) for _ in range(max(1, min(workers, len(jobs))))]
+        clients = [
+            stack.enter_context(client_factory(engine))
+            for _ in range(max(1, min(workers, len(jobs))))
+        ]
         reported = getattr(clients[0], "model", None)
         if model is None:
             model = reported
@@ -265,7 +320,7 @@ def run_synth(jobs: Sequence[SynthJob], engine: str, client_factory: Callable[[s
                 followers.setdefault(keys[j.id], []).append(j)
             else:
                 first_by_key[keys[j.id]] = j
-        idle: "queue.Queue" = queue.Queue()
+        idle: queue.Queue = queue.Queue()
         for c in clients:
             idle.put(c)
         alive = [len(clients)]
@@ -322,37 +377,53 @@ def run_synth(jobs: Sequence[SynthJob], engine: str, client_factory: Callable[[s
         def work(job: SynthJob) -> None:
             key = keys[job.id]
             try:
-                r = cache_hit(job, key, cache_dir)  # Cache-Treffer brauchen keinen Worker (auch nicht, wenn alle tot sind)
+                r = cache_hit(
+                    job, key, cache_dir
+                )  # Cache-Treffer brauchen keinen Worker (auch nicht, wenn alle tot sind)
             except OSError as e:
                 # Fertige Part-Datei ließ sich nicht umbenennen: nicht neu anfragen, Datei für den nächsten Lauf behalten.
-                r = SynthResult(job.id, key, None, None, False, 0, False, f"{type(e).__name__}: {e}")
+                r = SynthResult(
+                    job.id, key, None, None, False, 0, False, f"{type(e).__name__}: {e}"
+                )
             if r is not None:
                 if not r.ok:
                     note(r)
                 emit(r)
                 for other in followers.get(key, []):
-                    emit(SynthResult(other.id, key, r.wav, r.duration, r.ok, r.attempts, r.flagged, r.error))
+                    emit(
+                        SynthResult(
+                            other.id, key, r.wav, r.duration, r.ok, r.attempts, r.flagged, r.error
+                        )
+                    )
                 return
             if stop.is_set():  # abgebrochen: nichts mehr starten, auch keine Fehlerzeile schreiben
                 count_not_run(key)
                 return
             client = _acquire(idle, alive, lock)
             if client is None:
-                r = SynthResult(job.id, key, None, None, False, 0, False, "kein Worker mehr verfügbar")
+                r = SynthResult(
+                    job.id, key, None, None, False, 0, False, "kein Worker mehr verfügbar"
+                )
             else:
                 try:
-                    r = synth_one(client, job, key, cache_dir, on_sent=on_sent if track_sent else None)
+                    r = synth_one(
+                        client, job, key, cache_dir, on_sent=on_sent if track_sent else None
+                    )
                 except BudgetExceeded:
                     idle.put(client)
                     count_not_run(key)
                     return
-                except EngineError as e:  # Worker tot: nicht zurücklegen, Rest dieses Laufs scheitert sauber
+                except EngineError as e:
+                    # Worker tot: nicht zurücklegen, Rest dieses Laufs scheitert sauber
                     with lock:
                         alive[0] -= 1
                     r = SynthResult(job.id, key, None, None, False, 0, False, str(e))
-                except Exception as e:  # z. B. gesperrte Cache-Datei: Worker ist in Ordnung, dieser Auftrag nicht
+                except Exception as e:  # noqa: BLE001
+                    # z. B. gesperrte Cache-Datei: Worker ist in Ordnung, dieser Auftrag nicht
                     idle.put(client)
-                    r = SynthResult(job.id, key, None, None, False, 0, False, f"{type(e).__name__}: {e}")
+                    r = SynthResult(
+                        job.id, key, None, None, False, 0, False, f"{type(e).__name__}: {e}"
+                    )
                 else:
                     idle.put(client)
                 if not r.ok:
@@ -360,7 +431,11 @@ def run_synth(jobs: Sequence[SynthJob], engine: str, client_factory: Callable[[s
             note(r)
             emit(r)
             for other in followers.get(key, []):
-                emit(SynthResult(other.id, key, r.wav, r.duration, r.ok, r.attempts, r.flagged, r.error))
+                emit(
+                    SynthResult(
+                        other.id, key, r.wav, r.duration, r.ok, r.attempts, r.flagged, r.error
+                    )
+                )
 
         with ThreadPoolExecutor(max_workers=len(clients)) as pool:
             list(pool.map(work, first_by_key.values()))

@@ -1,6 +1,12 @@
 import pytest
 
-from drova_voice.casting import cast_report, load_casting, tree_conflicts, voice_speakers, write_auto_casting
+from drova_voice.casting import (
+    cast_report,
+    load_casting,
+    tree_conflicts,
+    voice_speakers,
+    write_auto_casting,
+)
 from drova_voice.fish_voices import FishVoice
 from drova_voice.lines import Line
 
@@ -11,8 +17,21 @@ VOICES = {
 
 
 def line(actor, category="dialog", skip=None, key="Plh_1"):
-    return Line(id=f"T|P|{key}", tree="T", loca_path="P", loca_key=key, node_type="statement", choice_index=None,
-                actor=actor, category=category, generic=False, raw="x", speech="x", stage=(), skip=skip)
+    return Line(
+        id=f"T|P|{key}",
+        tree="T",
+        loca_path="P",
+        loca_key=key,
+        node_type="statement",
+        choice_index=None,
+        actor=actor,
+        category=category,
+        generic=False,
+        raw="x",
+        speech="x",
+        stage=(),
+        skip=skip,
+    )
 
 
 def write(tmp_path, text):
@@ -22,7 +41,9 @@ def write(tmp_path, text):
 
 
 def test_voice_for_speaker_and_player(tmp_path):
-    c = load_casting(write(tmp_path, "default_player: leon\nspeakers:\n  Mira: {voice: lena}\n"), VOICES)
+    c = load_casting(
+        write(tmp_path, "default_player: leon\nspeakers:\n  Mira: {voice: lena}\n"), VOICES
+    )
     assert c.voice_for(line("Mira")) == "lena"
     assert c.voice_for(line("MIRA")) == "lena"  # Groß-/Kleinschreibung egal
     assert c.voice_for(line("Player", category="player")) == "leon"
@@ -43,15 +64,24 @@ def test_unknown_default_player_and_missing_default(tmp_path):
 
 
 def test_duplicate_speaker_after_lowercasing(tmp_path):
-    path = write(tmp_path, "default_player: leon\nspeakers:\n  Mira: {voice: lena}\n  mira: {voice: leon}\n")
+    path = write(
+        tmp_path, "default_player: leon\nspeakers:\n  Mira: {voice: lena}\n  mira: {voice: leon}\n"
+    )
     with pytest.raises(ValueError, match="doppelt"):
         load_casting(path, VOICES)
 
 
 def test_cast_report_counts_missing_and_usage(tmp_path):
-    c = load_casting(write(tmp_path, "default_player: leon\nspeakers:\n  mira: {voice: lena}\n"), VOICES)
-    lines = [line("Mira", key="Plh_1"), line("Mira", key="Plh_2"), line("Fremder", key="Plh_3"),
-             line("Player", "player", key="Plh_4"), line("Fremder", skip="gvar", key="Plh_5")]
+    c = load_casting(
+        write(tmp_path, "default_player: leon\nspeakers:\n  mira: {voice: lena}\n"), VOICES
+    )
+    lines = [
+        line("Mira", key="Plh_1"),
+        line("Mira", key="Plh_2"),
+        line("Fremder", key="Plh_3"),
+        line("Player", "player", key="Plh_4"),
+        line("Fremder", skip="gvar", key="Plh_5"),
+    ]
     report = cast_report(lines, c)
     assert report.missing == {"Fremder": 1}
     assert report.usage == {"lena": 2, "leon": 1}
@@ -94,13 +124,39 @@ def test_auto_file_roundtrip_with_special_names(tmp_path):
 
 
 def tline(key, actor, tree="T1", skip=None, category="dialog"):
-    return Line(id=f"{tree}|P|{key}", tree=tree, loca_path="P", loca_key=key, node_type="statement", choice_index=None,
-                actor=actor, category=category, generic=False, raw="x", speech="x", stage=(), skip=skip)
+    return Line(
+        id=f"{tree}|P|{key}",
+        tree=tree,
+        loca_path="P",
+        loca_key=key,
+        node_type="statement",
+        choice_index=None,
+        actor=actor,
+        category=category,
+        generic=False,
+        raw="x",
+        speech="x",
+        stage=(),
+        skip=skip,
+    )
 
 
 def test_voice_speakers_and_tree_conflicts(tmp_path):
-    c = load_casting(write(tmp_path, "default_player: leon\nspeakers:\n  mira: {voice: lena}\n  bo: {voice: lena}\n  cy: {voice: leon}\n"), VOICES)
-    lines = [tline("1", "Mira"), tline("2", "Bo"), tline("3", "Cy"), tline("4", "Mira", tree="T2"), tline("5", "Bo", tree="T3"),
-             tline("6", "Mira", tree="T4", skip="gvar"), tline("7", "Fremder")]
+    c = load_casting(
+        write(
+            tmp_path,
+            "default_player: leon\nspeakers:\n  mira: {voice: lena}\n  bo: {voice: lena}\n  cy: {voice: leon}\n",
+        ),
+        VOICES,
+    )
+    lines = [
+        tline("1", "Mira"),
+        tline("2", "Bo"),
+        tline("3", "Cy"),
+        tline("4", "Mira", tree="T2"),
+        tline("5", "Bo", tree="T3"),
+        tline("6", "Mira", tree="T4", skip="gvar"),
+        tline("7", "Fremder"),
+    ]
     assert voice_speakers(lines, c) == {"lena": {"mira", "bo"}, "leon": {"cy"}}
     assert tree_conflicts(lines, c) == [("T1", "lena", ["bo", "mira"])]

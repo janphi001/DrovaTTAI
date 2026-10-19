@@ -28,5 +28,5 @@ class SynthResponse:
     http_attempts: int | None = None  # POSTs des Fish-Workers; andere Engines lassen das leer
 
     @classmethod
-    def from_dict(cls, d: dict) -> "SynthResponse":
-        return cls(**{f.name: d.get(f.name) for f in fields(cls)})
+    def from_dict(cls, d: dict) -> SynthResponse:
+        return cls(**{f.name: d.get(f.name) for f in fields(cls)})  # type: ignore[arg-type]

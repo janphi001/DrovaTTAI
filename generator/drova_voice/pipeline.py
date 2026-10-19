@@ -4,30 +4,81 @@ import argparse
 import json
 import sys
 from collections import Counter
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
 
 from drova_voice.assign import assign
-from drova_voice.casting import cast_report, load_casting, tree_conflicts, voice_speakers, write_auto_casting
+from drova_voice.casting import (
+    cast_report,
+    load_casting,
+    tree_conflicts,
+    voice_speakers,
+    write_auto_casting,
+)
 from drova_voice.casting_sheet import write_casting_sheet
 from drova_voice.config import Config
-from drova_voice.emote import import_llm_emotions, merge_emotions, prepare_emote_packets, read_emotions, write_emotions
+from drova_voice.emote import (
+    import_llm_emotions,
+    merge_emotions,
+    prepare_emote_packets,
+    read_emotions,
+    write_emotions,
+)
 from drova_voice.encode import run_encode
-from drova_voice.export_report import locate_manifest
 from drova_voice.engines.client import EngineClient, EngineError, cache_env, worker_command
-from drova_voice.fish_model import free_tier_warning, guard_fish_model, resolve_fish_profile, write_model_stamp
+from drova_voice.export_report import locate_manifest
+from drova_voice.fish_model import (
+    free_tier_warning,
+    guard_fish_model,
+    resolve_fish_profile,
+    write_model_stamp,
+)
 from drova_voice.fish_voices import load_catalog
 from drova_voice.ids import VARIANT_SEP, with_variant
 from drova_voice.install import install_audio
-from drova_voice.jsonl import append_jsonl, latest_by_id, read_jsonl_counted, read_jsonl_lenient, write_jsonl
-from drova_voice.lines import (Line, build_lines, emotion_id, load_lexicon, load_loc_texts, read_lines, select_npc, write_lines)
+from drova_voice.jsonl import (
+    append_jsonl,
+    latest_by_id,
+    read_jsonl_counted,
+    read_jsonl_lenient,
+    write_jsonl,
+)
+from drova_voice.lines import (
+    Line,
+    build_lines,
+    emotion_id,
+    load_lexicon,
+    load_loc_texts,
+    read_lines,
+    select_npc,
+    write_lines,
+)
 from drova_voice.pools import expand_pool_lines, load_pools
 from drova_voice.preview import write_preview
-from drova_voice.profiles import LOW_CONFIDENCE, Profile, merge_import, prepare_packets, read_profiles, write_profiles
-from drova_voice.report import build_report, build_speaker_report, format_report, format_speaker_report
-from drova_voice.selection import (DEFAULT_BATCH_CHARS, batch_lines, plan_batches, read_batches, sample_lines,
-                                   speaker_stats, write_batches)
+from drova_voice.profiles import (
+    LOW_CONFIDENCE,
+    Profile,
+    merge_import,
+    prepare_packets,
+    read_profiles,
+    write_profiles,
+)
+from drova_voice.report import (
+    build_report,
+    build_speaker_report,
+    format_report,
+    format_speaker_report,
+)
+from drova_voice.selection import (
+    DEFAULT_BATCH_CHARS,
+    batch_lines,
+    plan_batches,
+    read_batches,
+    sample_lines,
+    speaker_stats,
+    write_batches,
+)
 from drova_voice.synth import SynthJob, SynthStatus, build_jobs, run_synth
 from drova_voice.voice_check import SKIPPED, api_key, query_voices, summarize, used_voices
 
@@ -92,7 +143,10 @@ def _selected(cfg: Config, args: argparse.Namespace, expand_pool: bool = True) -
         lines = [l for l in lines if l.category == category]
     if expand_pool:
         try:
-            pools = load_pools(cfg.casting_dir / "pools.yaml", load_catalog(cfg.casting_dir / "fish_voices.yaml").known())
+            pools = load_pools(
+                cfg.casting_dir / "pools.yaml",
+                load_catalog(cfg.casting_dir / "fish_voices.yaml").known(),
+            )
         except (OSError, ValueError) as e:
             _fail(str(e))
             return None
@@ -105,7 +159,9 @@ def _extract(cfg: Config, args: argparse.Namespace) -> int:
     if manifest_path is None:
         return _fail(notice or "Manifest nicht gefunden")
     if not cfg.loc_dir.is_dir():
-        return _fail(f"Lokalisierungsordner nicht gefunden: {cfg.loc_dir} (game_dir in config.yaml prüfen)")
+        return _fail(
+            f"Lokalisierungsordner nicht gefunden: {cfg.loc_dir} (game_dir in config.yaml prüfen)"
+        )
     if notice:
         print(notice)
     manifest = read_json_object(manifest_path, "Manifest")
@@ -128,8 +184,12 @@ def auto_casting_path(cfg: Config) -> Path:
 
 def _load_casting(cfg: Config):
     catalog = load_catalog(cfg.casting_dir / "fish_voices.yaml")
-    return catalog, load_casting(cfg.casting_dir / "casting.yaml", catalog.known(), auto_casting_path(cfg),
-                                 cfg.casting_dir / "pools.yaml")
+    return catalog, load_casting(
+        cfg.casting_dir / "casting.yaml",
+        catalog.known(),
+        auto_casting_path(cfg),
+        cfg.casting_dir / "pools.yaml",
+    )
 
 
 def _cast(cfg: Config, args: argparse.Namespace) -> int:
@@ -147,12 +207,24 @@ def _cast(cfg: Config, args: argparse.Namespace) -> int:
     except (OSError, ValueError) as e:
         return _fail(str(e))
     report = cast_report(lines, casting)
-    print("Stimmen (Zeilen): " + (", ".join(f"{v}: {n}" for v, n in sorted(report.usage.items())) or "keine"))
-    print("Sprecher ohne Stimme: " + (", ".join(f"{a}: {n}" for a, n in sorted(report.missing.items())) or "keine"))
-    crowded = {v: sorted(who) for v, who in voice_speakers(lines, casting).items() if len(who) > args.max_speakers}
+    print(
+        "Stimmen (Zeilen): "
+        + (", ".join(f"{v}: {n}" for v, n in sorted(report.usage.items())) or "keine")
+    )
+    print(
+        "Sprecher ohne Stimme: "
+        + (", ".join(f"{a}: {n}" for a, n in sorted(report.missing.items())) or "keine")
+    )
+    crowded = {
+        v: sorted(who)
+        for v, who in voice_speakers(lines, casting).items()
+        if len(who) > args.max_speakers
+    }
     if crowded:
-        print("Überbelegt (mehr als %d Sprecher): " % args.max_speakers
-              + "; ".join(f"{v}: {len(who)}" for v, who in sorted(crowded.items())))
+        print(
+            f"Überbelegt (mehr als {args.max_speakers} Sprecher): "
+            + "; ".join(f"{v}: {len(who)}" for v, who in sorted(crowded.items()))
+        )
     conflicts = tree_conflicts(lines, casting)
     if conflicts:
         print(f"Gleiche Stimme im selben Baum: {len(conflicts)} Fälle")
@@ -171,20 +243,30 @@ def _cast_propose(cfg: Config, args: argparse.Namespace) -> int:
         manual = load_casting(cfg.casting_dir / "casting.yaml", catalog.known())
         keep = auto_casting_path(cfg).is_file() and not args.reset
         # nur beim Behalten wird die alte Auto-Datei geladen (und geprüft); --reset verwirft sie ungesehen
-        merged = load_casting(cfg.casting_dir / "casting.yaml", catalog.known(), auto_casting_path(cfg)) if keep else None
+        merged = (
+            load_casting(cfg.casting_dir / "casting.yaml", catalog.known(), auto_casting_path(cfg))
+            if keep
+            else None
+        )
         profiles = read_profiles(profiles_path(cfg))
     except (OSError, ValueError) as e:
         return _fail(str(e))
     stats = speaker_stats(lines)
-    kept = {n: v for n, v in merged.speakers.items() if n not in manual.speakers} if keep else {}
+    kept = (
+        {n: v for n, v in merged.speakers.items() if n not in manual.speakers}
+        if merged is not None
+        else {}
+    )
     result = assign(stats, profiles, catalog.candidates(), {**kept, **manual.speakers})
     write_auto_casting(auto_casting_path(cfg), {**kept, **result.voices})
     if keep:
         print("Bisherige Auto-Zuteilung bleibt (--reset verwirft sie)")
     else:
         print("Neu zugeteilt (--reset)" if args.reset else "Neu zugeteilt (erste Zuteilung)")
-    print(f"{len(result.voices)} Sprecher neu zugeteilt, {len(kept)} behalten, {len(manual.speakers)} von Hand besetzt "
-          f"-> {auto_casting_path(cfg)}")
+    print(
+        f"{len(result.voices)} Sprecher neu zugeteilt, {len(kept)} behalten, {len(manual.speakers)} von Hand besetzt "
+        f"-> {auto_casting_path(cfg)}"
+    )
     display = {s.name: s.display for s in stats}
     if result.open:
         print("Offen (kein Steckbrief): " + ", ".join(display[n] for n in result.open))
@@ -192,7 +274,10 @@ def _cast_propose(cfg: Config, args: argparse.Namespace) -> int:
         print(f"Notbesetzung {display[name]}: {why}")
     speakers_by_voice = Counter({**Counter(kept.values()), **Counter(manual.speakers.values())})
     speakers_by_voice.update(result.voices.values())
-    print("Stimmen (Sprecher): " + ", ".join(f"{v}: {n}" for v, n in sorted(speakers_by_voice.items())))
+    print(
+        "Stimmen (Sprecher): "
+        + ", ".join(f"{v}: {n}" for v, n in sorted(speakers_by_voice.items()))
+    )
     return 1 if result.open else 0
 
 
@@ -218,7 +303,15 @@ def _cast_check_voices(cfg: Config) -> int:
         found = query_voices(WORKERS_DIR, sorted(ids))
     except EngineError as e:
         return _fail(str(e))
-    lines, code = summarize(rows, {item.get("id"): item for item in found if isinstance(item, dict)}, catalog)
+    lines, code = summarize(
+        rows,
+        {
+            item["id"]: item
+            for item in found
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        },
+        catalog,
+    )
     print("\n".join(lines))
     return code
 
@@ -235,8 +328,16 @@ def _cast_listen(cfg: Config) -> int:
         return _fail(str(e))
     samples = {l.actor.lower(): l for l in sample_lines(lines)}
     encoded = latest_by_id(read_jsonl_lenient(encoded_path(cfg)))
-    page = write_casting_sheet(speaker_stats(lines), casting, catalog.candidates(), profiles, samples, encoded,
-                               audio_dir(cfg), cfg.out_dir / "casting" / "index.html")
+    page = write_casting_sheet(
+        speaker_stats(lines),
+        casting,
+        catalog.candidates(),
+        profiles,
+        samples,
+        encoded,
+        audio_dir(cfg),
+        cfg.out_dir / "casting" / "index.html",
+    )
     heard = sum(1 for l in samples.values() if l.id in encoded)
     print(f"Hörseite: {page} ({heard} von {len(samples)} Beispielen mit Ton)")
     return 0
@@ -287,7 +388,9 @@ def _emote(cfg: Config, args: argparse.Namespace) -> int:
         for old in out.glob("packet_*.json"):
             old.unlink()
         for i, packet in enumerate(packets, start=1):
-            (out / f"packet_{i:03d}.json").write_text(json.dumps(packet, ensure_ascii=False, indent=1), encoding="utf-8")
+            (out / f"packet_{i:03d}.json").write_text(
+                json.dumps(packet, ensure_ascii=False, indent=1), encoding="utf-8"
+            )
         print(f"{sum(len(p) for p in packets)} Dialogbäume in {len(packets)} Paketen -> {out}")
         return 0
     if args.import_files:
@@ -297,14 +400,19 @@ def _emote(cfg: Config, args: argparse.Namespace) -> int:
         rows, read_errors = loaded
         result = import_llm_emotions(existing, rows, {l.id for l in lines if not l.skip})
         write_emotions(emotions_path(cfg), result.merged)
-        print(f"{result.imported} LLM-Emotionen übernommen, {result.kept} feste Zeilen behalten -> {emotions_path(cfg)}")
+        print(
+            f"{result.imported} LLM-Emotionen übernommen, {result.kept} feste Zeilen behalten -> {emotions_path(cfg)}"
+        )
         errors = read_errors + result.errors
         _print_import_errors(errors)
         return 1 if errors else 0
     merged = merge_emotions(existing, lines)
     write_emotions(emotions_path(cfg), merged)
     sources = Counter(t.source for t in merged.values())
-    print(f"{len(merged)} Emotionen -> {emotions_path(cfg)}; " + ", ".join(f"{s}: {n}" for s, n in sorted(sources.items())))
+    print(
+        f"{len(merged)} Emotionen -> {emotions_path(cfg)}; "
+        + ", ".join(f"{s}: {n}" for s, n in sorted(sources.items()))
+    )
     return 0
 
 
@@ -347,6 +455,7 @@ def _client_factory(cfg: Config, fish_env: dict[str, str] | None):
         if engine == "fish" and fish_env:
             env.update(fish_env)  # dieselbe ID, Sprache und Sampling wie im Cache-Schlüssel
         return EngineClient(worker_command(WORKERS_DIR, engine), env=env)
+
     return make
 
 
@@ -370,10 +479,14 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     if args.engine == "fish":
         try:
             profile = resolve_fish_profile(
-                cfg.language, cfg.fish_model, cfg.fish_latency, cfg.fish_temperature, cfg.fish_top_p)
+                cfg.language, cfg.fish_model, cfg.fish_latency, cfg.fish_temperature, cfg.fish_top_p
+            )
         except ValueError as e:
             return _fail(str(e))
-        jobs = [SynthJob(j.id, j.text, j.speech_len, j.voice, {**j.params, **profile.params()}) for j in jobs]
+        jobs = [
+            SynthJob(j.id, j.text, j.speech_len, j.voice, {**j.params, **profile.params()})
+            for j in jobs
+        ]
         model_alias = profile.cache_model()
         proceed, notice = guard_fish_model(cache_dir, profile.stamp(), args.accept_model_change)
         if notice:
@@ -394,9 +507,17 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     recorded: list[dict] = []
     # Auch bei Abbruch (Strg+C, zu viele Fehler) landet, was bis dahin fertig war, in results.jsonl.
     try:
-        results = run_synth(jobs, args.engine, _client_factory(cfg, fish_env), cache_dir, args.workers,
-                            on_result=lambda r: recorded.append(r.to_dict()), status=status,
-                            max_utf8_bytes=budget, model=model_alias)
+        results = run_synth(
+            jobs,
+            args.engine,
+            _client_factory(cfg, fish_env),
+            cache_dir,
+            args.workers,
+            on_result=lambda r: recorded.append(r.to_dict()),
+            status=status,
+            max_utf8_bytes=budget,
+            model=model_alias,
+        )
     finally:
         record_synth_results(path, recorded)
     done = [r for r in results if r.ok]
@@ -405,28 +526,47 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     flagged = [r for r in done if r.flagged]
     reasons = Counter(skipped.values())
     detail = ", ".join(f"{k}: {n}" for k, n in sorted(reasons.items())) or "keine"
-    print(f"{len(done)} erzeugt ({len(done) - len(new)} aus dem Cache, {len(new)} neu erzeugt), {len(failed)} Fehler, "
-          f"{len(flagged)} auffällige Dauer; übersprungen: {detail}")
+    print(
+        f"{len(done)} erzeugt ({len(done) - len(new)} aus dem Cache, {len(new)} neu erzeugt), {len(failed)} Fehler, "
+        f"{len(flagged)} auffällige Dauer; übersprungen: {detail}"
+    )
     unique_new = {r.key: r for r in new}  # Zeilen mit neuem Ton; Zeichen und Bytes stehen in status
     # HTTP-POSTs inklusive Worker-Wiederholungen. Ohne Worker-Zählung ist es die Zahl der Aufrufe.
     requests = sum({r.key: r.attempts for r in results if r.attempts > 0}.values())
-    append_jsonl(usage_path(cfg), {"at": datetime.now().isoformat(timespec="seconds"), "engine": args.engine,
-                                   "lines": len(unique_new), "requests": requests,
-                                   "chars": status.sent_chars, "utf8_bytes": status.sent_bytes})
-    history = [row for row in read_jsonl_lenient(usage_path(cfg)) if row.get("engine") == args.engine]
+    append_jsonl(
+        usage_path(cfg),
+        {
+            "at": datetime.now().isoformat(timespec="seconds"),
+            "engine": args.engine,
+            "lines": len(unique_new),
+            "requests": requests,
+            "chars": status.sent_chars,
+            "utf8_bytes": status.sent_bytes,
+        },
+    )
+    history = [
+        row for row in read_jsonl_lenient(usage_path(cfg)) if row.get("engine") == args.engine
+    ]
     total_chars = sum(row.get("chars", 0) for row in history)
     # Ältere Zeilen haben nur `chars`. Die sind eine Untergrenze der UTF-8-Bytes.
-    total_bytes = sum(row["utf8_bytes"] if "utf8_bytes" in row else row.get("chars", 0) for row in history)
-    print(f"Zeichen neu an {args.engine} gesendet: {status.sent_chars} "
-          f"({status.sent_bytes} UTF-8-Bytes, {requests} Anfragen); "
-          f"insgesamt bisher: {total_chars} ({total_bytes} UTF-8-Bytes)")
+    total_bytes = sum(
+        row["utf8_bytes"] if "utf8_bytes" in row else row.get("chars", 0) for row in history
+    )
+    print(
+        f"Zeichen neu an {args.engine} gesendet: {status.sent_chars} "
+        f"({status.sent_bytes} UTF-8-Bytes, {requests} Anfragen); "
+        f"insgesamt bisher: {total_chars} ({total_bytes} UTF-8-Bytes)"
+    )
     for r in failed[:10]:
         print(f"FEHLER {r.id}: {r.error}", file=sys.stderr)
     for r in flagged[:10]:
         print(f"AUFFÄLLIG {r.id}: Dauer {r.duration:.1f} s", file=sys.stderr)
     if status.aborted:
-        print(f"ABBRUCH: {status.aborted}; {status.not_run} Aufträge nicht gestartet (später `synth` erneut ausführen, "
-              f"Fertiges kommt aus dem Cache)", file=sys.stderr)
+        print(
+            f"ABBRUCH: {status.aborted}; {status.not_run} Aufträge nicht gestartet (später `synth` erneut ausführen, "
+            f"Fertiges kommt aus dem Cache)",
+            file=sys.stderr,
+        )
     return 1 if failed or status.aborted else 0
 
 
@@ -444,21 +584,28 @@ def _encode(cfg: Config, args: argparse.Namespace) -> int:
         return 2
     synth_rows = latest_by_id(read_jsonl_lenient(synth_results_path(cfg)))
     if not synth_rows:
-        return _fail(f"{synth_results_path(cfg)} fehlt oder ist leer (zuerst `drova-voice synth` ausführen)")
+        return _fail(
+            f"{synth_results_path(cfg)} fehlt oder ist leer (zuerst `drova-voice synth` ausführen)"
+        )
     try:
         catalog, casting = _load_casting(cfg)
         emotions = read_emotions(emotions_path(cfg))
-        variants = {l.id: catalog.variants[casting.voice_for(l)] for l in lines
-                    if not l.skip and casting.voice_for(l) in catalog.variants}
-        rows, errors = run_encode(lines, synth_rows, emotions, audio_dir(cfg), args.workers, variants)
+        variants = {
+            l.id: catalog.variants[casting.voice_for(l)]
+            for l in lines
+            if not l.skip and casting.voice_for(l) in catalog.variants
+        }
+        rows, errors = run_encode(
+            lines, synth_rows, emotions, audio_dir(cfg), args.workers, variants
+        )
     except (OSError, ValueError) as e:
         return _fail(str(e))
     merged = latest_by_id(read_jsonl_lenient(encoded_path(cfg)))
     merged.update({r["id"]: r for r in rows})
     write_jsonl(encoded_path(cfg), merged.values())
     print(f"{len(rows)} kodiert -> {audio_dir(cfg)}; {len(errors)} Fehler")
-    for e in errors[:10]:
-        print(f"FEHLER {e}", file=sys.stderr)
+    for err in errors[:10]:
+        print(f"FEHLER {err}", file=sys.stderr)
     return 1 if errors else 0
 
 
@@ -468,7 +615,9 @@ def _install(cfg: Config, args: argparse.Namespace) -> int:
         return 2
     encoded = latest_by_id(read_jsonl_lenient(encoded_path(cfg)))
     if not encoded:
-        return _fail(f"{encoded_path(cfg)} fehlt oder ist leer (zuerst `drova-voice encode` ausführen)")
+        return _fail(
+            f"{encoded_path(cfg)} fehlt oder ist leer (zuerst `drova-voice encode` ausführen)"
+        )
     try:
         _, casting = _load_casting(cfg)
     except (OSError, ValueError) as e:
@@ -486,26 +635,40 @@ def _install(cfg: Config, args: argparse.Namespace) -> int:
             rows.append(row)
     drop = {l.id for l in lines} - {r["id"] for r in rows}
     # Ein installierter Basis-Eintrag verdrängt eine alte neutrale Variante (die Mod bevorzugt Varianten).
-    drop |= {with_variant(l.id, "neutral") for l in lines if not l.skip and VARIANT_SEP not in l.id} - {r["id"] for r in rows}
+    drop |= {
+        with_variant(l.id, "neutral") for l in lines if not l.skip and VARIANT_SEP not in l.id
+    } - {r["id"] for r in rows}
     # Poolzeilen: alle Varianten der Basis-ID neu aufbauen, damit Stimmen, die aus dem Pool gefallen sind, verschwinden.
     drop |= {emotion_id(l) for l in lines if l.pool}
     prune = bool(getattr(args, "prune", False))
     dry_run = bool(getattr(args, "dry_run", False))
-    result = install_audio(rows, audio_dir(cfg), cfg.install_dir, cfg.language, drop_ids=drop,
-                           prune=prune, dry_run=dry_run,
-                           audio_root=cfg.game_dir / "Mods" / "DrovaVoice" / "Audio", game_dir=cfg.game_dir)
+    result = install_audio(
+        rows,
+        audio_dir(cfg),
+        cfg.install_dir,
+        cfg.language,
+        drop_ids=drop,
+        prune=prune,
+        dry_run=dry_run,
+        audio_root=cfg.game_dir / "Mods" / "DrovaVoice" / "Audio",
+        game_dir=cfg.game_dir,
+    )
     result.errors.extend(stale)
     if dry_run:
-        print(f"würde {result.copied} kopieren, {result.entries} Einträge, {len(result.pruned)} verwaist")
+        print(
+            f"würde {result.copied} kopieren, {result.entries} Einträge, {len(result.pruned)} verwaist"
+        )
     else:
-        print(f"{result.copied} Dateien kopiert, index.json mit {result.entries} Einträgen -> {cfg.install_dir}")
+        print(
+            f"{result.copied} Dateien kopiert, index.json mit {result.entries} Einträgen -> {cfg.install_dir}"
+        )
         if prune:
             print(f"gelöscht: {len(result.pruned)} verwaiste OGG")
     if dry_run or prune:
         for rel in result.pruned:
             print(f"  {rel}")
-    for e in result.errors[:10]:
-        print(f"FEHLER {e}", file=sys.stderr)
+    for err in result.errors[:10]:
+        print(f"FEHLER {err}", file=sys.stderr)
     return 1 if result.errors else 0
 
 
@@ -529,7 +692,11 @@ def _report(cfg: Config, args: argparse.Namespace) -> int:
     synth_rows = latest_by_id(read_jsonl_lenient(synth_results_path(cfg)))
     encoded = latest_by_id(read_jsonl_lenient(encoded_path(cfg)))
     if args.by_speaker:
-        print(format_speaker_report(build_speaker_report(lines, casting, synth_rows, encoded, entries), casting))
+        print(
+            format_speaker_report(
+                build_speaker_report(lines, casting, synth_rows, encoded, entries), casting
+            )
+        )
         return 0
     print(format_report(build_report(lines, casting, synth_rows, encoded, entries)))
     return 0
@@ -543,8 +710,14 @@ def _preview(cfg: Config, args: argparse.Namespace) -> int:
         emotions = read_emotions(emotions_path(cfg))
     except ValueError as e:
         return _fail(str(e))
-    page = write_preview(lines, latest_by_id(read_jsonl_lenient(encoded_path(cfg))), emotions, audio_dir(cfg),
-                         cfg.out_dir / "preview" / "index.html", f"Hörprobe {args.npc or 'alle Zeilen'}")
+    page = write_preview(
+        lines,
+        latest_by_id(read_jsonl_lenient(encoded_path(cfg))),
+        emotions,
+        audio_dir(cfg),
+        cfg.out_dir / "preview" / "index.html",
+        f"Hörprobe {args.npc or 'alle Zeilen'}",
+    )
     print(f"Hörseite: {page}")
     return 0
 
@@ -558,8 +731,12 @@ def _batches(cfg: Config, args: argparse.Namespace) -> int:
     write_batches(batches_path(cfg), batches, args.max_chars)
     display = {s.name: s.display for s in speaker_stats(lines)}
     for b in batches:
-        who = ", ".join(display[n] for n in b.speakers[:6]) + (", ..." if len(b.speakers) > 6 else "")
-        print(f"Etappe {b.n}: {len(b.speakers)} Sprecher{' + Spieler' if b.player else ''}, {b.lines} Zeilen, {b.chars} Zeichen ({who})")
+        who = ", ".join(display[n] for n in b.speakers[:6]) + (
+            ", ..." if len(b.speakers) > 6 else ""
+        )
+        print(
+            f"Etappe {b.n}: {len(b.speakers)} Sprecher{' + Spieler' if b.player else ''}, {b.lines} Zeilen, {b.chars} Zeichen ({who})"
+        )
     print(f"{len(batches)} Etappen, {sum(b.chars for b in batches)} Zeichen -> {batches_path(cfg)}")
     return 0
 
@@ -577,13 +754,24 @@ def _profile(cfg: Config, args: argparse.Namespace) -> int:
         if not args.gender or not args.age:
             return _fail("--set braucht --gender und --age")
         try:
-            p = Profile.from_dict({"speaker": args.set, "gender": args.gender, "age": args.age, "type": args.type,
-                                   "confidence": 1.0, "note": args.note or "", "source": "manual"})
+            p = Profile.from_dict(
+                {
+                    "speaker": args.set,
+                    "gender": args.gender,
+                    "age": args.age,
+                    "type": args.type,
+                    "confidence": 1.0,
+                    "note": args.note or "",
+                    "source": "manual",
+                }
+            )
         except ValueError as e:
             return _fail(str(e))
         profiles[p.speaker] = p
         write_profiles(profiles_path(cfg), profiles.values())
-        print(f"{p.speaker}: {p.gender}, {p.age}{', ' + p.type if p.type else ''} -> {profiles_path(cfg)}")
+        print(
+            f"{p.speaker}: {p.gender}, {p.age}{', ' + p.type if p.type else ''} -> {profiles_path(cfg)}"
+        )
         return 0
     path = lines_path(cfg)
     if not path.is_file():
@@ -598,7 +786,9 @@ def _profile(cfg: Config, args: argparse.Namespace) -> int:
         for old in out.glob("packet_*.json"):
             old.unlink()
         for i, packet in enumerate(packets, start=1):
-            (out / f"packet_{i:03d}.json").write_text(json.dumps(packet, ensure_ascii=False, indent=1), encoding="utf-8")
+            (out / f"packet_{i:03d}.json").write_text(
+                json.dumps(packet, ensure_ascii=False, indent=1), encoding="utf-8"
+            )
         print(f"{sum(len(p) for p in packets)} Sprecher in {len(packets)} Paketen -> {out}")
         return 0
     if args.import_files:
@@ -608,20 +798,26 @@ def _profile(cfg: Config, args: argparse.Namespace) -> int:
         rows, read_errors = loaded
         merged, merge_errors = merge_import(profiles, rows, {s.name for s in speaker_stats(lines)})
         write_profiles(profiles_path(cfg), merged.values())
-        print(f"{len(merged)} Steckbriefe ({len(merged) - len(profiles)} neu) -> {profiles_path(cfg)}")
+        print(
+            f"{len(merged)} Steckbriefe ({len(merged) - len(profiles)} neu) -> {profiles_path(cfg)}"
+        )
         errors = read_errors + merge_errors
         _print_import_errors(errors)
         return 1 if errors else 0
     stats = speaker_stats(lines)
     for s in stats:
-        p = profiles.get(s.name)
-        if p is None:
+        found = profiles.get(s.name)
+        if found is None:
             print(f"{s.display} ({s.lines}): kein Steckbrief")
         else:
-            flag = " UNSICHER" if p.confidence < LOW_CONFIDENCE else ""
-            print(f"{s.display} ({s.lines}): {p.gender}, {p.age}{', ' + p.type if p.type else ''}, "
-                  f"{p.confidence:.1f}{flag}, {p.source}: {p.note}")
-    print(f"{sum(1 for s in stats if s.name in profiles)} von {len(stats)} Sprechern haben einen Steckbrief")
+            flag = " UNSICHER" if found.confidence < LOW_CONFIDENCE else ""
+            print(
+                f"{s.display} ({s.lines}): {found.gender}, {found.age}{', ' + found.type if found.type else ''}, "
+                f"{found.confidence:.1f}{flag}, {found.source}: {found.note}"
+            )
+    print(
+        f"{sum(1 for s in stats if s.name in profiles)} von {len(stats)} Sprechern haben einen Steckbrief"
+    )
     return 0
 
 
@@ -641,61 +837,163 @@ HANDLERS: dict[str, Callable[[Config, argparse.Namespace], int]] = {
 
 def _add_selection(parser, npc_help: str = "nur Bäume, in denen dieser NPC spricht") -> None:
     parser.add_argument("--npc", help=npc_help)
-    parser.add_argument("--sample", action="store_true", help="nur eine Beispielzeile je Sprecher (Hörstufe)")
+    parser.add_argument(
+        "--sample", action="store_true", help="nur eine Beispielzeile je Sprecher (Hörstufe)"
+    )
     parser.add_argument("--batch", type=int, help="nur die Zeilen dieser Etappe (siehe `batches`)")
-    parser.add_argument("--category", choices=("dialog", "bark", "player"), help="nur Zeilen dieser Kategorie")
+    parser.add_argument(
+        "--category", choices=("dialog", "bark", "player"), help="nur Zeilen dieser Kategorie"
+    )
 
 
 def add_parsers(sub) -> None:
     ex = sub.add_parser("extract", help="Manifest + .loc -> data/lines.jsonl (Sprechtext)")
     ex.add_argument("--manifest", type=Path, help="Standard: data/export/<Sprache>/manifest.json")
-    cast = sub.add_parser("cast", help="Besetzung prüfen (--check) oder aus Steckbriefen vorschlagen (--propose)")
-    cast.add_argument("--check", action="store_true", help="nur prüfen (Standard und einzige Betriebsart in Plan 3)")
-    cast.add_argument("--check-voices", action="store_true",
-                      help="genutzte Fish-IDs gegen die API prüfen (ohne FISH_API_KEY übersprungen)")
+    cast = sub.add_parser(
+        "cast", help="Besetzung prüfen (--check) oder aus Steckbriefen vorschlagen (--propose)"
+    )
+    cast.add_argument(
+        "--check",
+        action="store_true",
+        help="nur prüfen (Standard und einzige Betriebsart in Plan 3)",
+    )
+    cast.add_argument(
+        "--check-voices",
+        action="store_true",
+        help="genutzte Fish-IDs gegen die API prüfen (ohne FISH_API_KEY übersprungen)",
+    )
     cast.add_argument("--npc", help="nur Bäume, in denen dieser NPC spricht")
-    cast.add_argument("--propose", action="store_true", help="Stimmen aus den Steckbriefen zuteilen (casting/casting_auto.yaml)")
-    cast.add_argument("--listen", action="store_true", help="Hörseite out/casting/index.html (nach synth/encode --sample)")
-    cast.add_argument("--keep", action="store_true", help="mit --propose: bisherige Auto-Zuteilung behalten (jetzt Standard, nur noch Synonym)")
-    cast.add_argument("--reset", action="store_true", help="mit --propose: bisherige Auto-Zuteilung verwerfen und alles neu zuteilen")
-    cast.add_argument("--max-speakers", type=int, default=12, help="--check: ab so vielen Sprechern gilt eine Stimme als überbelegt")
-    em = sub.add_parser("emote", help="Emotionen aus Regieanweisungen nach casting/emotions.jsonl (llm/manual bleiben)")
+    cast.add_argument(
+        "--propose",
+        action="store_true",
+        help="Stimmen aus den Steckbriefen zuteilen (casting/casting_auto.yaml)",
+    )
+    cast.add_argument(
+        "--listen",
+        action="store_true",
+        help="Hörseite out/casting/index.html (nach synth/encode --sample)",
+    )
+    cast.add_argument(
+        "--keep",
+        action="store_true",
+        help="mit --propose: bisherige Auto-Zuteilung behalten (jetzt Standard, nur noch Synonym)",
+    )
+    cast.add_argument(
+        "--reset",
+        action="store_true",
+        help="mit --propose: bisherige Auto-Zuteilung verwerfen und alles neu zuteilen",
+    )
+    cast.add_argument(
+        "--max-speakers",
+        type=int,
+        default=12,
+        help="--check: ab so vielen Sprechern gilt eine Stimme als überbelegt",
+    )
+    em = sub.add_parser(
+        "emote",
+        help="Emotionen aus Regieanweisungen nach casting/emotions.jsonl (llm/manual bleiben)",
+    )
     _add_selection(em)
-    em.add_argument("--prepare", action="store_true", help="Dialogbäume als Pakete für Subagents nach out/subagent/emote schreiben")
+    em.add_argument(
+        "--prepare",
+        action="store_true",
+        help="Dialogbäume als Pakete für Subagents nach out/subagent/emote schreiben",
+    )
     em.add_argument("--size", type=int, default=20, help="Dialogbäume je Paket (Standard 20)")
-    em.add_argument("--import", dest="import_files", nargs="+", type=Path, metavar="DATEI", help="JSONL-Ergebnisse der Subagents einlesen")
-    sy = sub.add_parser("synth", help="Sprache erzeugen (Cache unter cache/synth, wiederaufnehmbar)")
+    em.add_argument(
+        "--import",
+        dest="import_files",
+        nargs="+",
+        type=Path,
+        metavar="DATEI",
+        help="JSONL-Ergebnisse der Subagents einlesen",
+    )
+    sy = sub.add_parser(
+        "synth", help="Sprache erzeugen (Cache unter cache/synth, wiederaufnehmbar)"
+    )
     sy.add_argument("--engine", default="fish")
-    sy.add_argument("--accept-model-change", action="store_true",
-                    help="Wechsel von Modell, Sprache, Latenz oder Sampling bestätigen (vorhandener Fish-Cache gilt dann als Fehltreffer)")
-    sy.add_argument("--workers", type=int, default=8, help="parallele Anfragen (Standard 8, gemessen ohne 429 bis 16)")
+    sy.add_argument(
+        "--accept-model-change",
+        action="store_true",
+        help="Wechsel von Modell, Sprache, Latenz oder Sampling bestätigen (vorhandener Fish-Cache gilt dann als Fehltreffer)",
+    )
+    sy.add_argument(
+        "--workers",
+        type=int,
+        default=8,
+        help="parallele Anfragen (Standard 8, gemessen ohne 429 bis 16)",
+    )
     sy.add_argument("--limit", type=int, help="nur die ersten N Aufträge (0 sendet nichts)")
-    sy.add_argument("--max-utf8-bytes", type=int,
-                    help="höchstens so viele UTF-8-Bytes neu senden, danach abbrechen (Cache zählt nicht)")
+    sy.add_argument(
+        "--max-utf8-bytes",
+        type=int,
+        help="höchstens so viele UTF-8-Bytes neu senden, danach abbrechen (Cache zählt nicht)",
+    )
     _add_selection(sy)
-    en = sub.add_parser("encode", help="WAV -> OGG (Stille trimmen, -16 LUFS, mono) nach out/audio/<Sprache>")
+    en = sub.add_parser(
+        "encode", help="WAV -> OGG (Stille trimmen, -16 LUFS, mono) nach out/audio/<Sprache>"
+    )
     en.add_argument("--workers", type=int, default=4)
     _add_selection(en)
-    ins = sub.add_parser("install", help="Dateien in den Mod-Ordner kopieren und index.json schreiben")
-    _add_selection(ins, "nur Bäume, in denen dieser NPC spricht (frühere Einträge bleiben erhalten)")
-    ins.add_argument("--prune", action="store_true",
-                     help="verwaiste OGG im Zielordner löschen (stehen danach nicht im Index; Standard: aus)")
-    ins.add_argument("--dry-run", action="store_true",
-                     help="nichts kopieren und index.json nicht schreiben; nur zählen und auflisten "
-                          "(würde N kopieren, M Einträge, K verwaist; gilt auch zusammen mit --prune)")
-    rp = sub.add_parser("report", help="Status je Kategorie: offen, erzeugt, kodiert, installiert, übersprungen")
+    ins = sub.add_parser(
+        "install", help="Dateien in den Mod-Ordner kopieren und index.json schreiben"
+    )
+    _add_selection(
+        ins, "nur Bäume, in denen dieser NPC spricht (frühere Einträge bleiben erhalten)"
+    )
+    ins.add_argument(
+        "--prune",
+        action="store_true",
+        help="verwaiste OGG im Zielordner löschen (stehen danach nicht im Index; Standard: aus)",
+    )
+    ins.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="nichts kopieren und index.json nicht schreiben; nur zählen und auflisten "
+        "(würde N kopieren, M Einträge, K verwaist; gilt auch zusammen mit --prune)",
+    )
+    rp = sub.add_parser(
+        "report", help="Status je Kategorie: offen, erzeugt, kodiert, installiert, übersprungen"
+    )
     _add_selection(rp)
-    rp.add_argument("--by-speaker", action="store_true", help="Status je Sprecher statt je Kategorie")
-    pv = sub.add_parser("preview", help="Hörseite out/preview/index.html (Zeilen mit Emotion und Audio)")
+    rp.add_argument(
+        "--by-speaker", action="store_true", help="Status je Sprecher statt je Kategorie"
+    )
+    pv = sub.add_parser(
+        "preview", help="Hörseite out/preview/index.html (Zeilen mit Emotion und Audio)"
+    )
     _add_selection(pv)
     bt = sub.add_parser("batches", help="Etappen für den Vollauf planen (data/batches.json)")
-    bt.add_argument("--max-chars", type=int, default=DEFAULT_BATCH_CHARS, help="Zeichen je Etappe (Standard 100000)")
-    pr = sub.add_parser("profile", help="Steckbriefe der Sprecher (casting/profiles.jsonl): Pakete für Subagents, Import, Anzeige")
-    pr.add_argument("--prepare", action="store_true", help="Pakete für Subagents nach out/subagent/profile schreiben")
+    bt.add_argument(
+        "--max-chars",
+        type=int,
+        default=DEFAULT_BATCH_CHARS,
+        help="Zeichen je Etappe (Standard 100000)",
+    )
+    pr = sub.add_parser(
+        "profile",
+        help="Steckbriefe der Sprecher (casting/profiles.jsonl): Pakete für Subagents, Import, Anzeige",
+    )
+    pr.add_argument(
+        "--prepare",
+        action="store_true",
+        help="Pakete für Subagents nach out/subagent/profile schreiben",
+    )
     pr.add_argument("--size", type=int, default=20, help="Sprecher je Paket (Standard 20)")
-    pr.add_argument("--all", action="store_true", help="auch Sprecher mit Steckbrief in die Pakete aufnehmen")
-    pr.add_argument("--import", dest="import_files", nargs="+", type=Path, metavar="DATEI", help="JSONL-Ergebnisse der Subagents einlesen")
-    pr.add_argument("--set", metavar="NAME", help="Steckbrief von Hand setzen (braucht --gender und --age)")
+    pr.add_argument(
+        "--all", action="store_true", help="auch Sprecher mit Steckbrief in die Pakete aufnehmen"
+    )
+    pr.add_argument(
+        "--import",
+        dest="import_files",
+        nargs="+",
+        type=Path,
+        metavar="DATEI",
+        help="JSONL-Ergebnisse der Subagents einlesen",
+    )
+    pr.add_argument(
+        "--set", metavar="NAME", help="Steckbrief von Hand setzen (braucht --gender und --age)"
+    )
     pr.add_argument("--gender", choices=["m", "f"])
     pr.add_argument("--age", choices=["kind", "jung", "mittel", "alt"])
     pr.add_argument("--type", choices=["riese", "zwerg", "schurke"])

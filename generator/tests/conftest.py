@@ -4,6 +4,7 @@ Aufrufe, die einen Worker starten oder mit ihm sprechen, laufen über das Fixtur
 Kommt keine Antwort innerhalb GUARD_TIMEOUT, werden alle in diesem Test gestarteten Worker getötet und der Test scheitert.
 Am Ende jedes Tests werden Reste getötet und ihre Pipes geschlossen.
 """
+
 import subprocess
 import threading
 
@@ -71,8 +72,8 @@ def guarded(workers):
 
 
 # --- Fixture für die Pipeline-Schritte (Plan 3) --------------------------------------------------------------
-import json  # noqa: E402
-from types import SimpleNamespace  # noqa: E402
+import json
+from types import SimpleNamespace
 
 _LOC_TEXT = (
     "Plh_1 { *seufzt* Der Weg nach Norden ist weit. }\n"
@@ -86,8 +87,19 @@ _LOC_TEXT = (
 def _manifest_line(key, node_id, actor, category, node_type="statement", choice_index=None):
     tree, path = "DT_Test_NPC_Mira", "Dialog/NPC_Mira"
     line_id = f"{tree}|{path}|{key}" + (f"|c{choice_index}" if choice_index is not None else "")
-    row = {"id": line_id, "tree": tree, "nodeId": node_id, "nodeType": node_type, "actorName": actor,
-           "category": category, "generic": False, "locaPath": path, "locaKey": key, "text": "x", "gvars": []}
+    row = {
+        "id": line_id,
+        "tree": tree,
+        "nodeId": node_id,
+        "nodeType": node_type,
+        "actorName": actor,
+        "category": category,
+        "generic": False,
+        "locaPath": path,
+        "locaKey": key,
+        "text": "x",
+        "gvars": [],
+    }
     if choice_index is not None:
         row["choiceIndex"] = choice_index
     return row
@@ -105,24 +117,43 @@ def pipeline_repo(tmp_path):
     (loc / "NPC_Mira_de.loc").write_text(_LOC_TEXT, encoding="utf-8")
     export = repo / "data" / "export" / "de"
     export.mkdir(parents=True)
-    manifest = {"version": 1, "language": "de", "lines": [
-        _manifest_line("Plh_1", 1, "Mira", "dialog"),
-        _manifest_line("Plh_2", 2, "Mira", "dialog"),
-        _manifest_line("Plh_3", 3, "Player", "player"),                  # Spieler-Aussage: wird gesprochen (default_player)
-        _manifest_line("Plh_4", 4, "Mira", "dialog"),
-        _manifest_line("Plh_5", 5, "Mira", "dialog"),
-        _manifest_line("Plh_6", 6, "Player", "player", "choice", 0),     # Auswahloption: wird übersprungen (player_choice)
-    ]}
-    (export / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+    manifest = {
+        "version": 1,
+        "language": "de",
+        "lines": [
+            _manifest_line("Plh_1", 1, "Mira", "dialog"),
+            _manifest_line("Plh_2", 2, "Mira", "dialog"),
+            _manifest_line(
+                "Plh_3", 3, "Player", "player"
+            ),  # Spieler-Aussage: wird gesprochen (default_player)
+            _manifest_line("Plh_4", 4, "Mira", "dialog"),
+            _manifest_line("Plh_5", 5, "Mira", "dialog"),
+            _manifest_line(
+                "Plh_6", 6, "Player", "player", "choice", 0
+            ),  # Auswahloption: wird übersprungen (player_choice)
+        ],
+    }
+    (export / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False), encoding="utf-8"
+    )
     casting = repo / "casting"
     casting.mkdir()
     (casting / "fish_voices.yaml").write_text(
         "voices:\n"
-        "  lena: {id: \"3937b44b604249f18b94913daef94043\", label: Lena, gender: f}\n"
-        "  leon: {id: \"7b7c88bf825a4ab3bca27d55c26ddf16\", label: Leon, gender: m}\n", encoding="utf-8")
+        '  lena: {id: "3937b44b604249f18b94913daef94043", label: Lena, gender: f}\n'
+        '  leon: {id: "7b7c88bf825a4ab3bca27d55c26ddf16", label: Leon, gender: m}\n',
+        encoding="utf-8",
+    )
     (casting / "casting.yaml").write_text(
-        "default_player: leon\nspeakers:\n  mira: {voice: lena}\n", encoding="utf-8")
+        "default_player: leon\nspeakers:\n  mira: {voice: lena}\n", encoding="utf-8"
+    )
     cfg = gen / "config.yaml"
     cfg.write_text(f"game_dir: '{game.as_posix()}'\nlanguage: de\n", encoding="utf-8")
-    return SimpleNamespace(repo=repo, game=game, cfg=cfg, data=repo / "data", casting=casting,
-                           install_dir=game / "Mods" / "DrovaVoice" / "Audio" / "de")
+    return SimpleNamespace(
+        repo=repo,
+        game=game,
+        cfg=cfg,
+        data=repo / "data",
+        casting=casting,
+        install_dir=game / "Mods" / "DrovaVoice" / "Audio" / "de",
+    )

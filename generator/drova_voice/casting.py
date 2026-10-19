@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Mapping, Sequence
 
 import yaml
 
@@ -11,14 +11,18 @@ from drova_voice.jsonl import replace_with_retry
 from drova_voice.lines import Line
 from drova_voice.pools import load_pools
 
-AUTO_HEADER = ("# ERZEUGT von `drova-voice cast --propose`. Nicht von Hand ändern: Korrekturen gehören in\n"
-               "# casting/casting.yaml (gewinnt bei Überschneidung).\n")
+AUTO_HEADER = (
+    "# ERZEUGT von `drova-voice cast --propose`. Nicht von Hand ändern: Korrekturen gehören in\n"
+    "# casting/casting.yaml (gewinnt bei Überschneidung).\n"
+)
 
 
 @dataclass(frozen=True)
 class Casting:
     default_player: str
-    speakers: dict[str, str]  # Sprechername (klein) -> Stimmen- oder Variantenschlüssel aus fish_voices.yaml
+    speakers: dict[
+        str, str
+    ]  # Sprechername (klein) -> Stimmen- oder Variantenschlüssel aus fish_voices.yaml
     auto: frozenset[str] = frozenset()  # Sprecher, die nur aus casting_auto.yaml stammen
     pools: Mapping[str, str] = field(default_factory=dict)  # Poolstimme (vm1 …) -> Stimmenschlüssel
 
@@ -48,28 +52,42 @@ def _speakers_from(path: Path, raw: dict, voices: Mapping[str, object]) -> dict[
     for name, spec in (raw.get("speakers") or {}).items():
         key = str(name).lower()
         if not isinstance(spec, dict):
-            raise ValueError(f"{path}: Sprecher '{name}' muss als '{name}: {{voice: <Stimme>}}' angegeben werden")
+            raise ValueError(
+                f"{path}: Sprecher '{name}' muss als '{name}: {{voice: <Stimme>}}' angegeben werden"
+            )
         voice = str(spec.get("voice", "")).lower()
         if key in speakers:
-            raise ValueError(f"{path}: Sprecher '{name}' ist doppelt (Groß-/Kleinschreibung zählt nicht)")
+            raise ValueError(
+                f"{path}: Sprecher '{name}' ist doppelt (Groß-/Kleinschreibung zählt nicht)"
+            )
         if voice not in voices:
-            raise ValueError(f"{path}: Unbekannte Stimme '{voice}' für Sprecher '{name}' (Schlüssel aus casting/fish_voices.yaml)")
+            raise ValueError(
+                f"{path}: Unbekannte Stimme '{voice}' für Sprecher '{name}' (Schlüssel aus casting/fish_voices.yaml)"
+            )
         speakers[key] = voice
     return speakers
 
 
-def load_casting(path: Path, voices: Mapping[str, object], auto_path: Path | None = None,
-                 pools_path: Path | None = None) -> Casting:
+def load_casting(
+    path: Path,
+    voices: Mapping[str, object],
+    auto_path: Path | None = None,
+    pools_path: Path | None = None,
+) -> Casting:
     raw = _read_yaml(path)
     default_player = str(raw.get("default_player") or "").lower()
     if default_player not in voices:
-        raise ValueError(f"{path}: default_player '{default_player}' fehlt oder steht nicht in fish_voices.yaml")
+        raise ValueError(
+            f"{path}: default_player '{default_player}' fehlt oder steht nicht in fish_voices.yaml"
+        )
     manual = _speakers_from(path, raw, voices)
     auto: dict[str, str] = {}
     if auto_path is not None and Path(auto_path).is_file():
         auto = _speakers_from(auto_path, _read_yaml(auto_path), voices)
     pools = load_pools(pools_path, voices) if pools_path is not None else {}
-    return Casting(default_player, {**auto, **manual}, frozenset(n for n in auto if n not in manual), pools)
+    return Casting(
+        default_player, {**auto, **manual}, frozenset(n for n in auto if n not in manual), pools
+    )
 
 
 def write_auto_casting(path: Path, assignments: Mapping[str, str]) -> None:
@@ -77,8 +95,14 @@ def write_auto_casting(path: Path, assignments: Mapping[str, str]) -> None:
 
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    body = AUTO_HEADER + "speakers:\n" + "".join(
-        f"  {json.dumps(name, ensure_ascii=False)}: {{voice: {assignments[name]}}}\n" for name in sorted(assignments))
+    body = (
+        AUTO_HEADER
+        + "speakers:\n"
+        + "".join(
+            f"  {json.dumps(name, ensure_ascii=False)}: {{voice: {assignments[name]}}}\n"
+            for name in sorted(assignments)
+        )
+    )
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(body, encoding="utf-8", newline="\n")
     replace_with_retry(tmp, path)

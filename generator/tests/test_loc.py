@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from drova_voice.loc import loc_rel_path, parse_loc, read_loc_file
 
 
@@ -14,7 +12,9 @@ def test_single_line_entries_with_blank_lines():
 
 def test_crlf_and_bom(tmp_path):
     f = tmp_path / "NPC_X_de.loc"
-    f.write_bytes("\ufeffTst_1 { Äußerst Kappa Lambda. }\r\n\r\nTst_2 { Noch Iota? }\r\n".encode("utf-8"))
+    f.write_bytes(
+        "\ufeffTst_1 { Äußerst Kappa Lambda. }\r\n\r\nTst_2 { Noch Iota? }\r\n".encode("utf-8")
+    )
     res = read_loc_file(f)
     assert [(e.key, e.text) for e in res.entries] == [
         ("Tst_1", "Äußerst Kappa Lambda."),
@@ -76,7 +76,9 @@ def test_unterminated_entry_does_not_swallow_next_entry():
 
 
 def test_key_on_own_line_with_brace_on_next_line():
-    content = "Kopf Titel Gamma \n{\nEin Block Delta.\nZweite Zeile Epsilon.\n}\n\nTst_2 { Kurz Zeta. }\n"
+    content = (
+        "Kopf Titel Gamma \n{\nEin Block Delta.\nZweite Zeile Epsilon.\n}\n\nTst_2 { Kurz Zeta. }\n"
+    )
     res = parse_loc(content)
     assert res.errors == ()
     assert [(e.key, e.text, e.line) for e in res.entries] == [

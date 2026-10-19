@@ -5,8 +5,10 @@ import pytest
 
 from drova_voice.cli import main
 
-needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
-                                  reason="ffmpeg/ffprobe nicht installiert")
+needs_ffmpeg = pytest.mark.skipif(
+    shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
+    reason="ffmpeg/ffprobe nicht installiert",
+)
 
 
 @needs_ffmpeg
@@ -18,8 +20,11 @@ def test_install_after_encode(pipeline_repo, guarded, capsys):
     capsys.readouterr()
     assert main(base + ["install", "--npc", "Mira"]) == 0
     index = json.loads((pipeline_repo.install_dir / "index.json").read_text(encoding="utf-8"))
-    assert sorted(index["entries"]) == ["DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_1", "DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_2",
-                                        "DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_3"]
+    assert sorted(index["entries"]) == [
+        "DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_1",
+        "DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_2",
+        "DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_3",
+    ]
     assert len(list(pipeline_repo.install_dir.rglob("*.ogg"))) == 3
     assert "3 Einträge" in capsys.readouterr().out
 
@@ -34,7 +39,9 @@ def test_install_prune_and_dry_run_flags(pipeline_repo, capsys):
     synth.parent.mkdir(parents=True)
     synth.write_text(json.dumps({"id": line_id, "key": key, "ok": True}) + "\n", encoding="utf-8")
     (pipeline_repo.data / "encoded.jsonl").write_text(
-        json.dumps({"id": line_id, "rel": rel, "duration": 1.25, "key": key}) + "\n", encoding="utf-8")
+        json.dumps({"id": line_id, "rel": rel, "duration": 1.25, "key": key}) + "\n",
+        encoding="utf-8",
+    )
     audio = pipeline_repo.repo / "out" / "audio" / "de" / "dialog"
     audio.mkdir(parents=True)
     (audio / "keep.ogg").write_bytes(b"OggS-keep")
@@ -52,7 +59,8 @@ def test_install_prune_and_dry_run_flags(pipeline_repo, capsys):
     assert (target / "dialog" / "old.ogg").is_file()
     installed = {
         path.relative_to(target).as_posix(): path.read_bytes()
-        for path in target.rglob("*") if path.is_file()
+        for path in target.rglob("*")
+        if path.is_file()
     }
 
     assert main(base + ["install", "--dry-run"]) == 0
@@ -66,7 +74,8 @@ def test_install_prune_and_dry_run_flags(pipeline_repo, capsys):
     assert "würde 0 kopieren, 1 Einträge, 1 verwaist" in both and "gelöscht:" not in both
     assert {
         path.relative_to(target).as_posix(): path.read_bytes()
-        for path in target.rglob("*") if path.is_file()
+        for path in target.rglob("*")
+        if path.is_file()
     } == installed
 
     assert main(base + ["install", "--prune"]) == 0
@@ -91,7 +100,11 @@ def test_install_drops_entries_of_speakers_that_lost_their_voice(pipeline_repo, 
     guarded(lambda: main(base + ["synth", "--engine", "fake"]))
     guarded(lambda: main(base + ["encode"]))
     assert main(base + ["install"]) == 0
-    (pipeline_repo.casting / "casting.yaml").write_text("default_player: leon\nspeakers: {}\n", encoding="utf-8")
+    (pipeline_repo.casting / "casting.yaml").write_text(
+        "default_player: leon\nspeakers: {}\n", encoding="utf-8"
+    )
     assert main(base + ["install"]) == 0
     index = json.loads((pipeline_repo.install_dir / "index.json").read_text(encoding="utf-8"))
-    assert sorted(index["entries"]) == ["DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_3"]  # nur noch die Spielerzeile
+    assert sorted(index["entries"]) == [
+        "DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_3"
+    ]  # nur noch die Spielerzeile

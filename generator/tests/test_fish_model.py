@@ -1,14 +1,33 @@
 from datetime import date
 
-from drova_voice.fish_model import (DEFAULT_FISH_MODEL, HISTORICAL_CACHE_MODEL, free_tier_warning, guard_fish_model,
-                                    resolve_fish_profile, write_model_stamp)
+from drova_voice.fish_model import (
+    DEFAULT_FISH_MODEL,
+    HISTORICAL_CACHE_MODEL,
+    free_tier_warning,
+    guard_fish_model,
+    resolve_fish_profile,
+    write_model_stamp,
+)
 
 
 def _profile(**kw):
-    base = dict(language="de", model=None, latency=None, temperature=None, top_p=None, env={})
+    base = {
+        "language": "de",
+        "model": None,
+        "latency": None,
+        "temperature": None,
+        "top_p": None,
+        "env": {},
+    }
     base.update(kw)
-    return resolve_fish_profile(base.pop("language"), base.pop("model"), base.pop("latency"),
-                                base.pop("temperature"), base.pop("top_p"), base.pop("env"))
+    return resolve_fish_profile(
+        base.pop("language"),
+        base.pop("model"),
+        base.pop("latency"),
+        base.pop("temperature"),
+        base.pop("top_p"),
+        base.pop("env"),
+    )
 
 
 def test_defaults_and_env_override():
@@ -60,9 +79,13 @@ def test_existing_cache_without_a_stamp_blocks_a_changed_profile_until_accepted(
 
 def test_default_profile_keeps_the_historical_cache_key():
     from drova_voice.synth import make_key
+
     old = make_key("fish", HISTORICAL_CACHE_MODEL, "voice-1", "Ein kurzer Satz.", {})
     profile = _profile()
-    assert make_key("fish", profile.cache_model(), "voice-1", "Ein kurzer Satz.", {**profile.params()}) == old
+    assert (
+        make_key("fish", profile.cache_model(), "voice-1", "Ein kurzer Satz.", {**profile.params()})
+        == old
+    )
 
 
 def test_sampling_change_is_its_own_cache_change(tmp_path):

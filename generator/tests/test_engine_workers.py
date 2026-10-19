@@ -1,4 +1,5 @@
 """Die echten Engine-Worker laufen in fremden venvs mit torch – hier prüfen wir nur, was ohne torch geht."""
+
 from __future__ import annotations
 
 import ast
@@ -10,7 +11,11 @@ from pathlib import Path
 import pytest
 
 WORKERS = Path(__file__).resolve().parents[1] / "workers"
-ENGINES = {"kitten": "KittenML/kitten-tts-2", "chatterbox": "ResembleAI/chatterbox-multilingual", "xtts": "tts_models/multilingual/multi-dataset/xtts_v2"}
+ENGINES = {
+    "kitten": "KittenML/kitten-tts-2",
+    "chatterbox": "ResembleAI/chatterbox-multilingual",
+    "xtts": "tts_models/multilingual/multi-dataset/xtts_v2",
+}
 # Alles, was ein Worker VOR serve() importieren darf (Ledger Task 9: schwere Imports gehören in load()/synth()).
 ALLOWED_TOP_LEVEL = {"__future__", "os", "sys", "pathlib", "worker_loop"}
 
@@ -38,7 +43,9 @@ def test_worker_imports_nothing_heavy_before_serve(engine):
             imported |= {a.name.split(".")[0] for a in node.names}
         elif isinstance(node, ast.ImportFrom):
             imported.add((node.module or "").split(".")[0])
-    assert imported <= ALLOWED_TOP_LEVEL, f"{engine}: schwere Imports auf Modulebene: {imported - ALLOWED_TOP_LEVEL}"
+    assert imported <= ALLOWED_TOP_LEVEL, (
+        f"{engine}: schwere Imports auf Modulebene: {imported - ALLOWED_TOP_LEVEL}"
+    )
 
 
 @pytest.mark.parametrize("engine,model", ENGINES.items())
@@ -76,14 +83,19 @@ def test_kitten_synth_uses_voice_without_reference_and_reference_with_it(monkeyp
             return [0.0] * 24000
 
     module = _load_module("kitten")
-    rate, seconds = module.synth(FakeModel(), {"text": "Hallo", "out_path": "a.wav", "voice": "Bruno"})
+    rate, seconds = module.synth(
+        FakeModel(), {"text": "Hallo", "out_path": "a.wav", "voice": "Bruno"}
+    )
     assert (rate, seconds) == (24000, 1.0)
     assert calls[-1] == ("Hallo", {"normalize": False, "voice": "Bruno"})
     ref = tmp_path / "ref.wav"
     ref.write_bytes(b"x")
     ref.with_suffix(".txt").write_text("Ich bleibe.", encoding="utf-8")
     module.synth(FakeModel(), {"text": "Hallo", "out_path": "b.wav", "reference": str(ref)})
-    assert calls[-1] == ("Hallo", {"normalize": False, "reference": str(ref), "reference_text": "Ich bleibe."})
+    assert calls[-1] == (
+        "Hallo",
+        {"normalize": False, "reference": str(ref), "reference_text": "Ich bleibe."},
+    )
     assert [w[0] for w in fake_sf.written] == ["a.wav", "b.wav"]
 
 
@@ -101,25 +113,41 @@ def _kitten_with_fake_model(monkeypatch):
     return _load_module("kitten"), FakeModel(), calls
 
 
-def test_kitten_clone_passes_the_known_transcript_instead_of_letting_whisper_guess(monkeypatch, tmp_path):
+def test_kitten_clone_passes_the_known_transcript_instead_of_letting_whisper_guess(
+    monkeypatch, tmp_path
+):
     module, model, calls = _kitten_with_fake_model(monkeypatch)
     (tmp_path / "ref.wav").write_bytes(b"x")
     (tmp_path / "ref.txt").write_text("Ich bleibe.", encoding="utf-8")
-    module.synth(model, {"text": "Hallo", "out_path": "a.wav", "reference": str(tmp_path / "ref.wav")})
+    module.synth(
+        model, {"text": "Hallo", "out_path": "a.wav", "reference": str(tmp_path / "ref.wav")}
+    )
     assert calls[-1]["reference_text"] == "Ich bleibe."
 
 
-def test_kitten_clone_without_transcript_fails_instead_of_downloading_whisper(monkeypatch, tmp_path):
+def test_kitten_clone_without_transcript_fails_instead_of_downloading_whisper(
+    monkeypatch, tmp_path
+):
     module, model, calls = _kitten_with_fake_model(monkeypatch)
     (tmp_path / "ref.wav").write_bytes(b"x")
     with pytest.raises(ValueError, match="Whisper"):
-        module.synth(model, {"text": "Hallo", "out_path": "a.wav", "reference": str(tmp_path / "ref.wav")})
+        module.synth(
+            model, {"text": "Hallo", "out_path": "a.wav", "reference": str(tmp_path / "ref.wav")}
+        )
     assert not calls
 
 
 def test_kitten_passes_the_preset_from_params(monkeypatch):
     module, model, calls = _kitten_with_fake_model(monkeypatch)
-    module.synth(model, {"text": "Hallo", "out_path": "a.wav", "voice": "Bruno", "params": {"preset": "expressive"}})
+    module.synth(
+        model,
+        {
+            "text": "Hallo",
+            "out_path": "a.wav",
+            "voice": "Bruno",
+            "params": {"preset": "expressive"},
+        },
+    )
     assert calls[-1]["preset"] == "expressive"
     module.synth(model, {"text": "Hallo", "out_path": "b.wav", "voice": "Bruno"})
     assert "preset" not in calls[-1]

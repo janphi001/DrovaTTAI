@@ -4,9 +4,9 @@ import json
 import math
 import shutil
 import subprocess
+from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Mapping, Sequence
 
 from drova_voice.emotions import EmotionTag
 from drova_voice.ids import audio_filename
@@ -36,8 +36,10 @@ def rel_audio_path(line: Line) -> str:
 
 def variant_filter(v) -> str:
     """Rezept aus casting/fish_voices.yaml: formant (Vokaltrakt) über die Abtastrate, pitch/tempo über rubberband."""
-    return (f"aresample={VARIANT_RATE},asetrate={round(VARIANT_RATE * v.formant)},aresample={VARIANT_RATE},"
-            f"rubberband=pitch={v.pitch / v.formant:g}:tempo={v.tempo / v.formant:g}:formant=preserved")
+    return (
+        f"aresample={VARIANT_RATE},asetrate={round(VARIANT_RATE * v.formant)},aresample={VARIANT_RATE},"
+        f"rubberband=pitch={v.pitch / v.formant:g}:tempo={v.tempo / v.formant:g}:formant=preserved"
+    )
 
 
 def _front(variant=None) -> list[str]:
@@ -52,19 +54,29 @@ def build_filter(notes: Sequence[str], variant=None) -> str:
     # (aresample vor UND nach loudnorm: mit ffmpeg 7.0 bricht jede andere Stellung des Filters ab.)
     # Kurze Clips bleiben ungefüllt: Stille auf 3 s aufzufüllen zieht die gemessene Lautheit nach unten,
     # nach dem Zurückschneiden liegt die Zeile über dem Ziel. ffmpeg 6 misst unter 3 s bereits linear.
-    parts = _front(variant) + [f"aresample={SAMPLE_RATE}", f"{LOUDNORM}:linear=true", f"aresample={SAMPLE_RATE}"]
-    if "whisper" in notes:  # *flüstert*: leiser (das "gehauchte" kommt später, falls der Hörtest es verlangt)
+    parts = _front(variant) + [
+        f"aresample={SAMPLE_RATE}",
+        f"{LOUDNORM}:linear=true",
+        f"aresample={SAMPLE_RATE}",
+    ]
+    if (
+        "whisper" in notes
+    ):  # *flüstert*: leiser (das "gehauchte" kommt später, falls der Hörtest es verlangt)
         parts.append(f"volume={WHISPER_GAIN_DB}dB")
     return ",".join(parts)
 
 
 def _linear_loudnorm(measured: Mapping[str, str]) -> str:
-    return (f"{LOUDNORM}:measured_I={measured['input_i']}:measured_TP={measured['input_tp']}"
-            f":measured_LRA={measured['input_lra']}:measured_thresh={measured['input_thresh']}"
-            f":offset={measured['target_offset']}:linear=true")
+    return (
+        f"{LOUDNORM}:measured_I={measured['input_i']}:measured_TP={measured['input_tp']}"
+        f":measured_LRA={measured['input_lra']}:measured_thresh={measured['input_thresh']}"
+        f":offset={measured['target_offset']}:linear=true"
+    )
 
 
-def encode_filter(notes: Sequence[str], variant=None, measured: Mapping[str, str] | None = None) -> str:
+def encode_filter(
+    notes: Sequence[str], variant=None, measured: Mapping[str, str] | None = None
+) -> str:
     loud = _linear_loudnorm(measured) if measured else LOUDNORM
     parts = _front(variant) + [f"aresample={SAMPLE_RATE}", loud, f"aresample={SAMPLE_RATE}"]
     if "whisper" in notes:
@@ -76,32 +88,71 @@ def _measure_filter(variant=None) -> str:
     return ",".join(_front(variant) + [f"aresample={SAMPLE_RATE}", f"{LOUDNORM}:print_format=json"])
 
 
-def ffmpeg_command(ffmpeg: str, src: Path, dst: Path, notes: Sequence[str], variant=None,
-                   audio_filter: str | None = None) -> list[str]:
-    return [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
-            "-af", build_filter(notes, variant) if audio_filter is None else audio_filter,
-            "-ac", "1", "-c:a", "libvorbis", "-q:a", "4", str(dst)]
+def ffmpeg_command(
+    ffmpeg: str,
+    src: Path,
+    dst: Path,
+    notes: Sequence[str],
+    variant=None,
+    audio_filter: str | None = None,
+) -> list[str]:
+    return [
+        ffmpeg,
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        str(src),
+        "-af",
+        build_filter(notes, variant) if audio_filter is None else audio_filter,
+        "-ac",
+        "1",
+        "-c:a",
+        "libvorbis",
+        "-q:a",
+        "4",
+        str(dst),
+    ]
 
 
 def find_tools() -> tuple[str, str]:
     ffmpeg, ffprobe = shutil.which("ffmpeg"), shutil.which("ffprobe")
     if not ffmpeg or not ffprobe:
         raise ValueError("ffmpeg/ffprobe nicht gefunden (müssen im PATH liegen)")
-    encoders = subprocess.run([ffmpeg, "-hide_banner", "-encoders"], capture_output=True, text=True, errors="replace")
+    encoders = subprocess.run(
+        [ffmpeg, "-hide_banner", "-encoders"],
+        capture_output=True,
+        text=True,
+        errors="replace",
+        check=False,
+    )
     if "libvorbis" not in encoders.stdout:
         raise ValueError("Dieses ffmpeg kann kein OGG Vorbis (Encoder libvorbis fehlt)")
     return ffmpeg, ffprobe
 
 
 def require_rubberband(ffmpeg: str) -> None:
-    out = subprocess.run([ffmpeg, "-hide_banner", "-filters"], capture_output=True, text=True, errors="replace")
+    out = subprocess.run(
+        [ffmpeg, "-hide_banner", "-filters"],
+        capture_output=True,
+        text=True,
+        errors="replace",
+        check=False,
+    )
     if " rubberband " not in out.stdout:
-        raise ValueError("Dieses ffmpeg hat den Filter 'rubberband' nicht; er wird für Stimmenvarianten gebraucht")
+        raise ValueError(
+            "Dieses ffmpeg hat den Filter 'rubberband' nicht; er wird für Stimmenvarianten gebraucht"
+        )
 
 
 def probe_duration(ffprobe: str, path: Path) -> float:
-    out = subprocess.run([ffprobe, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
-                         capture_output=True, text=True, check=True)
+    out = subprocess.run(
+        [ffprobe, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
     return float(out.stdout.strip())
 
 
@@ -129,14 +180,30 @@ def _parse_loudnorm(stderr: str) -> dict[str, str] | None:
     if start < 0 or end < start:
         return None
     try:
-        return _usable_measured(json.loads(stderr[start:end + 1]))
+        return _usable_measured(json.loads(stderr[start : end + 1]))
     except json.JSONDecodeError:
         return None
 
 
 def _measure_loudnorm(ffmpeg: str, wav: Path, variant=None) -> dict[str, str] | None:
-    proc = subprocess.run([ffmpeg, "-hide_banner", "-nostats", "-i", str(wav), "-af", _measure_filter(variant),
-                           "-f", "null", "-"], capture_output=True, text=True, errors="replace")
+    proc = subprocess.run(
+        [
+            ffmpeg,
+            "-hide_banner",
+            "-nostats",
+            "-i",
+            str(wav),
+            "-af",
+            _measure_filter(variant),
+            "-f",
+            "null",
+            "-",
+        ],
+        capture_output=True,
+        text=True,
+        errors="replace",
+        check=False,
+    )
     if proc.returncode != 0:
         raise RuntimeError(f"ffmpeg Exit-Code {proc.returncode}: {proc.stderr.strip()[:200]}")
     return _parse_loudnorm(proc.stderr)
@@ -160,19 +227,32 @@ def _load_stamp(text: str) -> tuple[str, str, float] | None:
     return key, recipe, float(duration)
 
 
-def _write_stamp(path: Path, key: str, recipe: str, duration: float, measured: Mapping[str, str] | None) -> None:
+def _write_stamp(
+    path: Path, key: str, recipe: str, duration: float, measured: Mapping[str, str] | None
+) -> None:
     payload: dict[str, object] = {"duration": duration, "filter": recipe, "key": key}
     if measured:
         payload["loudnorm"] = dict(measured)
-    path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
-def _run_ffmpeg(ffmpeg: str, wav: Path, part: Path, notes: Sequence[str], variant, measured) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(ffmpeg_command(ffmpeg, wav, part, notes, variant, encode_filter(notes, variant, measured)),
-                          capture_output=True, text=True, errors="replace")
+def _run_ffmpeg(
+    ffmpeg: str, wav: Path, part: Path, notes: Sequence[str], variant, measured
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ffmpeg_command(ffmpeg, wav, part, notes, variant, encode_filter(notes, variant, measured)),
+        capture_output=True,
+        text=True,
+        errors="replace",
+        check=False,
+    )
 
 
-def encode_one(ffmpeg: str, ffprobe: str, wav: Path, dst: Path, notes: Sequence[str], key: str, variant=None) -> float:
+def encode_one(
+    ffmpeg: str, ffprobe: str, wav: Path, dst: Path, notes: Sequence[str], key: str, variant=None
+) -> float:
     dst = Path(dst)
     stamp_file = dst.with_suffix(".stamp")
     recipe = build_filter(notes, variant)
@@ -204,12 +284,22 @@ def encode_one(ffmpeg: str, ffprobe: str, wav: Path, dst: Path, notes: Sequence[
     return duration
 
 
-def run_encode(lines: Sequence[Line], synth_rows: Mapping[str, dict], emotions: Mapping[str, EmotionTag],
-               audio_dir: Path, workers: int = 4, variants: Mapping[str, object] | None = None) -> tuple[list[dict], list[str]]:
+def run_encode(
+    lines: Sequence[Line],
+    synth_rows: Mapping[str, dict],
+    emotions: Mapping[str, EmotionTag],
+    audio_dir: Path,
+    workers: int = 4,
+    variants: Mapping[str, object] | None = None,
+) -> tuple[list[dict], list[str]]:
     ffmpeg, ffprobe = find_tools()
     if variants:
         require_rubberband(ffmpeg)
-    todo = [(l, synth_rows[l.id]) for l in lines if not l.skip and l.id in synth_rows and synth_rows[l.id].get("ok")]
+    todo = [
+        (l, synth_rows[l.id])
+        for l in lines
+        if not l.skip and l.id in synth_rows and synth_rows[l.id].get("ok")
+    ]
 
     def work(item):
         line, row = item
@@ -220,7 +310,15 @@ def run_encode(lines: Sequence[Line], synth_rows: Mapping[str, dict], emotions: 
         notes = emotions[tag].notes if tag in emotions else []
         rel = rel_audio_path(line)
         try:
-            duration = encode_one(ffmpeg, ffprobe, wav, Path(audio_dir) / rel, notes, row["key"], (variants or {}).get(line.id))
+            duration = encode_one(
+                ffmpeg,
+                ffprobe,
+                wav,
+                Path(audio_dir) / rel,
+                notes,
+                row["key"],
+                (variants or {}).get(line.id),
+            )
         except (RuntimeError, OSError, ValueError, subprocess.CalledProcessError) as e:
             return None, f"{line.id}: {e}"
         return {"id": line.id, "rel": rel, "duration": round(duration, 3), "key": row["key"]}, None
