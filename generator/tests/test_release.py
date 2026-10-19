@@ -95,7 +95,9 @@ def test_missing_audio_file_stops_the_package(tmp_path):
     assert not (tmp_path / "dist" / "DrovaVoice-1.2.3-de.zip").exists()
 
 
-@pytest.mark.parametrize("rel", ["../draussen.ogg", "/abs.ogg", "C:/win.ogg", "dialog\\a.ogg", None])
+@pytest.mark.parametrize(
+    "rel", ["../draussen.ogg", "/abs.ogg", "C:/win.ogg", "dialog\\a.ogg", None]
+)
 def test_unsafe_index_paths_are_rejected(tmp_path, rel):
     _, audio = _game(tmp_path, {"T|P|Plh_1": {"file": rel, "duration": 1.0}})
     with pytest.raises(ValueError, match="ungültiger Pfad"):

@@ -104,7 +104,10 @@ def write_teachers(tmp_path, text):
 
 
 def test_load_teachers_lowercases_and_drops_duplicates(tmp_path):
-    assert load_teachers(write_teachers(tmp_path, "teachers: [Mira, tadhg, mira]\n")) == ["mira", "tadhg"]
+    assert load_teachers(write_teachers(tmp_path, "teachers: [Mira, tadhg, mira]\n")) == [
+        "mira",
+        "tadhg",
+    ]
 
 
 def test_missing_teachers_file_means_no_teachers(tmp_path):
@@ -119,10 +122,14 @@ def test_a_teacher_name_with_a_separator_is_a_clear_error(tmp_path):
 def test_teacher_lines_get_one_variant_per_teacher_next_to_the_pool_variants():
     teach = line("Plh_5", actor="Teacher", category="dialog")
     other = line("Plh_6", actor="NPC", category="dialog")
-    out = expand_teacher_lines(expand_pool_lines([teach, other], {"vw1": "lena"}), [teach, other], ["mira", "tadhg"])
+    out = expand_teacher_lines(
+        expand_pool_lines([teach, other], {"vw1": "lena"}), [teach, other], ["mira", "tadhg"]
+    )
     assert [l.id for l in out] == [
-        "DT_W|Dialog/W|Plh_5#vw1", "DT_W|Dialog/W|Plh_6#vw1",
-        "DT_W|Dialog/W|Plh_5#t_mira", "DT_W|Dialog/W|Plh_5#t_tadhg",
+        "DT_W|Dialog/W|Plh_5#vw1",
+        "DT_W|Dialog/W|Plh_6#vw1",
+        "DT_W|Dialog/W|Plh_5#t_mira",
+        "DT_W|Dialog/W|Plh_5#t_tadhg",
     ]
     assert out[2].pool == "t_mira"
 
@@ -134,10 +141,14 @@ def test_named_and_skipped_teacher_lines_get_no_teacher_variants():
 
 
 def test_teacher_variant_speaks_with_the_teachers_own_voice(tmp_path):
-    (tmp_path / "casting.yaml").write_text("default_player: leon\nspeakers:\n  mira: {voice: lena}\n", encoding="utf-8")
+    (tmp_path / "casting.yaml").write_text(
+        "default_player: leon\nspeakers:\n  mira: {voice: lena}\n", encoding="utf-8"
+    )
     casting = load_casting(tmp_path / "casting.yaml", VOICES)
     teach = line("Plh_5", actor="Teacher", category="dialog")
     mira, ghost = expand_teacher_lines([], [teach], ["mira", "ghost"])
     assert casting.voice_for(mira) == "lena"
-    assert casting.voice_for(ghost) is None   # Lehrer ohne Besetzung: Lücke wie bei jedem unbesetzten Sprecher
+    assert (
+        casting.voice_for(ghost) is None
+    )  # Lehrer ohne Besetzung: Lücke wie bei jedem unbesetzten Sprecher
     assert emotion_id(mira) == "DT_W|Dialog/W|Plh_5"

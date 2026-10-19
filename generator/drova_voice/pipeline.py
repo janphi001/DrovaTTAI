@@ -976,7 +976,8 @@ def add_parsers(sub) -> None:
         "(würde N kopieren, M Einträge, K verwaist; gilt auch zusammen mit --prune)",
     )
     pk = sub.add_parser(
-        "package", help="ZIP für Spieler aus dem Spielordner bauen (Mod, Bibliotheken, Audio, Liesmich)"
+        "package",
+        help="ZIP für Spieler aus dem Spielordner bauen (Mod, Bibliotheken, Audio, Liesmich)",
     )
     pk.add_argument("--out", type=Path, help="Zielordner (Standard: dist/ im Repo)")
     pk.add_argument("--version", help="Version im Dateinamen (Standard: aus MelonInfo der Mod)")
