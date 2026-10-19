@@ -1,7 +1,17 @@
 import json
 import os
 
+import pytest
+
 from drova_voice.install import install_audio, split_variant
+
+
+def _symlink(link, target, directory=False):
+    # Windows legt Symlinks nur mit Entwicklermodus oder Adminrecht an.
+    try:
+        link.symlink_to(target, target_is_directory=directory)
+    except OSError as e:
+        pytest.skip(f"Symlink nicht erlaubt: {e}")
 
 
 def make_audio(audio_dir, rel, content=b"OggS-Test"):
@@ -299,7 +309,7 @@ def test_prune_does_not_follow_an_audio_folder_symlink_out_of_the_game(tmp_path)
     secret = outside / "de" / "secret.ogg"
     secret.write_bytes(b"SECRET")
     audio_root = mods / "Audio"
-    audio_root.symlink_to(outside, target_is_directory=True)
+    _symlink(audio_root, outside, directory=True)
     src = tmp_path / "src"
     src.mkdir()
     result = install_audio([], src, audio_root / "de", "de", prune=True, audio_root=audio_root, game_dir=game)
@@ -317,7 +327,7 @@ def test_prune_does_not_delete_through_a_symlink_to_an_outside_file(tmp_path):
     secret = outside / "secret.ogg"
     secret.write_bytes(b"SECRET")
     link = target / "dialog" / "alias.ogg"
-    link.symlink_to(secret)
+    _symlink(link, secret)
     stray = target / "dialog" / "stray.ogg"
     stray.write_bytes(b"STRAY")
     src = tmp_path / "src"
