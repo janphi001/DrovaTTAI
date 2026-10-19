@@ -26,6 +26,7 @@ class FishVoice:
 @dataclass(frozen=True)
 class FishVariant:
     """Abwandlung einer Basisstimme per ffmpeg (Rezept siehe casting/fish_voices.yaml)."""
+
     key: str
     base: str
     label: str
@@ -40,6 +41,7 @@ class FishVariant:
 @dataclass(frozen=True)
 class Candidate:
     """Eine Stimme oder Variante, wie die Zuteilung sie sieht."""
+
     key: str
     gender: str
     age: str | None
@@ -51,7 +53,9 @@ class Candidate:
 class Catalog:
     voices: dict[str, FishVoice]
     variants: dict[str, FishVariant]
-    fallbacks: dict[str, str]  # Stimmenschlüssel -> Ersatz, wenn die Fish-ID fehlt (synth wechselt nicht von selbst)
+    fallbacks: dict[
+        str, str
+    ]  # Stimmenschlüssel -> Ersatz, wenn die Fish-ID fehlt (synth wechselt nicht von selbst)
 
     def synth_table(self) -> dict[str, FishVoice]:
         """Schlüssel -> Stimme, mit der Fish aufgerufen wird (Varianten nutzen die Basisstimme)."""
@@ -90,12 +94,21 @@ def _voices(raw: dict, path: Path) -> dict[str, FishVoice]:
     for key, v in voices.items():
         vid = str(v.get("id", ""))
         if not _ID_RE.fullmatch(vid):
-            raise ValueError(f"{path}: Stimme '{key}' hat keine gültige ID (32 Hex-Zeichen erwartet)")
+            raise ValueError(
+                f"{path}: Stimme '{key}' hat keine gültige ID (32 Hex-Zeichen erwartet)"
+            )
         if v.get("gender") not in ("m", "f"):
             raise ValueError(f"{path}: Stimme '{key}': gender muss 'm' oder 'f' sein")
         age = _optional(v.get("age"), AGES, "age", key, path)
-        table[str(key).lower()] = FishVoice(str(key).lower(), vid, str(v.get("label", key)), v["gender"],
-                                            str(v.get("region", "de")), age, None)
+        table[str(key).lower()] = FishVoice(
+            str(key).lower(),
+            vid,
+            str(v.get("label", key)),
+            v["gender"],
+            str(v.get("region", "de")),
+            age,
+            None,
+        )
     return table
 
 
@@ -114,16 +127,25 @@ def _variants(raw: dict, voices: dict[str, FishVoice], path: Path) -> dict[str, 
     for key, v in (raw.get("variants") or {}).items():
         name = str(key).lower()
         if name in voices or name in out:
-            raise ValueError(f"{path}: Variante '{key}' ist doppelt (auch Stimmenschlüssel sind belegt)")
+            raise ValueError(
+                f"{path}: Variante '{key}' ist doppelt (auch Stimmenschlüssel sind belegt)"
+            )
         base = str(v.get("base", "")).lower()
         if base not in voices:
             raise ValueError(f"{path}: Variante '{key}': Basis '{base}' steht nicht unter voices")
         if v.get("gender") not in ("m", "f"):
             raise ValueError(f"{path}: Variante '{key}': gender muss 'm' oder 'f' sein")
         out[name] = FishVariant(
-            name, base, str(v.get("label", key)), v["gender"],
-            _optional(v.get("age"), AGES, "age", key, path), _optional(v.get("type"), TYPES, "type", key, path),
-            _positive(v, "pitch", key, path), _positive(v, "formant", key, path), _positive(v, "tempo", key, path))
+            name,
+            base,
+            str(v.get("label", key)),
+            v["gender"],
+            _optional(v.get("age"), AGES, "age", key, path),
+            _optional(v.get("type"), TYPES, "type", key, path),
+            _positive(v, "pitch", key, path),
+            _positive(v, "formant", key, path),
+            _positive(v, "tempo", key, path),
+        )
     return out
 
 
@@ -131,7 +153,9 @@ def load_fish_voices(path: Path) -> dict[str, FishVoice]:
     return _voices(_read(path), Path(path))
 
 
-def _fallbacks(raw: dict, voices: dict[str, FishVoice], variants: dict[str, FishVariant], path: Path) -> dict[str, str]:
+def _fallbacks(
+    raw: dict, voices: dict[str, FishVoice], variants: dict[str, FishVariant], path: Path
+) -> dict[str, str]:
     known = set(voices) | set(variants)
     out: dict[str, str] = {}
     for key, spec in (raw.get("voices") or {}).items():
@@ -147,7 +171,9 @@ def _fallbacks(raw: dict, voices: dict[str, FishVoice], variants: dict[str, Fish
     for key, target in section.items():
         name = str(key).lower()
         if name in out:
-            raise ValueError(f"{path}: Fallback für '{key}' steht doppelt (Feld fallback und Abschnitt fallbacks)")
+            raise ValueError(
+                f"{path}: Fallback für '{key}' steht doppelt (Feld fallback und Abschnitt fallbacks)"
+            )
         if target is None or str(target).strip() == "":
             raise ValueError(f"{path}: Fallback für '{key}' ist leer")
         out[name] = str(target).lower()
@@ -155,7 +181,9 @@ def _fallbacks(raw: dict, voices: dict[str, FishVoice], variants: dict[str, Fish
         if key not in known:
             raise ValueError(f"{path}: Fallback für unbekannte Stimme '{key}'")
         if target not in known:
-            raise ValueError(f"{path}: Fallback '{target}' für '{key}' steht nicht in fish_voices.yaml")
+            raise ValueError(
+                f"{path}: Fallback '{target}' für '{key}' steht nicht in fish_voices.yaml"
+            )
         if target == key:
             raise ValueError(f"{path}: Fallback für '{key}' zeigt auf sich selbst")
     for start in out:
@@ -182,4 +210,6 @@ def resolve_fish_voice(table: dict[str, FishVoice], name_or_id: str) -> FishVoic
         return table[name_or_id.lower()]
     if _ID_RE.fullmatch(name_or_id):
         return FishVoice(name_or_id[:8], name_or_id, name_or_id, "?", "?")
-    raise ValueError(f"Unbekannte Fish-Stimme '{name_or_id}' (Name aus casting/fish_voices.yaml oder 32-stellige ID)")
+    raise ValueError(
+        f"Unbekannte Fish-Stimme '{name_or_id}' (Name aus casting/fish_voices.yaml oder 32-stellige ID)"
+    )

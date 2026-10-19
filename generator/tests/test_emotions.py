@@ -9,12 +9,15 @@ def test_defaults_are_neutral():
     assert (t.emotion, t.intensity, t.events, t.source) == ("neutral", 0.0, [], "default")
 
 
-@pytest.mark.parametrize("kwargs", [
-    {"emotion": "furious"},
-    {"intensity": 1.5},
-    {"events": [Event("cough", 0)]},
-    {"source": "guess"},
-])
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"emotion": "furious"},
+        {"intensity": 1.5},
+        {"events": [Event("cough", 0)]},
+        {"source": "guess"},
+    ],
+)
 def test_validation(kwargs):
     with pytest.raises(ValueError):
         EmotionTag(**kwargs)

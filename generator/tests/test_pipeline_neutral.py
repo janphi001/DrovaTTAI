@@ -6,16 +6,31 @@ import pytest
 from drova_voice.cli import main
 from drova_voice.lines import read_lines
 
-needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
-                                  reason="ffmpeg/ffprobe nicht installiert")
+needs_ffmpeg = pytest.mark.skipif(
+    shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
+    reason="ffmpeg/ffprobe nicht installiert",
+)
 NEUTRAL_ID = "DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_4#neutral"
 
 
 def _use_name_line(pipeline_repo):
-    loc = pipeline_repo.game / "Drova_Data" / "StreamingAssets" / "Localization" / "de" / "Dialog" / "NPC_Mira_de.loc"
+    loc = (
+        pipeline_repo.game
+        / "Drova_Data"
+        / "StreamingAssets"
+        / "Localization"
+        / "de"
+        / "Dialog"
+        / "NPC_Mira_de.loc"
+    )
     text = loc.read_text(encoding="utf-8")
-    loc.write_text(text.replace("Heute sind $GVAR:QuestVars_Beispiel_Config.Preis$ Münzen.", "Hallo $GVAR:EVars_Player.Name$!"),
-                   encoding="utf-8")
+    loc.write_text(
+        text.replace(
+            "Heute sind $GVAR:QuestVars_Beispiel_Config.Preis$ Münzen.",
+            "Hallo $GVAR:EVars_Player.Name$!",
+        ),
+        encoding="utf-8",
+    )
 
 
 def test_extract_gives_the_name_line_a_neutral_id(pipeline_repo):
@@ -29,7 +44,12 @@ def test_extract_gives_the_name_line_a_neutral_id(pipeline_repo):
 def test_neutral_line_is_installed_with_a_variants_block(pipeline_repo, guarded):
     _use_name_line(pipeline_repo)
     base = ["--config", str(pipeline_repo.cfg)]
-    for step in (["extract"], ["synth", "--engine", "fake", "--workers", "2"], ["encode"], ["install"]):
+    for step in (
+        ["extract"],
+        ["synth", "--engine", "fake", "--workers", "2"],
+        ["encode"],
+        ["install"],
+    ):
         assert guarded(lambda s=step: main(base + s)) == 0, step
     index = json.loads((pipeline_repo.install_dir / "index.json").read_text(encoding="utf-8"))
     assert NEUTRAL_ID in index["entries"]
@@ -40,11 +60,18 @@ def test_neutral_line_is_installed_with_a_variants_block(pipeline_repo, guarded)
 def test_neutral_entry_disappears_when_the_speaker_loses_the_voice(pipeline_repo, guarded):
     _use_name_line(pipeline_repo)
     base = ["--config", str(pipeline_repo.cfg)]
-    for step in (["extract"], ["synth", "--engine", "fake", "--workers", "2"], ["encode"], ["install"]):
+    for step in (
+        ["extract"],
+        ["synth", "--engine", "fake", "--workers", "2"],
+        ["encode"],
+        ["install"],
+    ):
         assert guarded(lambda s=step: main(base + s)) == 0, step
     index_path = pipeline_repo.install_dir / "index.json"
     assert NEUTRAL_ID in json.loads(index_path.read_text(encoding="utf-8"))["entries"]
-    (pipeline_repo.casting / "casting.yaml").write_text("default_player: leon\nspeakers: {}\n", encoding="utf-8")
+    (pipeline_repo.casting / "casting.yaml").write_text(
+        "default_player: leon\nspeakers: {}\n", encoding="utf-8"
+    )
     assert main(base + ["install"]) == 0
     index = json.loads(index_path.read_text(encoding="utf-8"))
     assert NEUTRAL_ID not in index["entries"] and index["variants"] == {}
@@ -59,9 +86,21 @@ def test_stale_neutral_entry_is_dropped_when_the_name_leaves_the_text(pipeline_r
         assert guarded(lambda s=step: main(base + s)) == 0, step
     index_path = pipeline_repo.install_dir / "index.json"
     assert NEUTRAL_ID in json.loads(index_path.read_text(encoding="utf-8"))["entries"]
-    loc = pipeline_repo.game / "Drova_Data" / "StreamingAssets" / "Localization" / "de" / "Dialog" / "NPC_Mira_de.loc"
-    loc.write_text(loc.read_text(encoding="utf-8").replace("Hallo $GVAR:EVars_Player.Name$!", "Das ist ein einfacher Satz."),
-                   encoding="utf-8")
+    loc = (
+        pipeline_repo.game
+        / "Drova_Data"
+        / "StreamingAssets"
+        / "Localization"
+        / "de"
+        / "Dialog"
+        / "NPC_Mira_de.loc"
+    )
+    loc.write_text(
+        loc.read_text(encoding="utf-8").replace(
+            "Hallo $GVAR:EVars_Player.Name$!", "Das ist ein einfacher Satz."
+        ),
+        encoding="utf-8",
+    )
     for step in steps:
         assert guarded(lambda s=step: main(base + s)) == 0, step
     index = json.loads(index_path.read_text(encoding="utf-8"))

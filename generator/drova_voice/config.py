@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,7 +36,9 @@ class Config:
     game_dir: Path
     language: str
     repo_root: Path
-    fish_model: str | None = None  # None: Standard aus drova_voice.fish_model, sonst diese Modell-ID
+    fish_model: str | None = (
+        None  # None: Standard aus drova_voice.fish_model, sonst diese Modell-ID
+    )
     fish_latency: str | None = None
     fish_temperature: float | None = None
     fish_top_p: float | None = None
@@ -113,7 +116,9 @@ def load_config(path: Path) -> Config:
     elif not isinstance(fish_model, str):
         raise ValueError(f"{path}: 'fish_model' muss ein Text sein")
     else:
-        fish_model = resolve_fish_model(fish_model, {})  # leere Umgebung: nur den Konfigurationswert prüfen
+        fish_model = resolve_fish_model(
+            fish_model, {}
+        )  # leere Umgebung: nur den Konfigurationswert prüfen
     fish_latency = _optional_text(raw, path, "fish_latency")
     fish_temperature = _optional_unit(raw, path, "fish_temperature")
     fish_top_p = _optional_unit(raw, path, "fish_top_p")
@@ -160,6 +165,6 @@ def _optional_unit(raw: dict, path: Path, field: str) -> float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{path}: '{field}' muss eine Zahl sein")
     number = float(value)
-    if number != number or number in (float("inf"), float("-inf")) or not 0 < number <= 1:
+    if not math.isfinite(number) or not 0 < number <= 1:
         raise ValueError(f"{path}: '{field}' muss größer als 0 und höchstens 1 sein")
     return number

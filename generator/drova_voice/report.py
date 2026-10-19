@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Mapping, Sequence
 
 from drova_voice.casting import Casting
 from drova_voice.lines import Line
@@ -22,8 +22,13 @@ class CategoryStatus:
         return sum(self.counts.values())
 
 
-def _status(line: Line, casting: Casting, synth: Mapping[str, dict], encoded: Mapping[str, dict],
-            index: Mapping[str, dict]) -> str:
+def _status(
+    line: Line,
+    casting: Casting,
+    synth: Mapping[str, dict],
+    encoded: Mapping[str, dict],
+    index: Mapping[str, dict],
+) -> str:
     if line.skip:
         return f"übersprungen: {line.skip}"
     if casting.voice_for(line) is None:
@@ -38,8 +43,13 @@ def _status(line: Line, casting: Casting, synth: Mapping[str, dict], encoded: Ma
     return "offen"
 
 
-def build_report(lines: Sequence[Line], casting: Casting, synth_rows: Mapping[str, dict],
-                 encoded: Mapping[str, dict], index_entries: Mapping[str, dict]) -> dict[str, CategoryStatus]:
+def build_report(
+    lines: Sequence[Line],
+    casting: Casting,
+    synth_rows: Mapping[str, dict],
+    encoded: Mapping[str, dict],
+    index_entries: Mapping[str, dict],
+) -> dict[str, CategoryStatus]:
     result: dict[str, CategoryStatus] = {}
     for line in lines:
         status = result.setdefault(line.category, CategoryStatus())
@@ -65,15 +75,22 @@ def format_report(statuses: Mapping[str, CategoryStatus]) -> str:
 GAP_STATUSES = ("kodiert", "erzeugt", "fehler", "offen", f"übersprungen: {SKIP_NO_VOICE}")
 
 
-def build_speaker_report(lines: Sequence[Line], casting: Casting, synth_rows: Mapping[str, dict],
-                         encoded: Mapping[str, dict], index_entries: Mapping[str, dict]) -> dict[str, Counter]:
+def build_speaker_report(
+    lines: Sequence[Line],
+    casting: Casting,
+    synth_rows: Mapping[str, dict],
+    encoded: Mapping[str, dict],
+    index_entries: Mapping[str, dict],
+) -> dict[str, Counter]:
     """Status je Sprecher; Barks und generische Sprecher gehören nicht zu Plan 5."""
     result: dict[str, Counter] = {}
     for line in lines:
         if line.category == "bark" or line.generic:
             continue
         who = "(Spieler)" if line.category == "player" else line.actor
-        result.setdefault(who, Counter())[_status(line, casting, synth_rows, encoded, index_entries)] += 1
+        result.setdefault(who, Counter())[
+            _status(line, casting, synth_rows, encoded, index_entries)
+        ] += 1
     return result
 
 
@@ -88,10 +105,14 @@ def format_speaker_report(report: Mapping[str, Counter], casting: Casting) -> st
         voice = casting.default_player if who == "(Spieler)" else casting.speakers.get(who.lower())
         parts = [f"{counts[k]} {k}" for k in ORDER if counts[k]]
         parts += [f"{n} {k}" for k, n in sorted(counts.items()) if k.startswith("übersprungen")]
-        out.append(f"{who} ({voice or 'keine Stimme'}): {total(counts)} Zeilen -> " + ", ".join(parts))
+        out.append(
+            f"{who} ({voice or 'keine Stimme'}): {total(counts)} Zeilen -> " + ", ".join(parts)
+        )
         gaps = sum(counts[k] for k in GAP_STATUSES)
         if gaps:
             gap_lines += gaps
             gap_speakers += 1
-    out.append(f"Lücken: {gap_lines} Zeilen bei {gap_speakers} Sprechern (nicht installiert, ohne Stimme eingeschlossen)")
+    out.append(
+        f"Lücken: {gap_lines} Zeilen bei {gap_speakers} Sprechern (nicht installiert, ohne Stimme eingeschlossen)"
+    )
     return "\n".join(out)

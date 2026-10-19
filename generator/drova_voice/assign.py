@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Mapping, Sequence
 
 from drova_voice.fish_voices import AGES, Candidate
 from drova_voice.profiles import Profile
@@ -24,9 +24,13 @@ W_SHARED_TREE = 20.0  # je Dialogbaum, in dem schon jemand mit dieser Stimme spr
 
 @dataclass
 class Assignment:
-    voices: dict[str, str] = field(default_factory=dict)  # Sprecher -> Schlüssel (nur neu zugeteilte)
+    voices: dict[str, str] = field(
+        default_factory=dict
+    )  # Sprecher -> Schlüssel (nur neu zugeteilte)
     open: list[str] = field(default_factory=list)  # Sprecher ohne brauchbaren Steckbrief
-    emergency: dict[str, str] = field(default_factory=dict)  # Sprecher -> Grund, warum die Stimme nur Notlösung ist
+    emergency: dict[str, str] = field(
+        default_factory=dict
+    )  # Sprecher -> Grund, warum die Stimme nur Notlösung ist
 
 
 class _Load:
@@ -54,7 +58,11 @@ def mismatch(profile: Profile, cand: Candidate) -> str | None:
 
 
 def _cost(profile: Profile, cand: Candidate, load: _Load, stat: SpeakerStat) -> float:
-    distance = UNKNOWN_AGE_DISTANCE if cand.age is None else abs(AGE_RANK[cand.age] - AGE_RANK[profile.age])
+    distance = (
+        UNKNOWN_AGE_DISTANCE
+        if cand.age is None
+        else abs(AGE_RANK[cand.age] - AGE_RANK[profile.age])
+    )
     cost = W_AGE * distance
     if profile.type:
         if cand.type == profile.type:
@@ -70,8 +78,12 @@ def _cost(profile: Profile, cand: Candidate, load: _Load, stat: SpeakerStat) -> 
     return cost
 
 
-def assign(stats: Sequence[SpeakerStat], profiles: Mapping[str, Profile], candidates: Sequence[Candidate],
-           pinned: Mapping[str, str]) -> Assignment:
+def assign(
+    stats: Sequence[SpeakerStat],
+    profiles: Mapping[str, Profile],
+    candidates: Sequence[Candidate],
+    pinned: Mapping[str, str],
+) -> Assignment:
     """Stimmen verteilen, wichtigste Sprecher (meiste Zeilen) zuerst; `pinned` bleibt unberührt, zählt aber mit."""
     ordered = sorted(stats, key=lambda s: (-s.lines, s.name))
     by_name = {s.name: s for s in ordered}
@@ -85,7 +97,7 @@ def assign(stats: Sequence[SpeakerStat], profiles: Mapping[str, Profile], candid
             continue
         profile = profiles.get(stat.name)
         options = [c for c in candidates if profile is not None and c.gender == profile.gender]
-        if not options:
+        if profile is None or not options:
             result.open.append(stat.name)
             continue
         best = min(options, key=lambda c: (_cost(profile, c, load, stat), c.key))

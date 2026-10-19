@@ -1,4 +1,5 @@
 """Fake-Engine für Tests: schreibt einen Sinuston, Länge abhängig von der Textlänge."""
+
 from __future__ import annotations
 
 import math
@@ -8,14 +9,13 @@ import wave
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "_common"))
-from worker_loop import serve  # noqa: E402
+from worker_loop import serve
 
 RATE = 22050
 
 
 def load():
     print("fake: lade Modell ... (dieser Text muss auf stderr landen)")
-    return None
 
 
 def synth(_state, req: dict) -> tuple[int, float]:
@@ -29,7 +29,12 @@ def synth(_state, req: dict) -> tuple[int, float]:
         w.setnchannels(1)
         w.setsampwidth(2)
         w.setframerate(RATE)
-        w.writeframes(b"".join(struct.pack("<h", int(8000 * math.sin(2 * math.pi * 220 * i / RATE))) for i in range(frames)))
+        w.writeframes(
+            b"".join(
+                struct.pack("<h", int(8000 * math.sin(2 * math.pi * 220 * i / RATE)))
+                for i in range(frames)
+            )
+        )
     return RATE, frames / RATE
 
 

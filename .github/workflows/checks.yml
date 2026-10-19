@@ -152,28 +152,38 @@ jobs:
       - name: Fish key
         run: python3 tools/checks/fish_key.py
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      # Dieselbe uv-Version, mit der generator/uv.lock erzeugt wurde.
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         if: steps.paths.outputs.generator == 'true'
         with:
+          version: "0.11.27"
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: generator/pyproject.toml
+          enable-cache: true
+          cache-dependency-glob: generator/uv.lock
 
       - name: Install ffmpeg
         if: steps.paths.outputs.generator == 'true'
         run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg
 
-      - name: Install generator
+      - name: Install from lockfile
         if: steps.paths.outputs.generator == 'true'
         working-directory: generator
-        env:
-          PIP_DISABLE_PIP_VERSION_CHECK: "1"
-        run: python -m pip install -e '.[dev]'
+        run: uv sync --frozen --extra dev
+
+      - name: Ruff
+        if: steps.paths.outputs.generator == 'true'
+        working-directory: generator
+        run: uv run ruff check . && uv run ruff format --check .
+
+      - name: Mypy
+        if: steps.paths.outputs.generator == 'true'
+        working-directory: generator
+        run: uv run mypy
 
       - name: Pytest
         if: steps.paths.outputs.generator == 'true'
         working-directory: generator
-        run: python -m pytest -q -ra
+        run: uv run pytest -q -ra
 
       # net8.0 tests build the net6.0 library. The 8.0 SDK covers both.
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0

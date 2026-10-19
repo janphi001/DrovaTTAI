@@ -6,22 +6,33 @@ import re
 import struct
 import time
 import wave
+from collections.abc import Callable, Sequence
+from contextlib import AbstractContextManager as ContextManager
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Callable, ContextManager, Sequence
 
 import yaml
 
 from drova_voice.emotions import EmotionTag, Event, from_stage_directions
 from drova_voice.engines.client import EngineError
 from drova_voice.engines.protocol import SynthRequest
-from drova_voice.loc import read_loc_file
 from drova_voice.jsonl import replace_with_retry
-from drova_voice.render import render_request
+from drova_voice.loc import read_loc_file
 from drova_voice.player_name import NAME_TOKEN, make_name_variants
+from drova_voice.render import render_request
 from drova_voice.speech_text import GVAR_RE, STAGE_RE, SpeechText, build_speech_text
 
-BUCKETS = ("short", "long", "stage", "emotion", "player_name", "gvar", "question", "exclaim", "normal")
+BUCKETS = (
+    "short",
+    "long",
+    "stage",
+    "emotion",
+    "player_name",
+    "gvar",
+    "question",
+    "exclaim",
+    "normal",
+)
 BAKEOFF_GVAR_FALLBACK = "zehn"
 
 # Feste synthetische Tags für den Bucket "emotion" (neutrale Zeilen, die Emotion bekommen), reihum vergeben.
@@ -52,7 +63,7 @@ class Sample:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Sample":
+    def from_dict(cls, d: dict) -> Sample:
         return cls(**d)
 
 
@@ -114,12 +125,26 @@ def select_samples(loc_dir: Path, per_bucket: int = 4, seed: int = 42) -> list[S
             for n, i in enumerate(picked):
                 source, key, raw, st = normal[i]
                 tag = _emotion_preset(n)
-                samples.append(Sample(f"{bucket}_{len(samples):02d}", source, key, raw, st.text, tag.to_dict(), bucket))
+                samples.append(
+                    Sample(
+                        f"{bucket}_{len(samples):02d}",
+                        source,
+                        key,
+                        raw,
+                        st.text,
+                        tag.to_dict(),
+                        bucket,
+                    )
+                )
             continue
         candidates = pool[bucket]
         for source, key, raw, st in rng.sample(candidates, min(per_bucket, len(candidates))):
             tag = from_stage_directions(st.stage)
-            samples.append(Sample(f"{bucket}_{len(samples):02d}", source, key, raw, st.text, tag.to_dict(), bucket))
+            samples.append(
+                Sample(
+                    f"{bucket}_{len(samples):02d}", source, key, raw, st.text, tag.to_dict(), bucket
+                )
+            )
     if not samples:
         raise ValueError(f"Keine Zeilen gefunden in {dialog}: Stichprobe ist leer")
     return samples
@@ -140,7 +165,9 @@ class VoiceSpec:
 
     @property
     def slug(self) -> str:
-        base = self.label or self.voice or (Path(self.reference).stem if self.reference else "default")
+        base = (
+            self.label or self.voice or (Path(self.reference).stem if self.reference else "default")
+        )
         return re.sub(r"[^a-z0-9]+", "-", base.lower()).strip("-") or "default"
 
 
@@ -159,7 +186,7 @@ class BakeoffResult:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict) -> "BakeoffResult":
+    def from_dict(cls, d: dict) -> BakeoffResult:
         return cls(**d)
 
 
@@ -267,19 +294,29 @@ def _adopt_orphan_audio(wav: Path, sample_id: str, text: str) -> bool:
     return False
 
 
-def _synth_one(client, engine: str, v: VoiceSpec, s: Sample, wav: Path, text: str, params: dict) -> BakeoffResult:
+def _synth_one(
+    client, engine: str, v: VoiceSpec, s: Sample, wav: Path, text: str, params: dict
+) -> BakeoffResult:
     part = wav.with_name(f"{s.sample_id}.part.wav")
     wav.parent.mkdir(parents=True, exist_ok=True)
     started = time.perf_counter()
-    resp = client.synth(SynthRequest(
-        id=f"{engine}/{v.slug}/{s.sample_id}", text=text, out_path=str(part),
-        voice=v.voice, reference=v.reference, params=params,
-    ))
+    resp = client.synth(
+        SynthRequest(
+            id=f"{engine}/{v.slug}/{s.sample_id}",
+            text=text,
+            out_path=str(part),
+            voice=v.voice,
+            reference=v.reference,
+            params=params,
+        )
+    )
     seconds = time.perf_counter() - started
     if resp.ok:
         replace_with_retry(part, wav)
         _sidecar(wav).write_bytes(text.encode("utf-8"))
-        return BakeoffResult(engine, v.slug, s.sample_id, True, str(wav), resp.duration, seconds, None)
+        return BakeoffResult(
+            engine, v.slug, s.sample_id, True, str(wav), resp.duration, seconds, None
+        )
     part.unlink(missing_ok=True)
     return BakeoffResult(engine, v.slug, s.sample_id, False, None, None, seconds, resp.error)
 
@@ -307,15 +344,21 @@ def run_bakeoff(
                 wav = Path(out_dir) / engine / v.slug / f"{s.sample_id}.wav"
                 text, params = render_request(engine, s.text, EmotionTag.from_dict(s.emotion))
                 if _is_finished(wav, text):
-                    emit(BakeoffResult(engine, v.slug, s.sample_id, True, str(wav), None, 0.0, None))
+                    emit(
+                        BakeoffResult(engine, v.slug, s.sample_id, True, str(wav), None, 0.0, None)
+                    )
                     continue
                 try:
                     adopted = _adopt_orphan_audio(wav, s.sample_id, text)
                 except OSError as exc:
-                    emit(BakeoffResult(engine, v.slug, s.sample_id, False, None, None, 0.0, str(exc)))
+                    emit(
+                        BakeoffResult(engine, v.slug, s.sample_id, False, None, None, 0.0, str(exc))
+                    )
                     continue
                 if adopted:
-                    emit(BakeoffResult(engine, v.slug, s.sample_id, True, str(wav), None, 0.0, None))
+                    emit(
+                        BakeoffResult(engine, v.slug, s.sample_id, True, str(wav), None, 0.0, None)
+                    )
                 else:
                     jobs.append((v, s, wav, text, params))
         if not jobs:
@@ -331,7 +374,11 @@ def run_bakeoff(
         except EngineError as e:
             # Engine gilt als ausgefallen: aktuelles Element (oder das erste) melden, Rest dieser Engine überspringen.
             v, s = (current or jobs[0])[:2]
-            emit(BakeoffResult(engine, v.slug, s.sample_id, False, None, None, time.perf_counter() - t0, str(e)))
+            emit(
+                BakeoffResult(
+                    engine, v.slug, s.sample_id, False, None, None, time.perf_counter() - t0, str(e)
+                )
+            )
     return results
 
 
@@ -348,7 +395,9 @@ def write_sheet(samples: Sequence[Sample], results: Sequence[BakeoffResult], out
     out_dir = Path(out_dir)
     by_id = {s.sample_id: s for s in samples}
     current_ids = set(by_id)
-    results = [r for r in results if r.sample_id in current_ids]  # Ergebnisse frueherer Stichproben ausblenden
+    results = [
+        r for r in results if r.sample_id in current_ids
+    ]  # Ergebnisse frueherer Stichproben ausblenden
     by_key = {(r.engine, r.voice_slug, r.sample_id): r for r in results}
     columns = sorted({(r.engine, r.voice_slug) for r in results})
     esc = html.escape
@@ -359,7 +408,9 @@ def write_sheet(samples: Sequence[Sample], results: Sequence[BakeoffResult], out
         for e, v in columns:
             r = by_key.get((e, v, s.sample_id))
             if r and r.ok and r.wav and not _matches_line(e, s, Path(r.wav)):
-                cells.append("<td>– veraltet (Text der Zeile hat sich geändert, bitte neu erzeugen)</td>")
+                cells.append(
+                    "<td>– veraltet (Text der Zeile hat sich geändert, bitte neu erzeugen)</td>"
+                )
             elif r and r.ok and r.wav:
                 wav_path = Path(r.wav).resolve()
                 try:
@@ -371,20 +422,31 @@ def write_sheet(samples: Sequence[Sample], results: Sequence[BakeoffResult], out
                 cells.append(f"<td>– {esc(r.error) if r and r.error else ''}</td>")
         emo = s.emotion.get("emotion", "neutral")
         events = ", ".join(ev["tag"] for ev in s.emotion.get("events", []))
-        rows.append(f"<tr><td><b>{esc(s.bucket)}</b><br>{esc(s.text)}<br><small>{esc(emo)} {esc(events)} · {esc(s.source)}/{esc(s.key)}</small></td>{''.join(cells)}</tr>")
+        rows.append(
+            f"<tr><td><b>{esc(s.bucket)}</b><br>{esc(s.text)}<br><small>{esc(emo)} {esc(events)} · {esc(s.source)}/{esc(s.key)}</small></td>{''.join(cells)}</tr>"
+        )
     summary = []
     for e, v in columns:
-        timed = [r for r in results if (r.engine, r.voice_slug) == (e, v) and r.ok and r.duration
-                 and _matches_line(e, by_id[r.sample_id], Path(r.wav))]
-        dur = sum(r.duration for r in timed)
+        timed = [
+            r
+            for r in results
+            if (r.engine, r.voice_slug) == (e, v)
+            and r.ok
+            and r.duration
+            and r.wav is not None
+            and _matches_line(e, by_id[r.sample_id], Path(r.wav))
+        ]
+        dur = sum(r.duration or 0.0 for r in timed)
         sec = sum(r.seconds for r in timed)
         rtf = f"{sec / dur:.2f}" if dur else "–"
-        summary.append(f"<tr><td>{esc(e)} / {esc(v)}</td><td>{dur:.1f} s</td><td>{sec:.1f} s</td><td>{rtf}</td></tr>")
+        summary.append(
+            f"<tr><td>{esc(e)} / {esc(v)}</td><td>{dur:.1f} s</td><td>{sec:.1f} s</td><td>{rtf}</td></tr>"
+        )
     page = f"""<!doctype html><html lang="de"><head><meta charset="utf-8"><title>DrovaVoice Hörtest</title>
 <style>body{{font-family:system-ui,sans-serif;margin:16px}}table{{border-collapse:collapse}}td,th{{border:1px solid #ccc;padding:6px;vertical-align:top}}audio{{width:220px}}</style>
 </head><body><h1>DrovaVoice Hörtest</h1>
-<h2>Geschwindigkeit</h2><table><tr><th>Engine / Stimme</th><th>Audio</th><th>Rechenzeit</th><th>Echtzeitfaktor</th></tr>{''.join(summary)}</table>
-<h2>Zeilen</h2><table><tr><th>Zeile</th>{head}</tr>{''.join(rows)}</table></body></html>"""
+<h2>Geschwindigkeit</h2><table><tr><th>Engine / Stimme</th><th>Audio</th><th>Rechenzeit</th><th>Echtzeitfaktor</th></tr>{"".join(summary)}</table>
+<h2>Zeilen</h2><table><tr><th>Zeile</th>{head}</tr>{"".join(rows)}</table></body></html>"""
     path = out_dir / "index.html"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(page, encoding="utf-8")

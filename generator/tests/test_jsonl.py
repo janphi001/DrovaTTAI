@@ -23,7 +23,7 @@ def test_blank_lines_are_skipped(tmp_path):
 
 def test_read_tolerates_utf8_bom(tmp_path):
     path = tmp_path / "rows.jsonl"
-    path.write_bytes(b"\xef\xbb\xbf" + '{"a": "Grüße"}\n{"a": 2}\n'.encode("utf-8"))
+    path.write_bytes(b"\xef\xbb\xbf" + '{"a": "Grüße"}\n{"a": 2}\n'.encode())
     assert read_jsonl(path) == [{"a": "Grüße"}, {"a": 2}]
 
 
@@ -43,7 +43,9 @@ def test_failed_write_keeps_old_file_and_leaves_no_tmp(tmp_path):
 
 def test_write_retries_when_another_program_briefly_holds_the_target_open(tmp_path, monkeypatch):
     import os
+
     import drova_voice.jsonl as jsonl_mod
+
     real_replace, failures = os.replace, []
 
     def flaky_replace(src, dst):
@@ -61,6 +63,7 @@ def test_write_retries_when_another_program_briefly_holds_the_target_open(tmp_pa
 
 def test_write_gives_up_after_the_retries_and_keeps_the_old_file(tmp_path, monkeypatch):
     import drova_voice.jsonl as jsonl_mod
+
     path = tmp_path / "r.jsonl"
     write_jsonl(path, [{"alt": True}])
 

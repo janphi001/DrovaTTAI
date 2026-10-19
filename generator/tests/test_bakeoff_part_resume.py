@@ -1,4 +1,5 @@
 """Bakeoff nimmt eine fertige Part-Datei nach einem Absturz wieder auf, ohne neu anzufragen."""
+
 import io
 import wave
 from pathlib import Path
@@ -36,7 +37,9 @@ class _Fake:
         self.requests.append(req)
         Path(req.out_path).parent.mkdir(parents=True, exist_ok=True)
         Path(req.out_path).write_bytes(_wav(b"\x11\x22" * 4))
-        return SynthResponse(id=req.id, ok=True, out_path=req.out_path, sample_rate=8000, duration=0.01)
+        return SynthResponse(
+            id=req.id, ok=True, out_path=req.out_path, sample_rate=8000, duration=0.01
+        )
 
 
 def _run(tmp_path, samples, client=None):

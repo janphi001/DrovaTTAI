@@ -1,4 +1,5 @@
 """Worker-stdout: geteilte Mehrbyte-Zeichen werden nicht zu U+FFFD im JSON."""
+
 import io
 
 import drova_voice.engines.client as client_mod
@@ -53,15 +54,15 @@ def _open(monkeypatch, chunks: list[bytes]) -> tuple[_Proc, dict]:
 
 
 def _bytes(payload: bytes) -> list[bytes]:
-    return [payload[i:i + 1] for i in range(len(payload))]
+    return [payload[i : i + 1] for i in range(len(payload))]
 
 
 def test_split_multibyte_character_is_preserved_and_invalid_utf8_is_not_parsed(monkeypatch):
-    euro = "€".encode("utf-8")
+    euro = "€".encode()
     ready = b'{"ready": true, "engine": "split", "model": "' + euro + b'"}\n'
     # Unvollständiges é vor dem Zeilenende: errors="replace" ergäbe gültiges JSON mit U+FFFD.
     bad = b'{"id": "s1", "ok": true, "error": "caf' + bytes([0xC3]) + b'"}\n'
-    acute = "é".encode("utf-8")
+    acute = "é".encode()
     reply = b'{"id": "s1", "ok": false, "error": "' + acute + b'"}\n'
     proc, seen = _open(monkeypatch, _bytes(ready) + [bad] + _bytes(reply))
     with EngineClient(["unused"]) as client:
@@ -71,7 +72,7 @@ def test_split_multibyte_character_is_preserved_and_invalid_utf8_is_not_parsed(m
         sent = proc.stdin.getvalue()
     assert not resp.ok and resp.error == "é"
     assert "\ufffd" not in (resp.error or "")
-    assert "Café.".encode("utf-8") in sent
+    assert "Café.".encode() in sent
     assert seen["bufsize"] == 0
     assert not seen.get("text")
     assert not seen.get("encoding")

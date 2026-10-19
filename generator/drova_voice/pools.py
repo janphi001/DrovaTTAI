@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
-from typing import Mapping, Sequence
 
 import yaml
 
@@ -32,7 +32,9 @@ def load_pools(path: Path, voices: Mapping[str, object]) -> dict[str, str]:
         for number, key in enumerate(keys, start=1):
             voice = str(key).lower()
             if voice not in voices:
-                raise ValueError(f"{path}: Unbekannte Stimme '{voice}' im Pool '{gender}' (Schlüssel aus casting/fish_voices.yaml)")
+                raise ValueError(
+                    f"{path}: Unbekannte Stimme '{voice}' im Pool '{gender}' (Schlüssel aus casting/fish_voices.yaml)"
+                )
             result[f"v{gender}{number}"] = voice
     return result
 

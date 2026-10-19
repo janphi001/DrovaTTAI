@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Sequence
 
 from drova_voice.lines import Line
 
@@ -82,7 +82,9 @@ def plan_batches(lines: Sequence[Line], max_chars: int = DEFAULT_BATCH_CHARS) ->
         extra_chars = sum(len(l.speech) for l in player)
         if batches:
             last = batches[-1]
-            batches[-1] = replace(last, lines=last.lines + len(player), chars=last.chars + extra_chars, player=True)
+            batches[-1] = replace(
+                last, lines=last.lines + len(player), chars=last.chars + extra_chars, player=True
+            )
         else:
             batches.append(Batch(1, (), len(player), extra_chars, True))
     return batches
@@ -91,19 +93,37 @@ def plan_batches(lines: Sequence[Line], max_chars: int = DEFAULT_BATCH_CHARS) ->
 def write_batches(path: Path, batches: Sequence[Batch], max_chars: int) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    data = {"max_chars": max_chars, "batches": [
-        {"n": b.n, "speakers": list(b.speakers), "lines": b.lines, "chars": b.chars, "player": b.player} for b in batches]}
+    data = {
+        "max_chars": max_chars,
+        "batches": [
+            {
+                "n": b.n,
+                "speakers": list(b.speakers),
+                "lines": b.lines,
+                "chars": b.chars,
+                "player": b.player,
+            }
+            for b in batches
+        ],
+    }
     path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 def read_batches(path: Path) -> list[Batch]:
     data = json.loads(Path(path).read_text(encoding="utf-8-sig"))
-    return [Batch(int(b["n"]), tuple(b["speakers"]), int(b["lines"]), int(b["chars"]), bool(b["player"]))
-            for b in data["batches"]]
+    return [
+        Batch(
+            int(b["n"]), tuple(b["speakers"]), int(b["lines"]), int(b["chars"]), bool(b["player"])
+        )
+        for b in data["batches"]
+    ]
 
 
 def batch_lines(lines: Sequence[Line], batch: Batch) -> list[Line]:
     names = set(batch.speakers)
-    return [l for l in lines
-            if (l.category == "dialog" and not l.generic and l.actor.lower() in names)
-            or (batch.player and l.category == "player")]
+    return [
+        l
+        for l in lines
+        if (l.category == "dialog" and not l.generic and l.actor.lower() in names)
+        or (batch.player and l.category == "player")
+    ]

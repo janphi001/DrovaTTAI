@@ -1,4 +1,5 @@
 """Fish-Audio-Worker: ruft die Cloud-API auf. Nur Standardbibliothek, kein venv nötig."""
+
 from __future__ import annotations
 
 import html
@@ -17,7 +18,7 @@ import wave
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "_common"))
-from worker_loop import serve  # noqa: E402
+from worker_loop import serve
 
 API_URL = "https://api.fish.audio/v1/tts"
 MODEL_API_URL = "https://api.fish.audio/model"
@@ -26,7 +27,9 @@ MODEL = os.environ.get("FISH_MODEL", "s2.1-pro-free")
 _RETRY_STATUS = {429, 500, 502, 503, 504}
 _MAX_ERROR_BODY = 4096
 REQUEST_TIMEOUT_S = 180.0
-DEFAULT_MAX_ATTEMPTS = 2  # synth.py wiederholt die Qualität; zusammen höchstens wenige POSTs, nicht 5×3
+DEFAULT_MAX_ATTEMPTS = (
+    2  # synth.py wiederholt die Qualität; zusammen höchstens wenige POSTs, nicht 5×3
+)
 MAX_HTTP_ATTEMPTS = 3
 DEFAULT_DEADLINE_S = 240.0
 _LANG = re.compile(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*\Z")
@@ -84,12 +87,16 @@ def _unit_env(name: str, default: str) -> float:
 def load() -> dict:
     key = os.environ.get("FISH_API_KEY", "").strip()
     if not key:
-        raise RuntimeError("FISH_API_KEY fehlt: den Schlüssel nur als Umgebungsvariable setzen (nie in Dateien oder ins Repo)")
+        raise RuntimeError(
+            "FISH_API_KEY fehlt: den Schlüssel nur als Umgebungsvariable setzen (nie in Dateien oder ins Repo)"
+        )
     # Der Schlüssel selbst darf in keiner Meldung stehen – sonst landet er im Protokoll/Log.
     if any(ord(ch) > 127 for ch in key):
         raise RuntimeError("FISH_API_KEY enthält ungültige Zeichen (nur ASCII erlaubt)")
     if any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in key):
-        raise RuntimeError("FISH_API_KEY enthält ungültige Zeichen (Leerzeichen oder Zeilenumbruch?)")
+        raise RuntimeError(
+            "FISH_API_KEY enthält ungültige Zeichen (Leerzeichen oder Zeilenumbruch?)"
+        )
     return {
         "key": key,
         "url": _check_url(os.environ.get("FISH_API_URL", API_URL), key),
@@ -151,8 +158,16 @@ def _retry_after(headers, default: float) -> float:
 
 def _post(cfg: dict, body: dict) -> bytes:
     data = json.dumps(body, ensure_ascii=False).encode("utf-8")
-    request = urllib.request.Request(cfg["url"], data=data, method="POST", headers={
-        "Authorization": f"Bearer {cfg['key']}", "Content-Type": "application/json", "model": cfg["model"]})
+    request = urllib.request.Request(
+        cfg["url"],
+        data=data,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {cfg['key']}",
+            "Content-Type": "application/json",
+            "model": cfg["model"],
+        },
+    )
     cfg["http_attempts"] = 0
     started = time.monotonic()
     last = "unbekannt"
@@ -161,7 +176,7 @@ def _post(cfg: dict, body: dict) -> bytes:
         if remaining <= 0:
             break
         cfg["http_attempts"] = attempt + 1
-        wait = cfg["backoff"] * (2 ** attempt)
+        wait = cfg["backoff"] * (2**attempt)
         try:
             with _OPENER.open(request, timeout=min(REQUEST_TIMEOUT_S, remaining)) as resp:
                 return resp.read()
@@ -172,7 +187,8 @@ def _post(cfg: dict, body: dict) -> bytes:
             if e.code not in _RETRY_STATUS:
                 raise RuntimeError(f"Fish lehnt die Anfrage ab (HTTP {e.code}): {detail}") from None
             last, wait = f"HTTP {e.code}", _retry_after(e.headers, wait)
-        except http.client.HTTPException as e:  # Antwort bricht mitten im Body ab (IncompleteRead, BadStatusLine)
+        except http.client.HTTPException as e:
+            # Antwort bricht mitten im Body ab (IncompleteRead, BadStatusLine)
             last = type(e).__name__
         except OSError as e:  # Verbindungsfehler, Zeitüberschreitung
             last = type(e).__name__
@@ -182,7 +198,9 @@ def _post(cfg: dict, body: dict) -> bytes:
         if attempt >= cfg["attempts"] - 1 or wait > remaining:
             break
         time.sleep(wait)
-    raise RuntimeError(f"Fish nicht erreichbar nach {cfg['http_attempts']} Versuchen (zuletzt {last})")
+    raise RuntimeError(
+        f"Fish nicht erreichbar nach {cfg['http_attempts']} Versuchen (zuletzt {last})"
+    )
 
 
 def _fix_streaming_wav(audio: bytes) -> bytes:
@@ -196,11 +214,13 @@ def _fix_streaming_wav(audio: bytes) -> bytes:
     frame_size, data_at, declared = 0, None, 0
     pos = 12
     while pos + 8 <= len(audio) and (frame_size == 0 or data_at is None):
-        cid = audio[pos:pos + 4]
+        cid = audio[pos : pos + 4]
         size = struct.unpack_from("<I", audio, pos + 4)[0]
         body = pos + 8
         if cid == b"fmt " and size >= 16 and body + 16 <= len(audio):
-            _tag, channels, _rate, _byte_rate, _align, bits = struct.unpack_from("<HHIIHH", audio, body)
+            _tag, channels, _rate, _byte_rate, _align, bits = struct.unpack_from(
+                "<HHIIHH", audio, body
+            )
             frame_size = channels * ((bits + 7) // 8)
         elif cid == b"data":
             data_at, declared = pos, size
@@ -216,7 +236,7 @@ def _fix_streaming_wav(audio: bytes) -> bytes:
         raise ValueError("data-Chunk ohne Audio")
     if usable == declared and struct.unpack_from("<I", audio, 4)[0] == len(audio) - 8:
         return audio
-    fixed = bytearray(audio[:start + usable])
+    fixed = bytearray(audio[: start + usable])
     struct.pack_into("<I", fixed, 4, len(fixed) - 8)
     struct.pack_into("<I", fixed, data_at + 4, usable)
     return bytes(fixed)
@@ -235,7 +255,9 @@ def _classify_model(payload: dict) -> str:
 def lookup_model(cfg: dict, model_id: str) -> dict:
     """GET /model/{id}. 404 heißt, die Stimme ist weg. Der Schlüssel steht in keiner Meldung."""
     url = f"{cfg['model_api']}/{model_id}"
-    request = urllib.request.Request(url, method="GET", headers={"Authorization": f"Bearer {cfg['key']}"})
+    request = urllib.request.Request(
+        url, method="GET", headers={"Authorization": f"Bearer {cfg['key']}"}
+    )
     try:
         with _OPENER.open(request, timeout=30) as resp:
             raw = resp.read()
@@ -307,8 +329,11 @@ def _sampling_number(params: dict, key: str, fallback: float) -> float:
 def synth(cfg: dict, req: dict) -> tuple[int, float]:
     cfg["http_attempts"] = 0
     if req.get("reference"):
-        raise ValueError("Fish nutzt eine Stimmen-ID (voice = reference_id), keine lokale Referenz-WAV")
-    params = req.get("params") if isinstance(req.get("params"), dict) else {}
+        raise ValueError(
+            "Fish nutzt eine Stimmen-ID (voice = reference_id), keine lokale Referenz-WAV"
+        )
+    raw_params = req.get("params")
+    params: dict = raw_params if isinstance(raw_params, dict) else {}
     language = _text_param(params, "language", cfg["language"])
     latency = _text_param(params, "latency", cfg["latency"])
     if not _LANG.fullmatch(language):

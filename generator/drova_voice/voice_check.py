@@ -1,12 +1,13 @@
 """Genutzte Fish-Stimmen gegen die API prüfen. Der HTTP-Aufruf bleibt im Fish-Worker."""
+
 from __future__ import annotations
 
 import json
 import os
 import subprocess
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping, Sequence
 
 from drova_voice.casting import Casting
 from drova_voice.engines.client import EngineError, worker_command
@@ -54,12 +55,18 @@ def substitute(catalog: Catalog, key: str, bad_ids: set[str]) -> str | None:
     return None
 
 
-def summarize(uses: Sequence[VoiceUse], statuses: Mapping[str, dict], catalog: Catalog) -> tuple[list[str], int]:
+def summarize(
+    uses: Sequence[VoiceUse], statuses: Mapping[str, dict], catalog: Catalog
+) -> tuple[list[str], int]:
     """Zeilen und Exit-Code. Fehlende Stimme mit Fallback ist gedeckt; ohne Fallback scheitert die Prüfung."""
-    by_id = {row.voice_id: statuses.get(row.voice_id, {"status": "error", "detail": "keine Antwort"}) for row in uses}
+    by_id = {
+        row.voice_id: statuses.get(row.voice_id, {"status": "error", "detail": "keine Antwort"})
+        for row in uses
+    }
     # Auch Fallbacks, die selbst fehlen oder deren Prüfung scheiterte, tragen nicht.
     bad_ids = {
-        vid for vid, info in {**statuses, **by_id}.items()
+        vid
+        for vid, info in {**statuses, **by_id}.items()
         if info.get("status") in UNUSABLE or info.get("status") not in {"ok", "retiring"}
     }
     lines: list[str] = []
@@ -99,7 +106,9 @@ def summarize(uses: Sequence[VoiceUse], statuses: Mapping[str, dict], catalog: C
     return [head, *lines], code
 
 
-def query_voices(workers_dir: Path, ids: Sequence[str], env: Mapping[str, str] | None = None) -> list[dict]:
+def query_voices(
+    workers_dir: Path, ids: Sequence[str], env: Mapping[str, str] | None = None
+) -> list[dict]:
     """Fish-Worker im Prüfmodus. Der Schlüssel bleibt in der Umgebung und steht in keiner Argumentliste."""
     cmd = worker_command(Path(workers_dir), "fish")
     proc_env = dict(os.environ if env is None else env)
@@ -108,8 +117,13 @@ def query_voices(workers_dir: Path, ids: Sequence[str], env: Mapping[str, str] |
     proc_env["PYTHONUTF8"] = "1"
     try:
         completed = subprocess.run(
-            cmd, input=json.dumps({"ids": list(ids)}), text=True, capture_output=True,
-            env=proc_env, timeout=300, check=False,
+            cmd,
+            input=json.dumps({"ids": list(ids)}),
+            text=True,
+            capture_output=True,
+            env=proc_env,
+            timeout=300,
+            check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as e:
         raise EngineError(f"Stimmenprüfung nicht gelaufen: {type(e).__name__}: {e}") from e

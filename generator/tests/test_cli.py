@@ -1,5 +1,5 @@
-import shutil
 import io
+import shutil
 import sys
 import urllib.parse
 from pathlib import Path
@@ -19,7 +19,9 @@ def test_bakeoff_select_and_run_with_fake_engine(tmp_path, guarded):
     game = tmp_path / "game"
     dialog = game / "Drova_Data" / "StreamingAssets" / "Localization" / "de" / "Dialog"
     dialog.mkdir(parents=True)
-    (dialog / "NPC_A_de.loc").write_text("Plh_1 { Wohin führt dieser Weg eigentlich? }\n", encoding="utf-8")
+    (dialog / "NPC_A_de.loc").write_text(
+        "Plh_1 { Wohin führt dieser Weg eigentlich? }\n", encoding="utf-8"
+    )
     cfg = gen / "config.yaml"
     cfg.write_text(f'game_dir: "{game.as_posix()}"\n', encoding="utf-8")
     voices = gen / "voices.yaml"
@@ -29,12 +31,17 @@ def test_bakeoff_select_and_run_with_fake_engine(tmp_path, guarded):
     samples = read_jsonl(repo / "data" / "bakeoff" / "samples.jsonl")
     assert [s["bucket"] for s in samples] == ["question"]
 
-    assert guarded(lambda: main(["--config", str(cfg), "bakeoff", "run", "--voices", str(voices)])) == 0
+    assert (
+        guarded(lambda: main(["--config", str(cfg), "bakeoff", "run", "--voices", str(voices)]))
+        == 0
+    )
     assert (repo / "out" / "bakeoff" / "fake" / "default" / "question_00.wav").exists()
     assert (repo / "out" / "bakeoff" / "index.html").exists()
 
 
-LOC_TWO_QUESTIONS = "Plh_1 { Wohin führt dieser Weg eigentlich? }\nPlh_2 { Wann kommt der Regen wohl an? }\n"
+LOC_TWO_QUESTIONS = (
+    "Plh_1 { Wohin führt dieser Weg eigentlich? }\nPlh_2 { Wann kommt der Regen wohl an? }\n"
+)
 
 
 def _setup(tmp_path, repo_name="repo", loc=LOC_TWO_QUESTIONS):
@@ -73,13 +80,17 @@ class StubClient:
         Path(req.out_path).write_bytes(b"RIFF")
         if not self.ok:
             return SynthResponse(id=req.id, ok=False, error="kaputt")
-        return SynthResponse(id=req.id, ok=True, out_path=req.out_path, sample_rate=22050, duration=1.0)
+        return SynthResponse(
+            id=req.id, ok=True, out_path=req.out_path, sample_rate=22050, duration=1.0
+        )
 
 
 def test_interrupted_run_keeps_finished_results_on_disk(tmp_path, monkeypatch):
     repo, cfg, voices = _setup(tmp_path)
     assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 0
-    monkeypatch.setattr("drova_voice.cli._client", lambda engine: StubClient(interrupt_on_second=True))
+    monkeypatch.setattr(
+        "drova_voice.cli._client", lambda engine: StubClient(interrupt_on_second=True)
+    )
     try:
         main(["--config", str(cfg), "bakeoff", "run", "--voices", str(voices)])
     except KeyboardInterrupt:
@@ -91,14 +102,17 @@ def test_interrupted_run_keeps_finished_results_on_disk(tmp_path, monkeypatch):
 
 
 def test_run_with_unmatched_engine_returns_2(tmp_path, capsys):
-    repo, cfg, voices = _setup(tmp_path)
+    _repo, cfg, voices = _setup(tmp_path)
     assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 0
-    assert main(["--config", str(cfg), "bakeoff", "run", "--voices", str(voices), "--engine", "nope"]) == 2
+    assert (
+        main(["--config", str(cfg), "bakeoff", "run", "--voices", str(voices), "--engine", "nope"])
+        == 2
+    )
     assert "nope" in capsys.readouterr().err
 
 
 def test_refs_works_without_samples_and_leaves_no_part_file(tmp_path, monkeypatch, capsys):
-    repo, cfg, voices = _setup(tmp_path)  # kein select: samples.jsonl fehlt
+    repo, cfg, _voices = _setup(tmp_path)  # kein select: samples.jsonl fehlt
     monkeypatch.setattr("drova_voice.cli._client", lambda engine: StubClient())
     assert main(["--config", str(cfg), "bakeoff", "refs", "--speaker", "Viktor Eka"]) == 0
     target = repo / "voices" / "bakeoff"
@@ -108,7 +122,7 @@ def test_refs_works_without_samples_and_leaves_no_part_file(tmp_path, monkeypatc
 
 
 def test_failed_refs_leaves_neither_final_nor_part_file(tmp_path, monkeypatch, capsys):
-    repo, cfg, voices = _setup(tmp_path)
+    repo, cfg, _voices = _setup(tmp_path)
     monkeypatch.setattr("drova_voice.cli._client", lambda engine: StubClient(ok=False))
     assert main(["--config", str(cfg), "bakeoff", "refs", "--speaker", "Viktor Eka"]) == 1
     target = repo / "voices" / "bakeoff"
@@ -135,7 +149,7 @@ def test_console_with_cp1252_and_unencodable_path_does_not_crash(tmp_path, monke
 
 
 def test_select_with_empty_dialog_returns_2_and_keeps_old_samples(tmp_path, capsys):
-    repo, cfg, voices = _setup(tmp_path)
+    repo, cfg, _voices = _setup(tmp_path)
     assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 0
     samples_path = repo / "data" / "bakeoff" / "samples.jsonl"
     before = samples_path.read_bytes()
@@ -148,19 +162,24 @@ def test_select_with_empty_dialog_returns_2_and_keeps_old_samples(tmp_path, caps
 
 def test_select_without_dialog_dir_returns_2(tmp_path, capsys):
     _, cfg, _ = _setup(tmp_path)
-    shutil.rmtree(tmp_path / "game" / "Drova_Data" / "StreamingAssets" / "Localization" / "de" / "Dialog")
+    shutil.rmtree(
+        tmp_path / "game" / "Drova_Data" / "StreamingAssets" / "Localization" / "de" / "Dialog"
+    )
     assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 2
     err = capsys.readouterr().err
     assert "Dialog-Ordner fehlt" in err and "Dialog" in err
 
 
-@pytest.mark.parametrize("argv", [
-    ["bakeoff", "select"],
-    ["bakeoff", "run"],
-    ["bakeoff", "sheet"],
-    ["bakeoff", "refs", "--speaker", "Viktor Eka"],
-    ["smoke", "fake"],
-])
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["bakeoff", "select"],
+        ["bakeoff", "run"],
+        ["bakeoff", "sheet"],
+        ["bakeoff", "refs", "--speaker", "Viktor Eka"],
+        ["smoke", "fake"],
+    ],
+)
 def test_broken_config_is_a_german_error_with_exit_2(tmp_path, capsys, argv):
     _, cfg, _ = _setup(tmp_path)
     cfg.write_text('game_dir: ""\n', encoding="utf-8")
@@ -200,22 +219,27 @@ def test_config_path_that_cannot_be_read_returns_2(tmp_path, capsys, argv):
 
 def test_refs_writes_the_spoken_text_next_to_each_reference(tmp_path, monkeypatch):
     from drova_voice.bakeoff import REF_TEXT
-    repo, cfg, voices = _setup(tmp_path)
+
+    repo, cfg, _voices = _setup(tmp_path)
     monkeypatch.setattr("drova_voice.cli._client", lambda engine: StubClient())
     assert main(["--config", str(cfg), "bakeoff", "refs", "--speaker", "Viktor Eka"]) == 0
-    assert (repo / "voices" / "bakeoff" / "xtts-viktor-eka.txt").read_text(encoding="utf-8") == REF_TEXT
+    assert (repo / "voices" / "bakeoff" / "xtts-viktor-eka.txt").read_text(
+        encoding="utf-8"
+    ) == REF_TEXT
 
 
 def test_failed_refs_leaves_no_text_file(tmp_path, monkeypatch):
-    repo, cfg, voices = _setup(tmp_path)
+    repo, cfg, _voices = _setup(tmp_path)
     monkeypatch.setattr("drova_voice.cli._client", lambda engine: StubClient(ok=False))
     assert main(["--config", str(cfg), "bakeoff", "refs", "--speaker", "Viktor Eka"]) == 1
     assert not list((repo / "voices" / "bakeoff").glob("*.txt"))
 
 
 def test_run_refuses_a_missing_reference_with_a_clear_message(tmp_path, capsys):
-    repo, cfg, voices = _setup(tmp_path)
-    voices.write_text("- {engine: kitten, reference: voices/bakeoff/xtts-fehlt.wav}\n", encoding="utf-8")
+    _repo, cfg, voices = _setup(tmp_path)
+    voices.write_text(
+        "- {engine: kitten, reference: voices/bakeoff/xtts-fehlt.wav}\n", encoding="utf-8"
+    )
     assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 0
     assert main(["--config", str(cfg), "bakeoff", "run", "--voices", str(voices)]) == 2
     err = capsys.readouterr().err
@@ -253,7 +277,9 @@ def test_run_refuses_a_kitten_reference_without_transcript(tmp_path, capsys):
     ref = repo / "voices" / "bakeoff" / "ohne-text.wav"
     ref.parent.mkdir(parents=True)
     ref.write_bytes(b"RIFF")
-    voices.write_text("- {engine: kitten, reference: voices/bakeoff/ohne-text.wav}\n", encoding="utf-8")
+    voices.write_text(
+        "- {engine: kitten, reference: voices/bakeoff/ohne-text.wav}\n", encoding="utf-8"
+    )
     assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 0
     assert main(["--config", str(cfg), "bakeoff", "run", "--voices", str(voices)]) == 2
     assert "ohne-text.txt" in capsys.readouterr().err
@@ -261,6 +287,7 @@ def test_run_refuses_a_kitten_reference_without_transcript(tmp_path, capsys):
 
 def test_value_error_names_its_type_and_can_raise(monkeypatch, capsys):
     import pytest
+
     from drova_voice import cli
 
     def boom(_args):

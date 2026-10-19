@@ -1,13 +1,24 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Sequence
 
 from drova_voice.speech_text import StageDirection
 
-EMOTIONS = ("neutral", "angry", "contemplative", "excited", "joyful", "mundane",
-            "nervous", "sad", "stern", "surprised", "tender")
+EMOTIONS = (
+    "neutral",
+    "angry",
+    "contemplative",
+    "excited",
+    "joyful",
+    "mundane",
+    "nervous",
+    "sad",
+    "stern",
+    "surprised",
+    "tender",
+)
 EVENTS = ("gasp", "giggle", "growl", "gulp", "laugh", "pause", "scoff", "sigh", "sob", "um")
 SOURCES = ("default", "stage", "llm", "manual")
 
@@ -49,7 +60,7 @@ class EmotionTag:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "EmotionTag":
+    def from_dict(cls, d: dict) -> EmotionTag:
         return cls(
             emotion=d.get("emotion", "neutral"),
             intensity=float(d.get("intensity", 0.0)),

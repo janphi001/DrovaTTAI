@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
 
 from drova_voice.fish_voices import AGES, TYPES
 from drova_voice.jsonl import write_jsonl
@@ -27,11 +27,18 @@ class Profile:
     source: str  # llm | manual
 
     def to_dict(self) -> dict:
-        return {"speaker": self.speaker, "gender": self.gender, "age": self.age, "type": self.type or "",
-                "confidence": self.confidence, "note": self.note, "source": self.source}
+        return {
+            "speaker": self.speaker,
+            "gender": self.gender,
+            "age": self.age,
+            "type": self.type or "",
+            "confidence": self.confidence,
+            "note": self.note,
+            "source": self.source,
+        }
 
     @classmethod
-    def from_dict(cls, d: Mapping) -> "Profile":
+    def from_dict(cls, d: Mapping) -> Profile:
         speaker = str(d.get("speaker") or "").strip().lower()
         if not speaker:
             raise ValueError("speaker fehlt")
@@ -51,7 +58,15 @@ class Profile:
         source = d.get("source", "llm")
         if source not in SOURCES:
             raise ValueError(f"{speaker}: source muss llm oder manual sein")
-        return cls(speaker, d["gender"], d["age"], type_, confidence, str(d.get("note") or "").strip()[:MAX_NOTE], source)
+        return cls(
+            speaker,
+            d["gender"],
+            d["age"],
+            type_,
+            confidence,
+            str(d.get("note") or "").strip()[:MAX_NOTE],
+            source,
+        )
 
 
 def read_profiles(path: Path) -> dict[str, Profile]:
@@ -74,7 +89,9 @@ def write_profiles(path: Path, profiles: Iterable[Profile]) -> None:
     write_jsonl(path, (p.to_dict() for p in sorted(profiles, key=lambda p: p.speaker)))
 
 
-def merge_import(existing: Mapping[str, Profile], rows: Iterable[Mapping], known: set[str]) -> tuple[dict[str, Profile], list[str]]:
+def merge_import(
+    existing: Mapping[str, Profile], rows: Iterable[Mapping], known: set[str]
+) -> tuple[dict[str, Profile], list[str]]:
     """LLM-Steckbriefe einlesen: Quelle wird auf llm gesetzt, manual-Zeilen bleiben, unbekannte Sprecher werden gemeldet."""
     merged = dict(existing)
     errors: list[str] = []
@@ -93,8 +110,14 @@ def merge_import(existing: Mapping[str, Profile], rows: Iterable[Mapping], known
     return merged, errors
 
 
-def prepare_packets(lines: Sequence[Line], profiles: Mapping[str, Profile], size: int = 20, max_own: int = 40,
-                    max_mentions: int = 12, include_known: bool = False) -> list[list[dict]]:
+def prepare_packets(
+    lines: Sequence[Line],
+    profiles: Mapping[str, Profile],
+    size: int = 20,
+    max_own: int = 40,
+    max_mentions: int = 12,
+    include_known: bool = False,
+) -> list[list[dict]]:
     """Pakete für Subagents: je Sprecher ein Auszug seiner Zeilen und Zeilen anderer, die ihn nennen."""
     if size < 1:
         raise ValueError("Paketgröße muss mindestens 1 sein")
@@ -109,8 +132,19 @@ def prepare_packets(lines: Sequence[Line], profiles: Mapping[str, Profile], size
         own = own_by_name[s.name]
         own = own[:: max(1, len(own) // max_own)][:max_own]
         pattern = re.compile(rf"\b{re.escape(s.display)}\b")
-        mentions = [{"by": l.actor, "text": l.speech} for l in dialog
-                    if l.actor.lower() != s.name and pattern.search(l.speech)][:max_mentions]
-        entries.append({"speaker": s.name, "display": s.display, "lines": s.lines, "trees": sorted(s.trees)[:8],
-                        "own": [l.speech for l in own], "mentions": mentions})
-    return [entries[i:i + size] for i in range(0, len(entries), size)]
+        mentions = [
+            {"by": l.actor, "text": l.speech}
+            for l in dialog
+            if l.actor.lower() != s.name and pattern.search(l.speech)
+        ][:max_mentions]
+        entries.append(
+            {
+                "speaker": s.name,
+                "display": s.display,
+                "lines": s.lines,
+                "trees": sorted(s.trees)[:8],
+                "own": [l.speech for l in own],
+                "mentions": mentions,
+            }
+        )
+    return [entries[i : i + size] for i in range(0, len(entries), size)]

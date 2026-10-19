@@ -59,7 +59,9 @@ def test_repo_root_must_be_a_string(tmp_path, value):
 
 def test_fish_settings_are_optional_and_checked(tmp_path):
     cfg_file = tmp_path / "config.yaml"
-    cfg_file.write_text('game_dir: "/tmp/game"\nfish_model: s2.1-pro\nfish_temperature: 0.5\n', encoding="utf-8")
+    cfg_file.write_text(
+        'game_dir: "/tmp/game"\nfish_model: s2.1-pro\nfish_temperature: 0.5\n', encoding="utf-8"
+    )
     cfg = load_config(cfg_file)
     assert cfg.fish_model == "s2.1-pro" and cfg.fish_temperature == 0.5 and cfg.fish_top_p is None
     cfg_file.write_text('game_dir: "/tmp/game"\nfish_model: kein-modell\n', encoding="utf-8")
@@ -117,7 +119,9 @@ def test_null_or_empty_language_stays_de_and_a_number_is_rejected(tmp_path):
         load_config(cfg_file)
 
 
-@pytest.mark.parametrize("value", ["..", "de/..", "../de", "de/en", "d e", ".de", "de.", "averyveryverylonglanguage"])
+@pytest.mark.parametrize(
+    "value", ["..", "de/..", "../de", "de/en", "d e", ".de", "de.", "averyveryverylonglanguage"]
+)
 def test_language_must_be_a_short_folder_name(tmp_path, value):
     cfg_file = tmp_path / "config.yaml"
     cfg_file.write_text(f"game_dir: '/tmp/game'\nlanguage: '{value}'\n", encoding="utf-8")

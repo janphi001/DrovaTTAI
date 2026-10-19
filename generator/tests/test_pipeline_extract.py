@@ -9,10 +9,24 @@ from drova_voice.lines import read_lines
 def test_extract_writes_lines_and_reports_skips(pipeline_repo, capsys):
     assert main(["--config", str(pipeline_repo.cfg), "extract"]) == 0
     lines = read_lines(pipeline_repo.data / "lines.jsonl")
-    assert [l.skip for l in lines] == [None, None, None, "gvar_value", "unspeakable", "player_choice"]
-    assert lines[0].speech == "Der Weg nach Norden ist weit." and lines[0].stage[0]["text"] == "seufzt"
+    assert [l.skip for l in lines] == [
+        None,
+        None,
+        None,
+        "gvar_value",
+        "unspeakable",
+        "player_choice",
+    ]
+    assert (
+        lines[0].speech == "Der Weg nach Norden ist weit." and lines[0].stage[0]["text"] == "seufzt"
+    )
     out = capsys.readouterr().out
-    assert "6 Zeilen" in out and "gvar_value: 1" in out and "unspeakable: 1" in out and "player_choice: 1" in out
+    assert (
+        "6 Zeilen" in out
+        and "gvar_value: 1" in out
+        and "unspeakable: 1" in out
+        and "player_choice: 1" in out
+    )
 
 
 def test_extract_without_manifest_fails_clearly(pipeline_repo, capsys):
@@ -47,7 +61,9 @@ def test_extract_prefers_the_full_manifest_when_both_exist(pipeline_repo, capsys
     assert "manifest-loaded.json" not in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("payload", ["{", "[]", "null", '"text"', '{"lines": null}', '{"lines": {}}'])
+@pytest.mark.parametrize(
+    "payload", ["{", "[]", "null", '"text"', '{"lines": null}', '{"lines": {}}']
+)
 def test_extract_rejects_unusable_manifest_json(pipeline_repo, capsys, payload):
     path = pipeline_repo.data / "export" / "de" / "manifest.json"
     path.write_text(payload, encoding="utf-8")
@@ -58,7 +74,15 @@ def test_extract_rejects_unusable_manifest_json(pipeline_repo, capsys, payload):
 
 
 def test_extract_rejects_a_loc_file_that_is_not_utf8(pipeline_repo, capsys):
-    loc = pipeline_repo.game / "Drova_Data" / "StreamingAssets" / "Localization" / "de" / "Dialog" / "NPC_Mira_de.loc"
+    loc = (
+        pipeline_repo.game
+        / "Drova_Data"
+        / "StreamingAssets"
+        / "Localization"
+        / "de"
+        / "Dialog"
+        / "NPC_Mira_de.loc"
+    )
     loc.write_bytes(b"Plh_1 { Aa\xe4 }\n")
     assert main(["--config", str(pipeline_repo.cfg), "extract"]) == 2
     err = capsys.readouterr().err

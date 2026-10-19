@@ -19,7 +19,9 @@ def test_synth_batch_runs_the_speaker_and_the_player(pipeline_repo, guarded):
     run(pipeline_repo, "extract")
     run(pipeline_repo, "batches")
     assert guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake", "--batch", "1")) == 0
-    ids = sorted(r["id"] for r in read_jsonl_lenient(pipeline_repo.data / "synth" / "results.jsonl"))
+    ids = sorted(
+        r["id"] for r in read_jsonl_lenient(pipeline_repo.data / "synth" / "results.jsonl")
+    )
     assert ids == [TREE + "Plh_1", TREE + "Plh_2", TREE + "Plh_3"]
 
 

@@ -22,7 +22,9 @@ def test_a_bloated_file_shrinks_to_one_row_per_id(tmp_path):
     for _ in range(2):
         append_jsonl(path, first)
         append_jsonl(path, second)
-    record_synth_results(path, [_row("a", attempts=0), _row("b", key="k2", wav="b.wav", attempts=0)])
+    record_synth_results(
+        path, [_row("a", attempts=0), _row("b", key="k2", wav="b.wav", attempts=0)]
+    )
     assert read_jsonl(path) == [first, second]
 
 

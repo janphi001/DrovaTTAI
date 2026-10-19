@@ -4,20 +4,21 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "_common"))
-from worker_loop import serve  # noqa: E402
+from worker_loop import serve
 
 MODEL = "KittenML/kitten-tts-2"
 
 
 def load():
     from kittenml import KittenTTS
+
     return KittenTTS(MODEL)
 
 
 def synth(model, req: dict) -> tuple[int, float]:
     import soundfile as sf
 
-    kwargs = {"normalize": False}
+    kwargs: dict[str, object] = {"normalize": False}
     preset = (req.get("params") or {}).get("preset")
     if preset:
         kwargs["preset"] = preset
@@ -25,7 +26,9 @@ def synth(model, req: dict) -> tuple[int, float]:
         transcript = Path(req["reference"]).with_suffix(".txt")
         if not transcript.is_file():
             # Ohne Text transkribiert Kitten die Referenz selbst: Whisper-large-v3 (ca. 3 GB Download), fest auf Englisch.
-            raise ValueError(f"Referenztext fehlt: {transcript} (ohne ihn würde Kitten Whisper laden); `bakeoff refs` schreibt ihn mit")
+            raise ValueError(
+                f"Referenztext fehlt: {transcript} (ohne ihn würde Kitten Whisper laden); `bakeoff refs` schreibt ihn mit"
+            )
         kwargs["reference"] = req["reference"]
         kwargs["reference_text"] = transcript.read_text(encoding="utf-8").strip()
     else:

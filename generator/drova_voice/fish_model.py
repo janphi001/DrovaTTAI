@@ -4,15 +4,16 @@ Der Cache-Schlüssel von `synth` enthält den Modell-Alias `fish-audio/<id>` (Ha
 des Workers) und die Parameter Sprache, Latenz, temperature und top_p. Ein anderer
 Stempel trifft keine vorhandene WAV. Der Wechsel ist nur mit `--accept-model-change` erlaubt.
 """
+
 from __future__ import annotations
 
 import math
 import os
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Mapping
 
 # Kostenloses Entwickler-Modell. Laut Fish-Changelog bis 30.11.2026, danach Nachfolger s2.1-pro.
 DEFAULT_FISH_MODEL = "s2.1-pro-free"
@@ -64,8 +65,10 @@ class FishProfile:
         return sampling
 
     def stamp(self) -> str:
-        parts = [f"{name}={_num(value) if isinstance(value, float) else value}"
-                 for name, value in sorted(self.params().items())]
+        parts = [
+            f"{name}={_num(value) if isinstance(value, float) else value}"
+            for name, value in sorted(self.params().items())
+        ]
         return " ".join([self.cache_model(), *parts])
 
     def worker_env(self) -> dict[str, str]:
@@ -86,7 +89,9 @@ def cache_model_name(model_id: str) -> str:
 def resolve_fish_model(configured: str | None, env: Mapping[str, str] | None = None) -> str:
     """FISH_MODEL in der Umgebung, sonst fish_model aus der Konfiguration, sonst der Standard."""
     source = os.environ if env is None else env
-    chosen = source.get("FISH_MODEL", "").strip() or (configured or "").strip() or DEFAULT_FISH_MODEL
+    chosen = (
+        source.get("FISH_MODEL", "").strip() or (configured or "").strip() or DEFAULT_FISH_MODEL
+    )
     if chosen not in KNOWN_FISH_MODELS:
         allowed = ", ".join(KNOWN_FISH_MODELS)
         raise ValueError(
@@ -117,29 +122,50 @@ def _env_unit(raw: str, label: str) -> float:
     return _unit(number, label)
 
 
-def resolve_fish_profile(language: str, model: str | None, latency: str | None,
-                         temperature: float | None, top_p: float | None,
-                         env: Mapping[str, str] | None = None) -> FishProfile:
+def resolve_fish_profile(
+    language: str,
+    model: str | None,
+    latency: str | None,
+    temperature: float | None,
+    top_p: float | None,
+    env: Mapping[str, str] | None = None,
+) -> FishProfile:
     """Sprache aus der Konfiguration. FISH_* in der Umgebung überschreibt Latenz und Sampling für einen Lauf."""
     source = os.environ if env is None else env
     if not isinstance(language, str) or not _LANG.fullmatch(language):
-        raise ValueError("language muss ein BCP-47-Kürzel sein, z. B. de (steht in config.yaml und geht an Fish)")
+        raise ValueError(
+            "language muss ein BCP-47-Kürzel sein, z. B. de (steht in config.yaml und geht an Fish)"
+        )
     chosen_latency = _from_env(source, "FISH_LATENCY") or (latency or "").strip() or DEFAULT_LATENCY
     if chosen_latency not in LATENCY_VALUES:
-        raise ValueError(f"Fish-Latenz '{chosen_latency}' ist unbekannt. Erlaubt: {', '.join(LATENCY_VALUES)}.")
+        raise ValueError(
+            f"Fish-Latenz '{chosen_latency}' ist unbekannt. Erlaubt: {', '.join(LATENCY_VALUES)}."
+        )
     raw_temperature = _from_env(source, "FISH_TEMPERATURE")
     raw_top_p = _from_env(source, "FISH_TOP_P")
-    chosen_temperature = _env_unit(raw_temperature, "FISH_TEMPERATURE") if raw_temperature else _unit(
-        DEFAULT_TEMPERATURE if temperature is None else temperature, "fish_temperature")
-    chosen_top_p = _env_unit(raw_top_p, "FISH_TOP_P") if raw_top_p else _unit(
-        DEFAULT_TOP_P if top_p is None else top_p, "fish_top_p")
-    return FishProfile(resolve_fish_model(model, source), language, chosen_latency, chosen_temperature, chosen_top_p)
+    chosen_temperature = (
+        _env_unit(raw_temperature, "FISH_TEMPERATURE")
+        if raw_temperature
+        else _unit(DEFAULT_TEMPERATURE if temperature is None else temperature, "fish_temperature")
+    )
+    chosen_top_p = (
+        _env_unit(raw_top_p, "FISH_TOP_P")
+        if raw_top_p
+        else _unit(DEFAULT_TOP_P if top_p is None else top_p, "fish_top_p")
+    )
+    return FishProfile(
+        resolve_fish_model(model, source),
+        language,
+        chosen_latency,
+        chosen_temperature,
+        chosen_top_p,
+    )
 
 
 def _model_id(stamp: str) -> str:
     head = stamp.split(" ", 1)[0]
     prefix = "fish-audio/"
-    return head[len(prefix):] if head.startswith(prefix) else head
+    return head.removeprefix(prefix)
 
 
 def _read_stamp(cache_dir: Path) -> str | None:

@@ -5,39 +5,51 @@ from drova_voice.player_name import NAME_TOKEN, has_player_name, make_name_varia
 N = NAME_TOKEN
 
 
-@pytest.mark.parametrize("raw, neutral", [
-    (f"Danke, {N}. Der Vogt Zerinda wartet am Brunnen.", "Danke. Der Vogt Zerinda wartet am Brunnen."),
-    (f"Hallo {N}! Der Wald riecht nach Regen.", "Hallo! Der Wald riecht nach Regen."),
-    (f"Hallo {N}, der Wald riecht nach Regen.", "Hallo, der Wald riecht nach Regen."),
-    (f"Nun zu dir, {N} ... Pass auf die Brücke auf.", "Nun zu dir ... Pass auf die Brücke auf."),
-    (f"Tarro! {N}!", "Tarro!"),
-    (f"Tarro! {N}. Komm.", "Tarro! Komm."),
-    (f"{N}, komm mal her.", "Komm mal her."),
-    (f"{N}, seid still.", "Seid still."),
-    (f"{N}, meinst du das?", "Meinst du das?"),
-])
+@pytest.mark.parametrize(
+    "raw, neutral",
+    [
+        (
+            f"Danke, {N}. Der Vogt Zerinda wartet am Brunnen.",
+            "Danke. Der Vogt Zerinda wartet am Brunnen.",
+        ),
+        (f"Hallo {N}! Der Wald riecht nach Regen.", "Hallo! Der Wald riecht nach Regen."),
+        (f"Hallo {N}, der Wald riecht nach Regen.", "Hallo, der Wald riecht nach Regen."),
+        (
+            f"Nun zu dir, {N} ... Pass auf die Brücke auf.",
+            "Nun zu dir ... Pass auf die Brücke auf.",
+        ),
+        (f"Tarro! {N}!", "Tarro!"),
+        (f"Tarro! {N}. Komm.", "Tarro! Komm."),
+        (f"{N}, komm mal her.", "Komm mal her."),
+        (f"{N}, seid still.", "Seid still."),
+        (f"{N}, meinst du das?", "Meinst du das?"),
+    ],
+)
 def test_vocative_is_removed(raw, neutral):
     v = make_name_variants(raw)
     assert v.neutral == neutral
     assert not v.needs_review
 
 
-@pytest.mark.parametrize("raw", [
-    f"Man nennt mich {N}.",
-    f"Vorsicht, Pamph. {N} schafft das bestimmt.",
-    f"Nett, dass du kommst {N} ... Der Tee ist noch warm.",
-    f"Pass auf. {N} ... Der Tee ist noch warm.",
-    f"{N}, der Vogt, wartet am Brunnen.",
-    f"{N}, mein Freund, wartet am Brunnen.",
-    f"{N}, eure Freunde, warten.",
-    f"{N}, eurer Vogt, wartet.",
-    f"{N}, euer Vogt, wartet.",
-    f"{N}, kein Narr, wartet.",
-    f"{N}, eines Tages, warten.",
-    f"Tarro?! {N}?!",
-    f"Tarro! {N}!!",
-    f"{N}!",
-])
+@pytest.mark.parametrize(
+    "raw",
+    [
+        f"Man nennt mich {N}.",
+        f"Vorsicht, Pamph. {N} schafft das bestimmt.",
+        f"Nett, dass du kommst {N} ... Der Tee ist noch warm.",
+        f"Pass auf. {N} ... Der Tee ist noch warm.",
+        f"{N}, der Vogt, wartet am Brunnen.",
+        f"{N}, mein Freund, wartet am Brunnen.",
+        f"{N}, eure Freunde, warten.",
+        f"{N}, eurer Vogt, wartet.",
+        f"{N}, euer Vogt, wartet.",
+        f"{N}, kein Narr, wartet.",
+        f"{N}, eines Tages, warten.",
+        f"Tarro?! {N}?!",
+        f"Tarro! {N}!!",
+        f"{N}!",
+    ],
+)
 def test_name_inside_sentence_needs_review(raw):
     v = make_name_variants(raw)
     assert v.neutral is None
