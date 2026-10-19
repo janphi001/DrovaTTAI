@@ -109,3 +109,7 @@ def test_empty_cache_does_not_warn_and_the_free_tier_warning_follows_the_date(tm
     assert free_tier_warning(DEFAULT_FISH_MODEL, date(2026, 11, 30)) is None
     assert "30.11.2026" in free_tier_warning(DEFAULT_FISH_MODEL, date(2026, 12, 1))
     assert free_tier_warning("s2.1-pro", date(2026, 12, 1)) is None
+
+
+def test_game_folder_zh_cn_becomes_a_bcp47_tag():
+    assert _profile(language="zh_CN").language == "zh-CN"

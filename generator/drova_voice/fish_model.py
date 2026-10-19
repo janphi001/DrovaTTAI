@@ -132,6 +132,8 @@ def resolve_fish_profile(
 ) -> FishProfile:
     """Sprache aus der Konfiguration. FISH_* in der Umgebung überschreibt Latenz und Sampling für einen Lauf."""
     source = os.environ if env is None else env
+    if isinstance(language, str):
+        language = language.replace("_", "-")  # Spielordner zh_CN -> BCP-47 zh-CN
     if not isinstance(language, str) or not _LANG.fullmatch(language):
         raise ValueError(
             "language muss ein BCP-47-Kürzel sein, z. B. de (steht in config.yaml und geht an Fish)"

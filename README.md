@@ -1,5 +1,7 @@
 # DrovaVoice (DrovaTTAI)
 
+**Deutsch** · [English](README.en.md)
+
 Deutsche KI-Stimmen für **Drova – Forsaken Kin**. Die Figuren sprechen ihre Dialoge, die Untertitel laufen wie gewohnt mit.
 
 Das Projekt besteht aus zwei Teilen:
@@ -7,9 +9,14 @@ Das Projekt besteht aus zwei Teilen:
 - **Generator** (`generator/`, Python, Befehl `drova-voice`): liest die Dialogtexte aus deiner eigenen Spielinstallation und erzeugt daraus Sprachdateien.
 - **Mod** (`mod/`, C#, MelonLoader): spielt diese Dateien im Spiel ab.
 
-**Nur spielen?** Das fertige Paket mit Mod und allen Sprachdateien gibt es unter [Releases](https://github.com/janphi001/DrovaTTAI/releases/latest). Die Anleitung steht in der `README.txt` im ZIP. **Alle Stimmen sind KI-generiert.**
+## Herunterladen oder selbst erzeugen
 
-Dieses Repo selbst enthält **keine Spieltexte und kein Audio**. Beides entsteht lokal auf deinem Rechner aus deiner Spielkopie und liegt nicht im Git (`data/`, `cache/`, `out/` sind ausgeschlossen). Die Anleitung unten ist für alle, die die Stimmen selbst erzeugen wollen.
+**Alle Stimmen sind KI-generiert.**
+
+- **Deutsch, fertig zum Spielen:** Das Paket mit Mod und allen deutschen Sprachdateien liegt unter [Releases](https://github.com/janphi001/DrovaTTAI/releases/latest). Herunterladen, in den Spielordner kopieren, spielen. Die Anleitung steht in der `README.txt` im ZIP.
+- **Eine andere Sprache:** Das Spiel hat Texte auf Deutsch, Englisch, Spanisch, Französisch, Polnisch, Koreanisch und Chinesisch. Mit dem Generator aus diesem Repo erzeugst du die Stimmen für eine dieser Sprachen selbst. Das geht wie unten beschrieben, mit den Änderungen aus [Andere Sprachen](#andere-sprachen).
+
+Dieses Repo selbst enthält **keine Spieltexte und kein Audio**. Beides entsteht lokal auf deinem Rechner aus deiner Spielkopie und liegt nicht im Git (`data/`, `cache/`, `out/` sind ausgeschlossen).
 
 Stand: Alle 245 benannten Sprecher haben eine Stimme, im Spiel sind rund 13.800 Zeilen vertont (41 Stimmen plus 7 Abwandlungen wie alte Frau, Riese, Zwerg). Dazu kommen Barks (Zurufe in der Welt, mit eigener Lautstärke und laufend leiser mit der Entfernung) und Zeilen generischer Figuren (`NPC`, Wache …): Dort wählt die Mod je Figur eine feste Stimme aus einem kleinen Pool nach Geschlecht. Nicht vertont sind die Antwortoptionen des Spielers (wie im Original), Briefe und Zeilen mit Quest- oder Geldwerten; Zeilen mit dem Spielernamen werden ohne den Namen gesprochen.
 
@@ -163,6 +170,22 @@ Spiel starten, Spielstand laden, mit NPCs sprechen. Die Einstellungen stehen in 
 Weitere Hinweise, Log-Meldungen und die Abnahme-Checkliste: `docs/playback.md`.
 
 Eine neue oder geänderte `index.json` liest die Mod im laufenden Spiel nach (etwa einmal pro Sekunde, an Größe und Schreibzeit der Datei). Dieselbe Datei noch einmal laden, ohne dass sich Größe oder Zeit geändert haben: leere Datei `Mods/DrovaVoice/reload.trigger` anlegen. Schlägt das Laden fehl, steht der Grund in `MelonLoader/Latest.log`; ein vorher gültiger Index bleibt aktiv.
+
+## Andere Sprachen
+
+Die Anleitung oben gilt für jede Sprache des Spiels. Die Ordnernamen sind `de`, `en`, `es`, `fr`, `pl`, `ko`, `zh_CN` und `zh_TW`. Für eine andere Sprache als Deutsch änderst du Folgendes, hier am Beispiel Englisch (`en`):
+
+1. **Spiel auf die Sprache stellen** und in `UserData/MelonPreferences.cfg` im Abschnitt `[DrovaVoice]` `ExportLanguage = "en"` und `AudioLanguage = "en"` setzen. Dann den Export (Schritt 4) neu auslösen: Er landet in `Mods/DrovaVoice/Export/en/`.
+2. **Generator auf die Sprache stellen:** `language: en` in `generator/config.yaml`. Damit liest `extract` die englischen Texte, Zahlen werden englisch ausgeschrieben, Fish bekommt `language=en`, und `install` schreibt nach `Mods/DrovaVoice/Audio/en/`.
+3. **Stimmen in der Sprache wählen:** Die 41 Stimmen in `casting/fish_voices.yaml` sind deutsche Stimmen. Suche in der [Fish-Bibliothek](https://fish.audio) Stimmen in deiner Sprache und trage sie dort ein (`id`, `label`, `gender`, `age`). Danach `casting/casting.yaml` anpassen oder mit `drova-voice cast --propose` neu zuteilen. Die Steckbriefe der Figuren (`casting/profiles.jsonl`) gelten für jede Sprache.
+4. **Dann wie gewohnt** `extract`, `emote`, `synth`, `encode`, `install`.
+
+Gut zu wissen:
+
+- Die Emotionen in `casting/emotions.jsonl` wurden am deutschen Text bestimmt. Sie hängen an den Zeilen-IDs und gelten deshalb auch für andere Sprachen; deutsche Betonungswörter, die im Text nicht vorkommen, werden übersprungen.
+- Zeilen mit dem Spielernamen werden ohne den Namen gesprochen. Die Regeln dafür sind auf Deutsch zugeschnitten; in anderen Sprachen kann dort ein Satzzeichen oder eine Anrede übrig bleiben.
+- Für Chinesisch und Koreanisch schreibt der Generator keine Zahlwörter aus; die Ziffern gehen an Fish, das sie über `language` selbst ausspricht.
+- Das Aussprache-Lexikon `casting/lexicon.yaml` ist leer und gilt für alle Sprachen. Trag dort Namen ein, die Fish falsch ausspricht.
 
 ## Kompatibilität
 
