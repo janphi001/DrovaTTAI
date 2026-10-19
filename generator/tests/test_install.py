@@ -273,7 +273,7 @@ def test_absolute_and_drive_rel_stay_out_of_the_index(tmp_path):
         audio, target, "de")
     assert result.copied == 0 and result.entries == 0 and len(result.errors) == 2
     assert absolute.read_bytes() == b"ABS"
-    assert not (target / "C:").exists()
+    assert sorted(p.name for p in target.iterdir()) == ["index.json"]  # unter Windows ist target / "C:" das Laufwerk
     assert read_index(target)["entries"] == {}
 
 
@@ -282,7 +282,7 @@ def test_symlink_outside_the_audio_folder_is_not_installed(tmp_path):
     outside = tmp_path / "outside"
     outside.mkdir()
     audio.mkdir()
-    (audio / "link").symlink_to(outside, target_is_directory=True)
+    _symlink(audio / "link", outside, directory=True)
     (outside / "x.ogg").write_bytes(b"OUT")
     result = install_audio([row("T|P|Plh_1", "link/x.ogg")], audio, target, "de")
     assert result.copied == 0 and result.entries == 0 and result.errors
