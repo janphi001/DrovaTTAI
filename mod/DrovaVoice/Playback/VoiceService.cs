@@ -81,7 +81,8 @@ namespace DrovaVoice.Playback
             var status = AwaitSamples(cacheKey, entry, percent, out var decoded, out string? error);
             if (status != DecodeStatus.Ready || decoded == null)
             {
-                _failed.Add(id!);
+                // Eine Zeitüberschreitung ist vorübergehend (kalte Platte, Last): beim nächsten Mal neu versuchen.
+                if (error != DecodeCache.TimeoutError) _failed.Add(id!);
                 _decodes.TryRemove(cacheKey, out _, out _);
                 Problem("fail|" + id, $"Zeile bleibt stumm ({error ?? "Dekodieren fehlgeschlagen"}): {id}", error: false);
                 return null;
