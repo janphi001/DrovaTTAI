@@ -115,12 +115,18 @@ def install_audio(rows: Sequence[dict], audio_dir: Path, install_dir: Path, lang
             result.errors.append(f"{row['id']}: Datei fehlt ({src})")
             continue
         if not _same_file(src, dst):
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            part = dst.with_name(f"{dst.stem}.part.ogg")
-            shutil.copy2(src, part)
-            replace_with_retry(part, dst)
             result.copied += 1
+            if not dry_run:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                part = dst.with_name(f"{dst.stem}.part.ogg")
+                shutil.copy2(src, part)
+                replace_with_retry(part, dst)
         entries[row["id"]] = {"file": row["rel"], "duration": round(float(row["duration"]), 3)}
+    result.entries = len(entries)
+    # Dry-Run zählt nur: nichts kopieren, index.json nicht anlegen und nichts löschen.
+    if dry_run:
+        result.pruned = _orphan_oggs(install_dir, entries)
+        return result
     variants: dict[str, list[str]] = {}
     for full_id in entries:
         base, variant = split_variant(full_id)
@@ -132,10 +138,8 @@ def install_audio(rows: Sequence[dict], audio_dir: Path, install_dir: Path, lang
     tmp = index_path.with_name("index.json.tmp")
     tmp.write_text(json.dumps(index, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     replace_with_retry(tmp, index_path)
-    result.entries = len(entries)
     # Erst den Index schreiben, dann löschen: ein Abbruch lässt höchstens Dateien übrig, nie einen Eintrag ohne Datei.
-    if prune or dry_run:
+    if prune:
         result.pruned = _orphan_oggs(install_dir, entries)
-        if prune and not dry_run:
-            result.pruned = _delete_orphans(install_dir, result.pruned, result)
+        result.pruned = _delete_orphans(install_dir, result.pruned, result)
     return result
