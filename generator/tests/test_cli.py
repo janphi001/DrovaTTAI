@@ -248,3 +248,19 @@ def test_run_refuses_a_kitten_reference_without_transcript(tmp_path, capsys):
     assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 0
     assert main(["--config", str(cfg), "bakeoff", "run", "--voices", str(voices)]) == 2
     assert "ohne-text.txt" in capsys.readouterr().err
+
+
+def test_value_error_names_its_type_and_can_raise(monkeypatch, capsys):
+    import pytest
+    from drova_voice import cli
+
+    def boom(_args):
+        raise ValueError("kaputt")
+
+    monkeypatch.setattr(cli, "_run", boom)
+    monkeypatch.delenv("DROVA_VOICE_TRACEBACK", raising=False)
+    assert cli.main(["report"]) == 2
+    assert "FEHLER: kaputt [ValueError]" in capsys.readouterr().err
+    monkeypatch.setenv("DROVA_VOICE_TRACEBACK", "1")
+    with pytest.raises(ValueError):
+        cli.main(["report"])

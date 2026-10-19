@@ -223,7 +223,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"FEHLER: {_redact(str(e))}", file=sys.stderr)
         return 1
     except (OSError, ValueError, yaml.YAMLError) as e:
-        print(f"FEHLER: {_redact(str(e))}", file=sys.stderr)
+        # ValueError fängt auch echte Programmfehler. Der Typ bleibt sichtbar, der Traceback auf Wunsch.
+        if os.environ.get("DROVA_VOICE_TRACEBACK") == "1":
+            raise
+        print(f"FEHLER: {_redact(str(e))} [{type(e).__name__}]", file=sys.stderr)
         return 2
 
 
