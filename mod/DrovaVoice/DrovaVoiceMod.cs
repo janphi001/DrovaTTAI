@@ -139,7 +139,7 @@ namespace DrovaVoice
             else if (trigger) RunExport(useCatalog: false);
             if (_frame % 60 == 30 && ConsumeTrigger(TriggerNpcsPath, ref _exportNpcsTriggerStuck))
             {
-                try { NpcExporter.Export(Path.Combine(ModDir, "Export", _language!.Value), LoggerInstance); }
+                try { NpcExporter.Export(Path.Combine(ModDir, "Export", ExportLanguageFolder()), LoggerInstance); }
                 catch (Exception e) { LoggerInstance.Error($"NPC-Export fehlgeschlagen: {e}"); }
             }
         }
@@ -172,6 +172,14 @@ namespace DrovaVoice
             }
         }
 
+        private string ExportLanguageFolder()
+        {
+            var warnings = new List<string>();
+            string lang = VoiceSettings.CleanFolderName(_language?.Value, "ExportLanguage", warnings);
+            foreach (string warning in warnings) LoggerInstance.Warning(warning);
+            return lang;
+        }
+
         private void LogLanguage(string preference)
         {
             string current;
@@ -194,7 +202,7 @@ namespace DrovaVoice
             {
                 if (_voice != null && !_connectorInstalled && WorldEventSystemManager.Instance == null)
                     LoggerInstance.Warning("Export im Hauptmenü: Die Modding API scheitert dabei beim Initialisieren ihres AudioManagers; die Vertonung bleibt in dieser Sitzung aus. Zum Hören das Spiel neu starten.");
-                string lang = _language!.Value;
+                string lang = ExportLanguageFolder();
                 LogLanguage(lang);
                 var exporter = new DialogueExporter(lang, LoggerInstance);
                 IEnumerable<Il2CppNodeCanvas.DialogueTrees.DialogueTree> trees;

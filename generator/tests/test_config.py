@@ -66,3 +66,23 @@ def test_null_or_empty_language_stays_de_and_a_number_is_rejected(tmp_path):
     cfg_file.write_text('game_dir: "/tmp/game"\nlanguage: 5\n', encoding="utf-8")
     with pytest.raises(ValueError, match="language"):
         load_config(cfg_file)
+
+
+@pytest.mark.parametrize("value", ["..", "de/..", "../de", "de/en", "d e", ".de", "de.", "averyveryverylonglanguage"])
+def test_language_must_be_a_short_folder_name(tmp_path, value):
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(f"game_dir: '/tmp/game'\nlanguage: '{value}'\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="gültiger Ordnername"):
+        load_config(cfg_file)
+
+
+def test_language_folder_codes_with_hyphen_or_underscore(tmp_path):
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text("game_dir: '/tmp/game'\nlanguage: 'zh_CN'\n", encoding="utf-8")
+    assert load_config(cfg_file).language == "zh_CN"
+    cfg_file.write_text("game_dir: '/tmp/game'\nlanguage: 'en-GB'\n", encoding="utf-8")
+    assert load_config(cfg_file).language == "en-GB"
+    cfg_file.write_text("game_dir: '/tmp/game'\nlanguage: ' en '\n", encoding="utf-8")
+    assert load_config(cfg_file).language == "en"
+    cfg_file.write_text("game_dir: '/tmp/game'\nlanguage: 'abcdefghijklmnop'\n", encoding="utf-8")
+    assert load_config(cfg_file).language == "abcdefghijklmnop"

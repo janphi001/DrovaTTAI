@@ -1,7 +1,17 @@
 import json
 import os
 
+import pytest
+
 from drova_voice.install import install_audio, split_variant
+
+
+def _symlink(link, target, directory=False):
+    # Windows legt Symlinks nur mit Entwicklermodus oder Adminrecht an.
+    try:
+        link.symlink_to(target, target_is_directory=directory)
+    except OSError as e:
+        pytest.skip(f"Symlink nicht erlaubt: {e}")
 
 
 def make_audio(audio_dir, rel, content=b"OggS-Test"):
@@ -178,7 +188,7 @@ def test_without_prune_orphan_oggs_stay(tmp_path):
 def test_prune_deletes_only_unreferenced_oggs(tmp_path):
     audio, target = _seed_keep_and_orphan(tmp_path)
     result = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, target, "de",
-                           drop_ids={"T|P|Plh_2"}, prune=True)
+                           drop_ids={"T|P|Plh_2"}, prune=True, audio_root=target.parent)
     assert result.pruned == ["bark/stray.ogg", "dialog/drop.ogg"]
     assert result.errors == [] and result.entries == 1
     assert (target / "dialog" / "keep.ogg").read_bytes() == b"KEEP"
@@ -248,6 +258,82 @@ def test_backslash_file_field_still_protects_the_ogg(tmp_path):
         "T|P|Plh_1": {"file": "dialog\\keep.ogg", "duration": 1.0},
     }}
     (target / "index.json").write_text(json.dumps(index), encoding="utf-8")
-    result = install_audio([], audio, target, "de", prune=True)
+    result = install_audio([], audio, target, "de", prune=True, audio_root=target.parent)
     assert result.pruned == [] and result.entries == 1
     assert (target / "dialog" / "keep.ogg").read_bytes() == b"KEEP"
+
+
+def test_prune_without_an_audio_root_deletes_nothing(tmp_path):
+    audio, target = _seed_keep_and_orphan(tmp_path)
+    result = install_audio([row("T|P|Plh_1", "dialog/keep.ogg")], audio, target, "de",
+                           drop_ids={"T|P|Plh_2"}, prune=True)
+    assert result.pruned == [] and result.errors
+    assert (target / "dialog" / "drop.ogg").read_bytes() == b"DROP"
+    assert (target / "bark" / "stray.ogg").is_file()
+
+
+def test_prune_does_not_delete_when_the_target_resolves_outside_the_audio_folder(tmp_path):
+    game = tmp_path / "game"
+    audio_root = game / "Mods" / "DrovaVoice" / "Audio"
+    parent = audio_root.parent
+    parent.mkdir(parents=True)
+    secret = parent / "secret.ogg"
+    secret.write_bytes(b"SECRET")
+    src = tmp_path / "src"
+    src.mkdir()
+    result = install_audio([], src, audio_root / "..", "de", prune=True, audio_root=audio_root, game_dir=game)
+    assert result.pruned == [] and result.errors
+    assert "nichts gelöscht" in result.errors[0]
+    assert secret.read_bytes() == b"SECRET"
+
+
+def test_prune_does_not_delete_when_the_language_path_resolves_to_the_audio_root(tmp_path):
+    game = tmp_path / "game"
+    audio_root = game / "Mods" / "DrovaVoice" / "Audio"
+    audio_root.mkdir(parents=True)
+    secret = audio_root / "secret.ogg"
+    secret.write_bytes(b"SECRET")
+    src = tmp_path / "src"
+    src.mkdir()
+    result = install_audio([], src, audio_root / "de" / "..", "de", prune=True, audio_root=audio_root, game_dir=game)
+    assert result.pruned == [] and result.errors
+    assert secret.read_bytes() == b"SECRET"
+
+
+def test_prune_does_not_follow_an_audio_folder_symlink_out_of_the_game(tmp_path):
+    game = tmp_path / "game"
+    mods = game / "Mods" / "DrovaVoice"
+    mods.mkdir(parents=True)
+    outside = tmp_path / "outside"
+    (outside / "de").mkdir(parents=True)
+    secret = outside / "de" / "secret.ogg"
+    secret.write_bytes(b"SECRET")
+    audio_root = mods / "Audio"
+    _symlink(audio_root, outside, directory=True)
+    src = tmp_path / "src"
+    src.mkdir()
+    result = install_audio([], src, audio_root / "de", "de", prune=True, audio_root=audio_root, game_dir=game)
+    assert result.pruned == [] and result.errors
+    assert secret.read_bytes() == b"SECRET"
+
+
+def test_prune_does_not_delete_through_a_symlink_to_an_outside_file(tmp_path):
+    game = tmp_path / "game"
+    audio_root = game / "Mods" / "DrovaVoice" / "Audio"
+    target = audio_root / "de"
+    (target / "dialog").mkdir(parents=True)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    secret = outside / "secret.ogg"
+    secret.write_bytes(b"SECRET")
+    link = target / "dialog" / "alias.ogg"
+    _symlink(link, secret)
+    stray = target / "dialog" / "stray.ogg"
+    stray.write_bytes(b"STRAY")
+    src = tmp_path / "src"
+    src.mkdir()
+    result = install_audio([], src, target, "de", prune=True, audio_root=audio_root, game_dir=game)
+    assert secret.read_bytes() == b"SECRET" and link.is_symlink()
+    assert not stray.exists()
+    assert result.pruned == ["dialog/stray.ogg"]
+    assert any("alias.ogg" in error for error in result.errors)

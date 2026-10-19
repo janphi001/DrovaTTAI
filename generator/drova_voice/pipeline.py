@@ -276,6 +276,31 @@ def synth_results_path(cfg: Config) -> Path:
     return cfg.data_dir / "synth" / "results.jsonl"
 
 
+def _same_synth_result(previous: dict, row: dict) -> bool:
+    return all(previous.get(field) == row.get(field) for field in ("key", "wav", "ok"))
+
+
+def record_synth_results(path: Path, fresh: list[dict]) -> None:
+    """Eine Zeile je id. Unveränderte Cache-Treffer (gleicher key, wav, ok) ersetzen den Stand nicht.
+    Schreiben passiert einmal am Ende, atomar, damit die Datei nicht bei jedem Lauf um alle Aufträge wächst."""
+    if not fresh:
+        return
+    existing = read_jsonl_lenient(path)
+    merged = latest_by_id(existing)
+    changed = False
+    for row in fresh:
+        row_id = row.get("id")
+        if not isinstance(row_id, str):
+            continue
+        previous = merged.get(row_id)
+        if previous is not None and _same_synth_result(previous, row):
+            continue
+        merged[row_id] = row
+        changed = True
+    if changed or len(existing) != len(merged):
+        write_jsonl(path, merged.values())
+
+
 def usage_path(cfg: Config) -> Path:
     return cfg.data_dir / "synth" / "usage.jsonl"
 
@@ -304,9 +329,14 @@ def _synth(cfg: Config, args: argparse.Namespace) -> int:
     budget = getattr(args, "max_utf8_bytes", None)
     if budget is not None and budget < 1:
         return _fail("--max-utf8-bytes muss mindestens 1 sein")
-    results = run_synth(jobs, args.engine, _client_factory(cfg), cache_dir, args.workers,
-                        on_result=lambda r: append_jsonl(path, r.to_dict()), status=status,
-                        max_utf8_bytes=budget)
+    recorded: list[dict] = []
+    # Auch bei Abbruch (Strg+C, zu viele Fehler) landet, was bis dahin fertig war, in results.jsonl.
+    try:
+        results = run_synth(jobs, args.engine, _client_factory(cfg), cache_dir, args.workers,
+                            on_result=lambda r: recorded.append(r.to_dict()), status=status,
+                            max_utf8_bytes=budget)
+    finally:
+        record_synth_results(path, recorded)
     done = [r for r in results if r.ok]
     new = [r for r in done if r.attempts > 0]
     failed = [r for r in results if not r.ok]
@@ -398,7 +428,8 @@ def _install(cfg: Config, args: argparse.Namespace) -> int:
     prune = bool(getattr(args, "prune", False))
     dry_run = bool(getattr(args, "dry_run", False))
     result = install_audio(rows, audio_dir(cfg), cfg.install_dir, cfg.language, drop_ids=drop,
-                           prune=prune, dry_run=dry_run)
+                           prune=prune, dry_run=dry_run,
+                           audio_root=cfg.game_dir / "Mods" / "DrovaVoice" / "Audio", game_dir=cfg.game_dir)
     result.errors.extend(stale)
     if dry_run:
         print(f"würde {result.copied} kopieren, {result.entries} Einträge, {len(result.pruned)} verwaist")

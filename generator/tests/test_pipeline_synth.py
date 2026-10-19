@@ -31,6 +31,18 @@ def test_synth_second_run_uses_the_cache(pipeline_repo, guarded, capsys):
     assert "0 neu erzeugt" in capsys.readouterr().out
 
 
+def test_synth_second_run_does_not_append_cached_rows(pipeline_repo, guarded):
+    run(pipeline_repo, "extract")
+    guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake"))
+    path = pipeline_repo.data / "synth" / "results.jsonl"
+    first = read_jsonl_lenient(path)
+    assert len(first) == 3
+    raw = path.read_bytes()
+    guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake"))
+    assert path.read_bytes() == raw
+    assert read_jsonl_lenient(path) == first
+
+
 def test_synth_reports_speaker_without_voice(pipeline_repo, guarded, capsys):
     (pipeline_repo.casting / "casting.yaml").write_text("default_player: leon\nspeakers: {}\n", encoding="utf-8")
     run(pipeline_repo, "extract")
@@ -130,3 +142,21 @@ def test_synth_counts_retries_and_failed_fake_requests(pipeline_repo, guarded, c
     assert rows[1]["chars"] == retry_chars and rows[1]["utf8_bytes"] == retry_bytes
     assert f"Zeichen neu an fake gesendet: {first_chars} ({first_bytes} UTF-8-Bytes, {first_requests} Anfragen)" in first
     assert (f"insgesamt bisher: {first_chars + retry_chars} ({first_bytes + retry_bytes} UTF-8-Bytes)") in second
+
+
+def test_an_aborted_synth_still_records_what_finished(pipeline_repo, guarded, monkeypatch):
+    import pytest
+    from drova_voice import pipeline
+    from drova_voice.synth import SynthResult
+
+    def half_then_abort(jobs, *args, on_result=None, **kwargs):
+        on_result(SynthResult(id=jobs[0].id, key="k", wav="a.wav", duration=1.0, ok=True,
+                              attempts=1, flagged=False, error=None))
+        raise KeyboardInterrupt
+
+    run(pipeline_repo, "extract")
+    monkeypatch.setattr(pipeline, "run_synth", half_then_abort)
+    with pytest.raises(KeyboardInterrupt):
+        run(pipeline_repo, "synth", "--engine", "fake")
+    rows = read_jsonl_lenient(pipeline_repo.data / "synth" / "results.jsonl")
+    assert [r["wav"] for r in rows] == ["a.wav"]

@@ -112,10 +112,14 @@ namespace DrovaVoice.Core
         }
 
         private static string CleanLanguage(string? language, List<string> warnings)
+            => CleanFolderName(language, "AudioLanguage", warnings);
+
+        /// <summary>Ordnername für eine Sprache: 1–16 Zeichen aus Buchstaben, Ziffern, '_' und '-'. Sonst <see cref="DefaultLanguage"/> und eine Warnung.</summary>
+        public static string CleanFolderName(string? language, string settingName, List<string> warnings)
         {
             string value = (language ?? "").Trim();
             if (value.Length > 0 && value.Length <= MaxLanguageLength && IsFolderSafe(value)) return value;
-            warnings.Add($"AudioLanguage = '{language}' ist kein gültiger Ordnername; verwende '{DefaultLanguage}'.");
+            warnings.Add($"{settingName} = '{language}' ist kein gültiger Ordnername; verwende '{DefaultLanguage}'.");
             return DefaultLanguage;
         }
 

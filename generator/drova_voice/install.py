@@ -99,8 +99,42 @@ def _delete_orphans(install_dir: Path, rels: list[str], result: InstallResult) -
     return deleted
 
 
+def _resolves_strictly_inside(path: Path, root: Path) -> bool:
+    """True, wenn der aufgelöste Pfad echt unter root liegt. Symlinks zählen am Ziel, nicht am Namen."""
+    try:
+        real = path.resolve()
+        base = root.resolve()
+    except OSError:
+        return False
+    if real == base:
+        return False
+    try:
+        real.relative_to(base)
+    except ValueError:
+        return False
+    return True
+
+
+def _prune_confined(install_dir: Path, audio_root: Path | None, game_dir: Path | None) -> bool:
+    """install_dir muss im erwarteten Audio-Ordner liegen, und der Audio-Ordner selbst im Spielordner.
+    Ein Symlink, der aus einem der beiden hinauszeigt, gilt nicht."""
+    if audio_root is None or not _resolves_strictly_inside(install_dir, audio_root):
+        return False
+    if game_dir is None:
+        return True
+    return _resolves_strictly_inside(audio_root, game_dir) and _resolves_strictly_inside(install_dir, game_dir)
+
+
+def _orphan_stays_inside(install_dir: Path, rel: str) -> bool:
+    candidate = Path(rel)
+    if not rel or candidate.is_absolute() or ".." in candidate.parts:
+        return False
+    return _resolves_strictly_inside(install_dir / candidate, install_dir)
+
+
 def install_audio(rows: Sequence[dict], audio_dir: Path, install_dir: Path, language: str,
-                  drop_ids: Collection[str] = (), prune: bool = False, dry_run: bool = False) -> InstallResult:
+                  drop_ids: Collection[str] = (), prune: bool = False, dry_run: bool = False,
+                  audio_root: Path | None = None, game_dir: Path | None = None) -> InstallResult:
     audio_dir, install_dir = Path(audio_dir), Path(install_dir)
     index_path = install_dir / "index.json"
     # frühere Einträge behalten, aber nur solche, deren Datei noch da ist
@@ -125,7 +159,10 @@ def install_audio(rows: Sequence[dict], audio_dir: Path, install_dir: Path, lang
     result.entries = len(entries)
     # Dry-Run zählt nur: nichts kopieren, index.json nicht anlegen und nichts löschen.
     if dry_run:
-        result.pruned = _orphan_oggs(install_dir, entries)
+        if audio_root is not None and not _prune_confined(install_dir, audio_root, game_dir):
+            result.errors.append(f"Ziel {install_dir} liegt nicht im Audio-Ordner {audio_root}; nichts gelöscht")
+        else:
+            result.pruned = _orphan_oggs(install_dir, entries)
         return result
     variants: dict[str, list[str]] = {}
     for full_id in entries:
@@ -139,7 +176,15 @@ def install_audio(rows: Sequence[dict], audio_dir: Path, install_dir: Path, lang
     tmp.write_text(json.dumps(index, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     replace_with_retry(tmp, index_path)
     # Erst den Index schreiben, dann löschen: ein Abbruch lässt höchstens Dateien übrig, nie einen Eintrag ohne Datei.
+    # Vor dem Löschen: das Ziel muss im Audio-Ordner des Spiels liegen. Ein Symlink nach draußen zählt nicht.
     if prune:
-        result.pruned = _orphan_oggs(install_dir, entries)
-        result.pruned = _delete_orphans(install_dir, result.pruned, result)
+        if not _prune_confined(install_dir, audio_root, game_dir):
+            shown = audio_root if audio_root is not None else install_dir
+            result.errors.append(f"Ziel {install_dir} liegt nicht im Audio-Ordner {shown}; nichts gelöscht")
+        else:
+            orphans = _orphan_oggs(install_dir, entries)
+            blocked = [rel for rel in orphans if not _orphan_stays_inside(install_dir, rel)]
+            for rel in blocked:
+                result.errors.append(f"{rel}: verlässt den Audio-Ordner (Symlink); nicht gelöscht")
+            result.pruned = _delete_orphans(install_dir, [rel for rel in orphans if rel not in set(blocked)], result)
     return result
