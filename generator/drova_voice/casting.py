@@ -28,7 +28,7 @@ class Casting:
 
     def voice_for(self, line: Line) -> str | None:
         if line.pool and line.pool.startswith(TEACHER_PREFIX):
-            return self.speakers.get(line.pool[len(TEACHER_PREFIX):])
+            return self.speakers.get(line.pool[len(TEACHER_PREFIX) :])
         if line.pool:
             return self.pools.get(line.pool)
         if line.category == "player":

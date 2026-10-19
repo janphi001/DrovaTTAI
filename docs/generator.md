@@ -77,3 +77,9 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 - Stand 2026-10-15: 171 benannte und 152 generische Barks (6 Poolstimmen) vertont und installiert; dazu 205 generische Dialogzeilen (`dialog`, Pool, 1.230 Clips). Index danach: 13.819 Einträge.
 - Besetzung: `casting/casting.yaml` (von Hand, gewinnt) über `casting/casting_auto.yaml` (erzeugt).
 - Fish ist eine Cloud-Engine: der Sprechtext geht an `api.fish.audio`. Nur nach ausdrücklichem Ja des Nutzers mit echten Spieltexten benutzen.
+
+## Release-Paket
+
+`drova-voice package` baut aus dem Spielordner ein ZIP für Spieler: `Mods/DrovaVoice.dll`, `UserLibs/DrovaVoice.Core.dll`, `UserLibs/NVorbis.dll`, `Mods/DrovaVoice/Audio/<Sprache>/` (nur die OGG-Dateien, auf die `index.json` zeigt) sowie `README.txt` und `LIZENZEN.txt` aus `release/`. Ziel ist `dist/DrovaVoice-<Version>-<Sprache>.zip` mit einer `.sha256` daneben; `dist/` steht nicht im Git. Die Version kommt aus `MelonInfo` in `mod/DrovaVoice/DrovaVoiceMod.cs`, `--version` überschreibt sie, `--out` wählt einen anderen Ordner.
+
+Vorher die Mod bauen und ins Spiel kopieren (`-p:DeployToGame=true`) und im Spiel prüfen: Das Paket enthält genau, was dort liegt. Fehlt eine Datei aus dem Index, bricht der Befehl ab und schreibt kein ZIP. Der Text für die Ankündigung liegt in `release/discord-post.md`.

@@ -77,12 +77,20 @@ def load_teachers(path: Path) -> list[str]:
     return result
 
 
-def expand_teacher_lines(expanded: Sequence[Line], base: Sequence[Line], teachers: Sequence[str]) -> list[Line]:
+def expand_teacher_lines(
+    expanded: Sequence[Line], base: Sequence[Line], teachers: Sequence[str]
+) -> list[Line]:
     """Hängt an `expanded` je sprechbarer generischer Lehrerzeile (Sprecher „Teacher“) aus `base` eine Variante je
     Lehrer an (`<ID>#t_<lehrer>`); die Mod spielt sie, wenn die Figur dieser Lehrer ist, sonst die Poolstimme."""
     out = list(expanded)
     for line in base:
-        if line.actor != TEACHER_ACTOR or not line.generic or line.skip or line.pool or VARIANT_SEP in line.id:
+        if (
+            line.actor != TEACHER_ACTOR
+            or not line.generic
+            or line.skip
+            or line.pool
+            or VARIANT_SEP in line.id
+        ):
             continue
         for name in teachers:
             tag = TEACHER_PREFIX + name

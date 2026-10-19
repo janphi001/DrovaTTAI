@@ -3,6 +3,7 @@
 /cache/
 /out/
 /voices/
+/dist/
 generator/config.yaml
 *.wav
 *.ogg
