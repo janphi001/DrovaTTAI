@@ -66,6 +66,22 @@ def test_synth_records_the_characters_sent(pipeline_repo, guarded, capsys):
     assert f"insgesamt bisher: {chars} ({utf8_bytes} UTF-8-Bytes)" in first
 
 
+def test_utf8_budget_sends_nothing_and_writes_no_error_rows(pipeline_repo, guarded, capsys):
+    run(pipeline_repo, "extract")
+    assert guarded(lambda: run(pipeline_repo, "synth", "--engine", "fake", "--max-utf8-bytes", "1", "--workers", "4")) == 1
+    err = capsys.readouterr().err
+    assert "UTF-8-Budget erreicht" in err and "Traceback" not in err
+    assert read_jsonl_lenient(pipeline_repo.data / "synth" / "results.jsonl") == []
+    usage = read_jsonl_lenient(pipeline_repo.data / "synth" / "usage.jsonl")
+    assert usage[0]["requests"] == 0 and usage[0]["utf8_bytes"] == 0 and usage[0]["chars"] == 0
+
+
+def test_utf8_budget_rejects_zero(pipeline_repo, capsys):
+    run(pipeline_repo, "extract")
+    assert run(pipeline_repo, "synth", "--engine", "fake", "--max-utf8-bytes", "0") == 2
+    assert "--max-utf8-bytes" in capsys.readouterr().err
+
+
 def test_usage_total_counts_old_rows_without_byte_field(pipeline_repo, guarded, capsys):
     usage = pipeline_repo.data / "synth"
     usage.mkdir(parents=True)

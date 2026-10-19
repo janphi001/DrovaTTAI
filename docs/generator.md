@@ -24,7 +24,7 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 | 7 | `drova-voice report --npc Adela` | Status je Kategorie |
 | 8 | `drova-voice preview --npc Adela` | Hörseite `out/preview/index.html` |
 
-`synth` hat `--engine` (Standard `fish`; `fake` für Tests ohne Netz), `--workers` (Standard 8) und `--limit N` (nur die ersten N Aufträge, zum Ausprobieren).
+`synth` hat `--engine` (Standard `fish`; `fake` für Tests ohne Netz), `--workers` (Standard 8), `--limit N` (nur die ersten N Aufträge, zum Ausprobieren) und `--max-utf8-bytes N` (Budget für neu gesendete UTF-8-Bytes).
 
 `install --prune` löscht im Zielordner OGG-Dateien, die danach kein Indexeintrag mehr nennt. Ohne die Option bleiben sie liegen. `install --dry-run` kopiert nichts und schreibt `index.json` nicht; es zählt und listet nur (`würde N kopieren, M Einträge, K verwaist`). Zusammen mit `--prune` gilt der Dry-Run. Beides ist standardmäßig aus.
 
@@ -56,7 +56,8 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 
 - Jeder Schritt ist wiederaufnehmbar. `synth` legt fertige WAVs unter `cache/synth/<Schlüssel>.wav` ab; der Schlüssel enthält Engine, Modell, Stimme, gerenderten Text (inklusive Emotions-Cues) und Parameter. Ändern sich Text, Stimme oder Emotion, wird automatisch neu erzeugt.
 - Erzwingen: die WAV in `cache/synth/` löschen und `synth` wiederholen. Danach `encode` und `install`.
-- Abbruch mittendrin (Strg+C, Netz weg) verliert höchstens die laufenden Anfragen. Halbe Dateien tragen `.part` im Namen und werden nie verwendet.
+- Abbruch mittendrin (Strg+C, Netz weg) verliert höchstens die laufende Anfrage. Eine halbe `.part`-Datei wird verworfen. Eine schon vollständige WAV unter diesem Namen wird übernommen und nicht erneut angefordert.
+- `synth --max-utf8-bytes N` bricht ab, bevor die nächste Anfrage das Budget an UTF-8-Bytes überschreitet. Cache-Treffer zählen nicht. Parallele Worker teilen sich dasselbe Budget.
 - Gleicher Text mit gleicher Stimme wird nur einmal erzeugt.
 
 ## Grenzen von Plan 3

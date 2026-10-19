@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from drova_voice.jsonl import read_jsonl, write_jsonl
@@ -68,5 +70,42 @@ def test_write_gives_up_after_the_retries_and_keeps_the_old_file(tmp_path, monke
     monkeypatch.setattr(jsonl_mod.os, "replace", locked)
     monkeypatch.setattr(jsonl_mod.time, "sleep", lambda _s: None)
     with pytest.raises(PermissionError):
+        write_jsonl(path, [{"neu": True}])
+    assert read_jsonl(path) == [{"alt": True}] and not list(tmp_path.glob("*.tmp"))
+
+
+def test_write_fsyncs_the_temp_file_before_replacing(tmp_path, monkeypatch):
+    import drova_voice.jsonl as jsonl_mod
+
+    order = []
+    real_fsync, real_replace = os.fsync, os.replace
+
+    def fsync(fd):
+        order.append("fsync")
+        return real_fsync(fd)
+
+    def replace(src, dst):
+        order.append("replace")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(jsonl_mod.os, "fsync", fsync)
+    monkeypatch.setattr(jsonl_mod.os, "replace", replace)
+    path = tmp_path / "r.jsonl"
+    write_jsonl(path, [{"a": "Grüße"}])
+    assert order == ["fsync", "replace"]
+    assert read_jsonl(path) == [{"a": "Grüße"}]
+
+
+def test_fsync_failure_keeps_the_old_file_and_removes_the_temp_file(tmp_path, monkeypatch):
+    import drova_voice.jsonl as jsonl_mod
+
+    path = tmp_path / "r.jsonl"
+    write_jsonl(path, [{"alt": True}])
+
+    def fail(_fd):
+        raise OSError("Platte voll")
+
+    monkeypatch.setattr(jsonl_mod.os, "fsync", fail)
+    with pytest.raises(OSError, match="Platte voll"):
         write_jsonl(path, [{"neu": True}])
     assert read_jsonl(path) == [{"alt": True}] and not list(tmp_path.glob("*.tmp"))

@@ -1,10 +1,12 @@
 import shutil
 import io
 import sys
+import urllib.parse
 from pathlib import Path
 
 import pytest
 
+from drova_voice import pipeline
 from drova_voice.cli import main
 from drova_voice.engines.protocol import SynthResponse
 from drova_voice.jsonl import read_jsonl
@@ -211,6 +213,32 @@ def test_run_refuses_a_missing_reference_with_a_clear_message(tmp_path, capsys):
     assert "xtts-fehlt.wav" in err and "refs" in err
 
 
+def test_cli_errors_redact_the_fish_key_and_have_no_traceback(tmp_path, monkeypatch, capsys):
+    _, cfg, _ = _setup(tmp_path)
+    key = "sk-test-geheim-123"
+    monkeypatch.setenv("FISH_API_KEY", key)
+    encoded = urllib.parse.quote(key, safe="")
+
+    def boom(_cfg, _args):
+        raise ValueError(f"siehe {key} und {encoded}")
+
+    monkeypatch.setitem(pipeline.HANDLERS, "report", boom)
+    assert main(["--config", str(cfg), "report"]) == 2
+    err = capsys.readouterr().err
+    assert "FEHLER:" in err and "Traceback" not in err
+    assert key not in err and encoded not in err and "geheim" not in err and "***" in err
+
+
+def test_corrupt_lines_file_is_a_german_error_without_traceback(tmp_path, capsys):
+    repo, cfg, _ = _setup(tmp_path)
+    path = repo / "data" / "lines.jsonl"
+    path.parent.mkdir(parents=True)
+    path.write_text("{\n", encoding="utf-8")
+    assert main(["--config", str(cfg), "synth", "--engine", "fake"]) == 2
+    err = capsys.readouterr().err
+    assert "FEHLER:" in err and "Traceback" not in err
+
+
 def test_run_refuses_a_kitten_reference_without_transcript(tmp_path, capsys):
     repo, cfg, voices = _setup(tmp_path)
     ref = repo / "voices" / "bakeoff" / "ohne-text.wav"
@@ -220,3 +248,19 @@ def test_run_refuses_a_kitten_reference_without_transcript(tmp_path, capsys):
     assert main(["--config", str(cfg), "bakeoff", "select", "--per-bucket", "2"]) == 0
     assert main(["--config", str(cfg), "bakeoff", "run", "--voices", str(voices)]) == 2
     assert "ohne-text.txt" in capsys.readouterr().err
+
+
+def test_value_error_names_its_type_and_can_raise(monkeypatch, capsys):
+    import pytest
+    from drova_voice import cli
+
+    def boom(_args):
+        raise ValueError("kaputt")
+
+    monkeypatch.setattr(cli, "_run", boom)
+    monkeypatch.delenv("DROVA_VOICE_TRACEBACK", raising=False)
+    assert cli.main(["report"]) == 2
+    assert "FEHLER: kaputt [ValueError]" in capsys.readouterr().err
+    monkeypatch.setenv("DROVA_VOICE_TRACEBACK", "1")
+    with pytest.raises(ValueError):
+        cli.main(["report"])

@@ -1,4 +1,5 @@
 import contextlib
+import io
 import threading
 import wave
 
@@ -10,8 +11,8 @@ from drova_voice.engines.client import EngineError
 from drova_voice.engines.protocol import SynthResponse
 from drova_voice.fish_voices import FishVoice
 from drova_voice.lines import Line
-from drova_voice.synth import (ABORT_AFTER, MAX_ATTEMPTS, SKIP_NO_VOICE, SynthJob, SynthStatus, build_jobs,
-                               fatal_reason, make_key, plausible, run_synth, synth_one, wav_duration)
+from drova_voice.synth import (ABORT_AFTER, BUDGET_REACHED, MAX_ATTEMPTS, SKIP_NO_VOICE, SynthJob, SynthStatus,
+                               build_jobs, fatal_reason, make_key, plausible, run_synth, synth_one, wav_duration)
 
 FISH = {"lena": FishVoice("lena", "a" * 32, "Lena", "f", "de"), "leon": FishVoice("leon", "b" * 32, "Leon", "m", "de")}
 CASTING = Casting("leon", {"mira": "lena"})
@@ -101,12 +102,67 @@ def test_identical_text_is_synthesized_once(tmp_path):
     assert len(calls) == 1 and {r.id for r in results} == {"a", "b"} and all(r.ok for r in results)
 
 
+def _wav_bytes(seconds=2.0, rate=8000) -> bytes:
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(b"\x00\x00" * int(rate * seconds))
+    return buf.getvalue()
+
+
 def test_stale_part_file_is_ignored_and_no_part_files_remain(tmp_path):
     key = make_key("fake", "stub-1", None, "Der Weg nach Norden ist weit.", {})
     (tmp_path / f"{key}.part.wav").write_bytes(b"halbe Datei")  # Rest eines abgebrochenen Laufs
     (r,) = run_synth([job("a")], "fake", factory([]), tmp_path)
     assert r.ok and wav_duration(r.wav) == pytest.approx(2.0, abs=0.01)
     assert list(tmp_path.glob("*.part.wav")) == []
+
+
+def test_complete_part_file_is_adopted_without_a_new_request(tmp_path):
+    text = "Der Weg nach Norden ist weit."
+    key = make_key("fake", "stub-1", None, text, {})
+    (tmp_path / f"{key}.part.wav").write_bytes(_wav_bytes())
+    calls = []
+    (r,) = run_synth([job("a", text)], "fake", factory(calls), tmp_path)
+    assert calls == [] and r.ok and r.attempts == 0
+    assert wav_duration(r.wav) == pytest.approx(2.0, abs=0.01)
+    assert list(tmp_path.glob("*.part.wav")) == []
+
+
+def test_truncated_part_file_is_synthesized_again(tmp_path):
+    text = "Der Weg nach Norden ist weit."
+    key = make_key("fake", "stub-1", None, text, {})
+    raw = _wav_bytes()
+    (tmp_path / f"{key}.part.wav").write_bytes(raw[: len(raw) // 2])
+    calls = []
+    (r,) = run_synth([job("a", text)], "fake", factory(calls), tmp_path)
+    assert len(calls) == 1 and r.ok and r.attempts == 1
+    assert list(tmp_path.glob("*.part.wav")) == []
+
+
+def test_failed_rename_keeps_the_paid_wav_for_the_next_run(tmp_path, monkeypatch):
+    import drova_voice.synth as synth_mod
+
+    calls = []
+    real = synth_mod.replace_with_retry
+    state = {"fail": True}
+
+    def flaky(src, dst):
+        if state["fail"]:
+            raise PermissionError(5, "Zugriff verweigert")
+        real(src, dst)
+
+    monkeypatch.setattr(synth_mod, "replace_with_retry", flaky)
+    status = SynthStatus()
+    (r,) = run_synth([job("a")], "fake", factory(calls), tmp_path, status=status)
+    assert not r.ok and "PermissionError" in (r.error or "")
+    assert status.sent_requests == 1 and len(list(tmp_path.glob("*.part.wav"))) == 1
+    state["fail"] = False
+    again = SynthStatus()
+    (r2,) = run_synth([job("a")], "fake", factory(calls), tmp_path, status=again)
+    assert r2.ok and r2.attempts == 0 and len(calls) == 1 and again.sent_requests == 0
 
 
 def test_implausible_duration_is_retried_then_flagged(tmp_path):
@@ -297,6 +353,38 @@ def test_sent_usage_counts_a_request_whose_worker_dies(tmp_path):
     by_id = {r.id: r for r in results}
     assert not by_id["a"].ok and not by_id["b"].ok
     assert status.sent_requests == 1 and status.sent_chars == len(jobs[0].text)
+
+
+def test_parallel_workers_share_one_utf8_budget(tmp_path):
+    jobs = [job(str(i), f"Zeile{i}") for i in range(8)]
+    one = len(jobs[0].text.encode("utf-8"))
+    calls = []
+    status = SynthStatus()
+    results = run_synth(jobs, "fake", factory(calls), tmp_path, workers=8, status=status, max_utf8_bytes=one)
+    assert status.sent_requests == 1 and status.sent_bytes == one
+    assert status.aborted == BUDGET_REACHED and status.not_run == 7
+    assert len(results) == 1 and len(calls) == 1
+
+
+def test_budget_uses_utf8_bytes_so_an_umlaut_blocks_a_one_byte_limit(tmp_path):
+    calls = []
+    status = SynthStatus()
+    results = run_synth([job("a", "ä"), job("b", "ö")], "fake", factory(calls), tmp_path, workers=4,
+                        status=status, max_utf8_bytes=1)
+    assert calls == [] and results == []
+    assert status.sent_requests == 0 and status.sent_bytes == 0
+    assert status.not_run == 2 and status.aborted == BUDGET_REACHED
+
+
+def test_budget_stops_a_second_attempt_when_the_first_audio_is_implausible(tmp_path):
+    text = "Grüße."
+    status = SynthStatus()
+    (r,) = run_synth([job("a", text)], "fake", factory([], seconds=40.0), tmp_path, status=status,
+                     max_utf8_bytes=len(text.encode("utf-8")))
+    assert r.ok and r.flagged and r.attempts == 1
+    assert status.sent_requests == 1
+    assert status.sent_bytes == len(text.encode("utf-8")) > len(text)
+    assert status.aborted == BUDGET_REACHED and status.not_run == 0
 
 
 def test_fatal_failures_count_every_attempt_until_abort(tmp_path):

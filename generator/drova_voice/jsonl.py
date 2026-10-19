@@ -29,6 +29,8 @@ def write_jsonl(path: Path, rows: Iterable[dict]) -> None:
         with open(tmp, "w", encoding="utf-8", newline="\n") as f:
             for row in rows:
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
         replace_with_retry(tmp, path)
     except BaseException:
         tmp.unlink(missing_ok=True)

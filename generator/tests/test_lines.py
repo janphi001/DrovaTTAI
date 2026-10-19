@@ -163,6 +163,19 @@ def test_roundtrip_and_loc_loading(tmp_path):
     assert isinstance(lines[0], Line)
 
 
+def test_load_loc_texts_keeps_umlauts_and_rejects_a_latin1_byte(tmp_path):
+    loc_dir = tmp_path / "loc"
+    (loc_dir / "Dialog").mkdir(parents=True)
+    good = loc_dir / "Dialog" / "NPC_A_de.loc"
+    good.write_bytes("\ufeffPlh_1 { Grüße. }\n".encode("utf-8"))
+    assert load_loc_texts(loc_dir, "de") == {("Dialog/NPC_A", "Plh_1"): "Grüße."}
+    bad = loc_dir / "Dialog" / "NPC_B_de.loc"
+    bad.write_bytes(b"Plh_9 { Aa\xe4 }\n")
+    with pytest.raises(ValueError, match="kein gültiges UTF-8") as info:
+        load_loc_texts(loc_dir, "de")
+    assert "Aa" not in str(info.value) and "\ufffd" not in str(info.value)
+
+
 def test_load_lexicon_missing_or_empty(tmp_path):
     assert load_lexicon(tmp_path / "nix.yaml") == {}
     (tmp_path / "lex.yaml").write_text("# nur Kommentar\n", encoding="utf-8")

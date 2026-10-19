@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import sys
+import urllib.parse
 from pathlib import Path
+
+import yaml
 
 from drova_voice.bakeoff import (REF_TEXT, BakeoffResult, Sample, VoiceSpec, load_voice_specs,
                                  run_bakeoff, select_samples, write_sheet)
@@ -195,6 +199,18 @@ def _run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _redact(message: str) -> str:
+    """Schlüssel aus Fehlermeldungen nehmen, auch in der prozentkodierten Form."""
+    key = os.environ.get("FISH_API_KEY", "").strip()
+    if len(key) < 8:
+        return message
+    hidden = message.replace(key, "***")
+    encoded = urllib.parse.quote(key, safe="")
+    if encoded != key:
+        hidden = hidden.replace(encoded, "***")
+    return hidden
+
+
 def main(argv: list[str] | None = None) -> int:
     # Windows-Konsolen (cp1252) dürfen beim Ausgeben von Pfaden nicht abstürzen.
     for stream in (sys.stdout, sys.stderr):
@@ -204,8 +220,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return _run(args)
     except EngineError as e:
-        print(f"FEHLER: {e}", file=sys.stderr)
+        print(f"FEHLER: {_redact(str(e))}", file=sys.stderr)
         return 1
+    except (OSError, ValueError, yaml.YAMLError) as e:
+        # ValueError fängt auch echte Programmfehler. Der Typ bleibt sichtbar, der Traceback auf Wunsch.
+        if os.environ.get("DROVA_VOICE_TRACEBACK") == "1":
+            raise
+        print(f"FEHLER: {_redact(str(e))} [{type(e).__name__}]", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
