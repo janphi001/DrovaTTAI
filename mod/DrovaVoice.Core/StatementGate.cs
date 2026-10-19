@@ -9,6 +9,11 @@ namespace DrovaVoice.Core
     {
         public const int BeforeApiPrefix = 801;
 
-        public static bool ClearAttachedClip(bool hasClip) => hasClip;
+        /// <summary>
+        /// Nur Clips dieser Mod werden geleert (Barks und Poolzeilen teilen die Aussage zwischen Figuren; der Connector
+        /// holt den passenden Clip danach aus dem Cache). Fremde Clips, etwa von einer anderen Sprachmod, bleiben.
+        /// </summary>
+        public static bool ClearAttachedClip(string? clipName, string modPrefix) =>
+            clipName != null && clipName.StartsWith(modPrefix, System.StringComparison.Ordinal);
     }
 }

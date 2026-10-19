@@ -20,7 +20,8 @@ namespace DrovaVoice.Playback
                 if (__instance == null) return;
                 var statement = __instance.statement;
                 if (statement == null) return;
-                if (StatementGate.ClearAttachedClip(statement.audio != null))
+                var clip = statement.audio;
+                if (clip != null && StatementGate.ClearAttachedClip(clip.name, ClipLoader.ClipNamePrefix))
                     statement.audio = null;
             }
             catch (Exception e)
