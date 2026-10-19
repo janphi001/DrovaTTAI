@@ -82,6 +82,9 @@ MelonLoader und die Modding API entfernst du wie in deren Anleitung beschrieben.
 
 BEKANNTE GRENZEN
 ----------------
+  - Das Spiel wurde mit der Mod noch nicht komplett durchgespielt. Die Stimmen
+    sind den Figuren anhand der Spieldaten zugeteilt; manche Figuren können mit
+    dem falschen Geschlecht oder einer unpassenden Stimme sprechen.
   - Es ist KI: Betonung und Aussprache passen nicht immer, besonders bei
     Eigennamen und sehr kurzen Ausrufen.
   - Nicht zusammen mit einer anderen Sprachausgabe-Mod (z. B. DrovaTTS) nutzen.
@@ -91,9 +94,12 @@ BEKANNTE GRENZEN
 
 PROBLEME?
 ---------
+Falsche Stimme, falsches Geschlecht oder ein Fehler? Bitte ein Issue auf GitHub
+erstellen: https://github.com/janphi001/DrovaTTAI/issues
+Am besten mit Figur, Ort im Spiel und dem Log.
+
 Die Mod schreibt ins Log: MelonLoader\Latest.log im Spielordner.
 Zeilen mit "DrovaVoice" zeigen, ob die Mod geladen wurde und ob Fehler auftreten.
-Bitte das Log mitschicken, wenn du einen Fehler meldest.
 
 
 Rechtliches und Stimmen-Liste: siehe LIZENZEN.txt

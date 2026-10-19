@@ -28,6 +28,10 @@ Du brauchst MelonLoader 0.7.3 und die Drova Modding API 0.5.4. Danach die Ordner
 
 📦 Download (ca. 600 MB): <LINK>
 
-Es ist KI, also passt nicht jede Betonung perfekt, gerade bei Namen. Wenn dir eine Zeile besonders schief vorkommt oder etwas nicht läuft, schreib mir gern hier, am besten mit Figur, Ort und der Datei `MelonLoader\Latest.log`.
+**Wichtig zu wissen**
+Ich habe das Spiel mit der Mod noch nicht komplett durchgespielt. Die Stimmen wurden den Figuren anhand der Spieldaten zugeteilt, deshalb kann es sein, dass manche Figuren mit dem falschen Geschlecht sprechen oder eine unpassende Stimme haben. Es ist außerdem KI, also passt nicht jede Betonung perfekt, gerade bei Namen.
+
+🐛 Wenn dir so etwas auffällt oder etwas nicht läuft, erstell gern ein Issue auf GitHub: https://github.com/janphi001/DrovaTTAI/issues
+Am besten mit Figur, Ort im Spiel und der Datei `MelonLoader\Latest.log`.
 
 Inoffizielles Fan-Projekt, kostenlos. Viel Spaß beim Zuhören! 🗡️
