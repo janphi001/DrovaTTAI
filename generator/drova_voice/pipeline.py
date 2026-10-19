@@ -61,6 +61,7 @@ from drova_voice.pools import (
     load_teachers,
 )
 from drova_voice.preview import write_preview
+from drova_voice.release import build_package
 from drova_voice.profiles import (
     LOW_CONFIDENCE,
     Profile,
@@ -828,6 +829,20 @@ def _profile(cfg: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def _package(cfg: Config, args: argparse.Namespace) -> int:
+    out = args.out if args.out is not None else cfg.repo_root / "dist"
+    try:
+        result = build_package(cfg.game_dir, cfg.language, cfg.repo_root, out, args.version)
+    except (OSError, ValueError) as e:
+        return _fail(str(e))
+    size_mb = result.size / 1024 / 1024
+    print(
+        f"{result.path} ({size_mb:.0f} MB): {result.audio_files} OGG, {result.entries} Einträge; "
+        f"SHA-256 {result.sha256}"
+    )
+    return 0
+
+
 HANDLERS: dict[str, Callable[[Config, argparse.Namespace], int]] = {
     "extract": _extract,
     "cast": _cast,
@@ -839,6 +854,7 @@ HANDLERS: dict[str, Callable[[Config, argparse.Namespace], int]] = {
     "preview": _preview,
     "batches": _batches,
     "profile": _profile,
+    "package": _package,
 }
 
 
@@ -959,6 +975,11 @@ def add_parsers(sub) -> None:
         help="nichts kopieren und index.json nicht schreiben; nur zählen und auflisten "
         "(würde N kopieren, M Einträge, K verwaist; gilt auch zusammen mit --prune)",
     )
+    pk = sub.add_parser(
+        "package", help="ZIP für Spieler aus dem Spielordner bauen (Mod, Bibliotheken, Audio, Liesmich)"
+    )
+    pk.add_argument("--out", type=Path, help="Zielordner (Standard: dist/ im Repo)")
+    pk.add_argument("--version", help="Version im Dateinamen (Standard: aus MelonInfo der Mod)")
     rp = sub.add_parser(
         "report", help="Status je Kategorie: offen, erzeugt, kodiert, installiert, übersprungen"
     )
