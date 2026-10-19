@@ -13,3 +13,5 @@ speakers:
   jola: {voice: emma}
   meluna: {voice: valentina}
   reija: {voice: lebhafte_junge_frau_37bab8}
+  # „Karim“ ist Carimas alter interner Name (23 Zeilen); gleiche Stimme wie carima (Nutzer, 2026-10-19)
+  karim: {voice: douchland_old_story_2ef205}
