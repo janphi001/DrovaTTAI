@@ -184,6 +184,12 @@ namespace DrovaVoice
                     _dialogueVoice.Install(HarmonyInstance);
                     _voice.DialogueVoice = _dialogueVoice;
                 }
+                try
+                {
+                    _voice.Recorder = new RuntimeLineRecorder(Path.Combine(ModDir, "Export", ExportLanguageFolder()), LoggerInstance);
+                    LoggerInstance.Msg($"Laufzeit-Zeilen: {_voice.Recorder.Count} bisher gesammelt ({RuntimeLineLog.FileName}).");
+                }
+                catch (Exception e) { LoggerInstance.Warning($"Laufzeit-Zeilen: Sammeln aus ({e.GetType().Name}: {e.Message})."); }
                 _probe = new StaleAudioProbe(LoggerInstance, _voice.Diagnostics);
                 _barkDistance = new BarkDistance(_voice.BarkMinDistance, _voice.BarkMaxDistance, LoggerInstance, _voice.Diagnostics);
                 _voice.BarkDistance = _barkDistance;

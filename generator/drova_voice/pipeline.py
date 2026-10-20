@@ -109,6 +109,34 @@ def read_json_object(path: Path, what: str) -> dict | None:
     return data
 
 
+RUNTIME_LINES = "manifest-runtime.jsonl"
+_RUNTIME_REQUIRED = ("id", "tree", "locaPath", "locaKey")
+
+
+def read_runtime_lines(path: Path) -> tuple[list[dict], int]:
+    """Zeilen, die die Mod im Spiel ohne Indexeintrag gesehen hat (eine Manifestzeile je Textzeile).
+
+    Gibt die lesbaren Zeilen und die Zahl der unlesbaren zurück; leere Zeilen zählen nicht.
+    """
+    if not path.is_file():
+        return [], 0
+    rows: list[dict] = []
+    bad = 0
+    for raw in path.read_text(encoding="utf-8-sig").splitlines():
+        if not raw.strip():
+            continue
+        try:
+            row = json.loads(raw)
+        except json.JSONDecodeError:
+            bad += 1
+            continue
+        if not isinstance(row, dict) or any(not isinstance(row.get(k), str) for k in _RUNTIME_REQUIRED):
+            bad += 1
+            continue
+        rows.append(row)
+    return rows, bad
+
+
 def lines_path(cfg: Config) -> Path:
     return cfg.data_dir / "lines.jsonl"
 
@@ -177,6 +205,13 @@ def _extract(cfg: Config, args: argparse.Namespace) -> int:
         return 2
     if not isinstance(manifest.get("lines", []), list):
         return _fail(f"Manifest: lines ist keine Liste ({manifest_path})")
+    runtime_path = cfg.data_dir / "export" / cfg.language / RUNTIME_LINES
+    runtime, bad = read_runtime_lines(runtime_path)
+    if runtime_path.is_file():
+        known = {row.get("id") for row in manifest.get("lines", []) if isinstance(row, dict)}
+        added = [row for row in runtime if row["id"] not in known]
+        manifest = {**manifest, "lines": [*manifest.get("lines", []), *added]}
+        print(f"{len(added)} Laufzeit-Zeilen aus {runtime_path.name} ({len(runtime) - len(added)} schon im Manifest, {bad} unlesbar)")
     lexicon = load_lexicon(cfg.casting_dir / "lexicon.yaml")
     lines = build_lines(manifest, load_loc_texts(cfg.loc_dir, cfg.language), lexicon)
     write_lines(lines_path(cfg), lines)

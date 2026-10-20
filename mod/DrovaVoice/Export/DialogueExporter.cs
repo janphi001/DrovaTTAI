@@ -20,7 +20,7 @@ namespace DrovaVoice.Export
 
     public sealed class DialogueExporter
     {
-        private const string KeyMissingPrefix = "[LOCA] Key not found";
+        internal const string KeyMissingPrefix = "[LOCA] Key not found";
         private readonly string _language;
         private const int MaxErrorLogs = 5;
         private readonly MelonLogger.Instance _log;

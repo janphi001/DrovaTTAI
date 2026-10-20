@@ -15,6 +15,7 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 
 | Schritt | Befehl | Ergebnis |
 |---|---|---|
+| 0 | `drova-voice export fetch` | kopiert den Export-Ordner aus dem Spiel nach `data/export/<Sprache>/`, auch `manifest-runtime.jsonl` (siehe unten) |
 | 1 | `drova-voice extract` | `data/lines.jsonl` (Sprechtext, Regieanweisungen, Gründe fürs Überspringen) |
 | 2 | `drova-voice cast --check --npc Adela` | prüft, ob jeder Sprecher eine Stimme hat (`casting/casting.yaml`) |
 | 3 | `drova-voice emote --npc Adela` | `casting/emotions.jsonl` (aus Regieanweisungen; `llm`- und `manual`-Zeilen bleiben) |
@@ -27,6 +28,12 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 `synth` hat `--engine` (Standard `fish`; `fake` für Tests ohne Netz), `--workers` (Standard 8), `--limit N` (nur die ersten N Aufträge, zum Ausprobieren; `0` sendet nichts) und `--max-utf8-bytes N` (Budget für neu gesendete UTF-8-Bytes).
 
 `install --prune` löscht im Zielordner OGG-Dateien, die danach kein Indexeintrag mehr nennt. Ohne die Option bleiben sie liegen. `install --dry-run` kopiert nichts und schreibt `index.json` nicht; es zählt und listet nur (`würde N kopieren, M Einträge, K verwaist`). Zusammen mit `--prune` gilt der Dry-Run. Beides ist standardmäßig aus.
+
+## Laufzeit-Zeilen (`manifest-runtime.jsonl`)
+
+Manche Aussagen sieht der Export nicht, vor allem Vorlagen-Bäume wie `DT_WorldDialogue_Template`, deren Loca-Pfad erst im Spiel feststeht (dieselben Schlüssel unter `Dialogues/WorldDialogue`, `WoodcampWorldDialogue` …). Die Mod hängt jede ausgeführte Aussage ohne Indexeintrag (und ohne Poolvarianten) einmal an `<Spiel>/Mods/DrovaVoice/Export/<Sprache>/manifest-runtime.jsonl` an: eine Manifestzeile je Textzeile, mit dem Sprecher der Aussage (`actorName`). Die Datei wächst mit jeder Spielsitzung und enthält Spieltext (nie ins Git).
+
+`export fetch` kopiert sie mit, `extract` nimmt sie zum Manifest dazu (Zeilen des Manifests gewinnen bei gleicher ID) und meldet `N Laufzeit-Zeilen …`. Danach behandeln alle Schritte sie wie Exportzeilen, ein Vollauf (`batches`, `synth --batch` …) also auch. Neue Sprecher meldet `cast --check`; Gründe fürs Überspringen (`gvar_value` …) gelten wie sonst.
 
 ## Casting und Vollauf (Plan 5)
 
