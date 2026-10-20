@@ -41,6 +41,8 @@ namespace DrovaVoice
         private bool _reloadTriggerStuck;
         private bool _indexIoLogged;
 
+        private bool _ownDialogueVoice = true;
+        private DialogueVoice? _dialogueVoice;
         private string ModDir => Path.Combine(MelonEnvironment.ModsDirectory, "DrovaVoice");
         private string TriggerPath => Path.Combine(ModDir, "export.trigger");
         private string TriggerAllPath => Path.Combine(ModDir, "export-all.trigger");
@@ -61,6 +63,7 @@ namespace DrovaVoice
             var audioLanguage = category.CreateEntry("AudioLanguage", "de", description: "Unterordner unter Mods/DrovaVoice/Audio");
             var cacheMb = category.CreateEntry("CacheMB", 64, description: "Obergrenze für geladene Clips in MB (8-512)");
             var diagnostics = category.CreateEntry("Diagnostics", false, description: "Jede Zeile einmal loggen (geladen/ohne Eintrag)");
+            _ownDialogueVoice = category.CreateEntry("OwnDialogueVoice", true, description: "Dialog- und Spielerzeilen auf eigener AudioSource abspielen (Skip wie ohne Stimme); aus = über das Spiel wie früher").Value;
             Directory.CreateDirectory(ModDir);
             string probe = LineIds.AudioFileName(LineIds.Statement("DT_Main_NPC_Adela", "Dialog/NPC_Adela", "Plh_5"));
             LoggerInstance.Msg($"DrovaVoice {Info.Version} geladen (Core ok: {probe}). Export: Datei export.trigger in {ModDir} anlegen oder F9 drücken. Index neu: reload.trigger, oder wenn sich index.json ändert.");
@@ -175,6 +178,12 @@ namespace DrovaVoice
                 AudioManager.ReplaceDialogueAudioConnector(new VoiceConnector(_voice));
                 _connectorInstalled = true;
                 _sources = new AudioSourceScan();
+                if (_ownDialogueVoice)
+                {
+                    _dialogueVoice = new DialogueVoice(LoggerInstance, _voice.Diagnostics);
+                    _dialogueVoice.Install(HarmonyInstance);
+                    _voice.DialogueVoice = _dialogueVoice;
+                }
                 _probe = new StaleAudioProbe(LoggerInstance, _voice.Diagnostics);
                 _barkDistance = new BarkDistance(_voice.BarkMinDistance, _voice.BarkMaxDistance, LoggerInstance, _voice.Diagnostics);
                 _voice.BarkDistance = _barkDistance;
@@ -205,10 +214,13 @@ namespace DrovaVoice
             }
         }
 
+        public override void OnLateUpdate() => _dialogueVoice?.LateUpdate(Time.unscaledTime);
+
         public override void OnUpdate()
         {
             _frame++;
             if (!_connectorInstalled) TryInstallConnector();   // billig: nur ein statischer Null-Test pro Frame bis zur Installation
+            _dialogueVoice?.Update(Time.unscaledTime);
             if (_sources != null)
             {
                 try { _sources.Tick(Time.unscaledTime); }

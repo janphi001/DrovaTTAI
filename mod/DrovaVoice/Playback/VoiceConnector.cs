@@ -42,6 +42,13 @@ namespace DrovaVoice.Playback
                 var clip = _service.GetClip(id, figure);
                 if (clip != null)
                 {
+                    // Dialog- und Spielerzeilen spielt die Mod selbst: Mit statement.audio skippt das Spiel nur die Stimme, nicht den Text.
+                    var voice = _service.DialogueVoice;
+                    if (voice != null && voice.Ready && !(clip.name ?? "").StartsWith(BarkDistance.BarkClipPrefix, System.StringComparison.Ordinal))
+                    {
+                        voice.Queue(clip);
+                        return;
+                    }
                     statement.audio = clip;
                     // Der Clip bleibt sonst an der Aussage stehen: Wiederholungen riefen den Connector nicht mehr auf (falsche Figur bei
                     // geteilten Aussagen, neue Lautstärke aus dem Optionsmenü käme nie an). Nach dem Abspielstart wieder freigeben.
