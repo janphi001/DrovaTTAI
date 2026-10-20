@@ -159,6 +159,7 @@ Spiel starten, Spielstand laden, mit NPCs sprechen. Die Einstellungen stehen in 
 | `CacheMB` | `64` | Speicher für geladene Sprachclips (8 bis 512) |
 | `Diagnostics` | `false` | ausführliches Log, hilft bei der Fehlersuche |
 | `ExportLanguage` | `de` | Ordnername des Exports |
+| `OwnDialogueVoice` | `true` | Dialoge über eine eigene Tonquelle abspielen, damit Überspringen wie ohne Stimme klappt; `false` = Wiedergabe durch das Spiel |
 
 Weitere Hinweise, Log-Meldungen und die Abnahme-Checkliste: `docs/playback.md`.
 
