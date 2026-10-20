@@ -6,6 +6,8 @@ dependencies = ["pyyaml>=6.0", "num2words>=0.5.13"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.17", "mypy>=1.13", "types-PyYAML"]
+# export world: Welt-Dialoge aus den Addressables-Bundles lesen
+assets = ["UnityPy>=1.25"]
 
 [project.scripts]
 drova-voice = "drova_voice.cli:main"
@@ -54,5 +56,6 @@ module = [
     "chatterbox.*",
     "TTS.*",
     "numpy",
+    "UnityPy",
 ]
 ignore_missing_imports = true

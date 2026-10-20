@@ -110,6 +110,7 @@ def read_json_object(path: Path, what: str) -> dict | None:
 
 
 RUNTIME_LINES = "manifest-runtime.jsonl"
+WORLD_LINES = "manifest-world.jsonl"
 _RUNTIME_REQUIRED = ("id", "tree", "locaPath", "locaKey")
 
 
@@ -130,7 +131,9 @@ def read_runtime_lines(path: Path) -> tuple[list[dict], int]:
         except json.JSONDecodeError:
             bad += 1
             continue
-        if not isinstance(row, dict) or any(not isinstance(row.get(k), str) for k in _RUNTIME_REQUIRED):
+        if not isinstance(row, dict) or any(
+            not isinstance(row.get(k), str) for k in _RUNTIME_REQUIRED
+        ):
             bad += 1
             continue
         rows.append(row)
@@ -205,13 +208,19 @@ def _extract(cfg: Config, args: argparse.Namespace) -> int:
         return 2
     if not isinstance(manifest.get("lines", []), list):
         return _fail(f"Manifest: lines ist keine Liste ({manifest_path})")
-    runtime_path = cfg.data_dir / "export" / cfg.language / RUNTIME_LINES
-    runtime, bad = read_runtime_lines(runtime_path)
-    if runtime_path.is_file():
-        known = {row.get("id") for row in manifest.get("lines", []) if isinstance(row, dict)}
-        added = [row for row in runtime if row["id"] not in known]
+    # Zusatzzeilen: erst die im Spiel gesehenen (echter Sprecher), dann die aus den Bundles gelesenen Welt-Dialoge.
+    known = {row.get("id") for row in manifest.get("lines", []) if isinstance(row, dict)}
+    for name, label in ((RUNTIME_LINES, "Laufzeit-Zeilen"), (WORLD_LINES, "Welt-Dialog-Zeilen")):
+        extra_path = cfg.data_dir / "export" / cfg.language / name
+        if not extra_path.is_file():
+            continue
+        extra, bad = read_runtime_lines(extra_path)
+        added = [row for row in extra if row["id"] not in known]
+        known.update(row["id"] for row in added)
         manifest = {**manifest, "lines": [*manifest.get("lines", []), *added]}
-        print(f"{len(added)} Laufzeit-Zeilen aus {runtime_path.name} ({len(runtime) - len(added)} schon im Manifest, {bad} unlesbar)")
+        print(
+            f"{len(added)} {label} aus {name} ({len(extra) - len(added)} schon bekannt, {bad} unlesbar)"
+        )
     lexicon = load_lexicon(cfg.casting_dir / "lexicon.yaml")
     lines = build_lines(manifest, load_loc_texts(cfg.loc_dir, cfg.language), lexicon)
     write_lines(lines_path(cfg), lines)

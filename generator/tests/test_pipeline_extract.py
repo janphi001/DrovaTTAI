@@ -108,7 +108,13 @@ def test_extract_adds_runtime_lines_from_the_mod(pipeline_repo, capsys):
     export = pipeline_repo.data / "export" / "de"
     first = json.loads((export / "manifest.json").read_text(encoding="utf-8"))["lines"][0]
     tree, path = "DT_Test_Template", first["locaPath"]
-    new = _runtime_row(first, id=f"{tree}|{path}|Plh_900", tree=tree, locaKey="Plh_900", text="Ein erfundener Satz.")
+    new = _runtime_row(
+        first,
+        id=f"{tree}|{path}|Plh_900",
+        tree=tree,
+        locaKey="Plh_900",
+        text="Ein erfundener Satz.",
+    )
     (export / "manifest-runtime.jsonl").write_text(new + "\n", encoding="utf-8")
     assert main(["--config", str(pipeline_repo.cfg), "extract"]) == 0
     lines = read_lines(pipeline_repo.data / "lines.jsonl")
@@ -121,7 +127,9 @@ def test_extract_adds_runtime_lines_from_the_mod(pipeline_repo, capsys):
 def test_extract_keeps_the_manifest_line_when_the_runtime_file_repeats_it(pipeline_repo):
     export = pipeline_repo.data / "export" / "de"
     first = json.loads((export / "manifest.json").read_text(encoding="utf-8"))["lines"][0]
-    (export / "manifest-runtime.jsonl").write_text(_runtime_row(first, actorName="Jemand") + "\n", encoding="utf-8")
+    (export / "manifest-runtime.jsonl").write_text(
+        _runtime_row(first, actorName="Jemand") + "\n", encoding="utf-8"
+    )
     assert main(["--config", str(pipeline_repo.cfg), "extract"]) == 0
     lines = read_lines(pipeline_repo.data / "lines.jsonl")
     assert len(lines) == 6
@@ -130,7 +138,9 @@ def test_extract_keeps_the_manifest_line_when_the_runtime_file_repeats_it(pipeli
 
 def test_extract_skips_unreadable_runtime_lines(pipeline_repo, capsys):
     export = pipeline_repo.data / "export" / "de"
-    (export / "manifest-runtime.jsonl").write_text('{kaputt\n\n{"id": "ohne Felder"}\n[]\n', encoding="utf-8")
+    (export / "manifest-runtime.jsonl").write_text(
+        '{kaputt\n\n{"id": "ohne Felder"}\n[]\n', encoding="utf-8"
+    )
     assert main(["--config", str(pipeline_repo.cfg), "extract"]) == 0
     assert len(read_lines(pipeline_repo.data / "lines.jsonl")) == 6
     out = capsys.readouterr().out

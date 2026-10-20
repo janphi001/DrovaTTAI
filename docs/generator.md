@@ -16,6 +16,7 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 | Schritt | Befehl | Ergebnis |
 |---|---|---|
 | 0 | `drova-voice export fetch` | kopiert den Export-Ordner aus dem Spiel nach `data/export/<Sprache>/`, auch `manifest-runtime.jsonl` (siehe unten) |
+| 0b | `drova-voice export world` | liest die Welt-Dialoge des Vorlagen-Baums aus den Bundles des Spiels nach `data/export/<Sprache>/manifest-world.jsonl` (siehe unten; braucht `uv sync --extra assets`) |
 | 1 | `drova-voice extract` | `data/lines.jsonl` (Sprechtext, Regieanweisungen, Gründe fürs Überspringen) |
 | 2 | `drova-voice cast --check --npc Adela` | prüft, ob jeder Sprecher eine Stimme hat (`casting/casting.yaml`) |
 | 3 | `drova-voice emote --npc Adela` | `casting/emotions.jsonl` (aus Regieanweisungen; `llm`- und `manual`-Zeilen bleiben) |
@@ -29,11 +30,20 @@ Jeder Schritt nimmt `--npc <Name>` und arbeitet dann auf allen Dialogbäumen, in
 
 `install --prune` löscht im Zielordner OGG-Dateien, die danach kein Indexeintrag mehr nennt. Ohne die Option bleiben sie liegen. `install --dry-run` kopiert nichts und schreibt `index.json` nicht; es zählt und listet nur (`würde N kopieren, M Einträge, K verwaist`). Zusammen mit `--prune` gilt der Dry-Run. Beides ist standardmäßig aus.
 
+## Welt-Dialoge (`export world`, `manifest-world.jsonl`)
+
+Viele Welt-Dialoge haben keinen eigenen Baum: Das Spiel baut sie zur Laufzeit aus `DT_WorldDialogue_Template`. Die Daten stehen in `WorldDialogueStarterModule._worldDialogueSettings` (`_graphLocaPath`, `Args` mit `_path`, `_key`, `Participant`) auf Komponenten in Prefabs und Szenen (`Interact_Bhvr_*`, `PPT_Bhvr_WorldDialog`, `HitReceiveBhvr_WorldDialogue`, `WorldDialogueContainer` …). `export world` liest sie offline aus allen Addressables-Bundles (`Drova_Data/StreamingAssets/aa/StandaloneWindows64`, TypeTrees über UnityPy, 8 Prozesse, `--workers`) und schreibt je Pfad und Schlüssel eine Manifestzeile mit der ID `DT_WorldDialogue_Template|<Pfad>|<Schlüssel>`. Module mit eigenem Baum (`_useTree`) stehen schon im normalen Export und zählen nicht.
+
+- Sprecher: `Participant` des Args, sonst die `EntityInfo` des Besitzers (Komponente mit `_entityInfo` auf dem GameObject oder darüber), über `npcs.json` auf den Sprechernamen des Spiels abgebildet. Ohne beides ist es ein Objekt (Statue, Erzader, Kiste …): Dort spricht der Spieler; unter `CrimesReactions` eine generische Figur (`NPC`). Teilen sich mehrere Module einen Schlüssel mit verschiedenen Sprechern, gewinnt der häufigste.
+- Kategorie wie in der Mod: Spieler `player`, sonst `bark` (Baum beginnt mit `DT_World`).
+- Der Text kommt beim `extract` aus den `.loc`-Dateien.
+- Stand 2026-10-20: 2.183 Bundles, 4.671 Module, davon 2.260 mit Vorlage, 836 Zeilen. Geprüft gegen das Spiel-Log: `Dialogues/WorldDialogue|Plh_10` spricht Almar (Participant), `Plh_11` Merik (Participant statt Besitzer Almar).
+
 ## Laufzeit-Zeilen (`manifest-runtime.jsonl`)
 
 Manche Aussagen sieht der Export nicht, vor allem Vorlagen-Bäume wie `DT_WorldDialogue_Template`, deren Loca-Pfad erst im Spiel feststeht (dieselben Schlüssel unter `Dialogues/WorldDialogue`, `WoodcampWorldDialogue` …). Die Mod hängt jede ausgeführte Aussage ohne Indexeintrag (und ohne Poolvarianten) einmal an `<Spiel>/Mods/DrovaVoice/Export/<Sprache>/manifest-runtime.jsonl` an: eine Manifestzeile je Textzeile, mit dem Sprecher der Aussage (`actorName`). Die Datei wächst mit jeder Spielsitzung und enthält Spieltext (nie ins Git).
 
-`export fetch` kopiert sie mit, `extract` nimmt sie zum Manifest dazu (Zeilen des Manifests gewinnen bei gleicher ID) und meldet `N Laufzeit-Zeilen …`. Danach behandeln alle Schritte sie wie Exportzeilen, ein Vollauf (`batches`, `synth --batch` …) also auch. Neue Sprecher meldet `cast --check`; Gründe fürs Überspringen (`gvar_value` …) gelten wie sonst.
+`export fetch` kopiert sie mit, `extract` nimmt sie zum Manifest dazu (Reihenfolge bei gleicher ID: Manifest, Laufzeit-Zeilen, Welt-Dialoge) und meldet `N Laufzeit-Zeilen …`. Danach behandeln alle Schritte sie wie Exportzeilen, ein Vollauf (`batches`, `synth --batch` …) also auch. Neue Sprecher meldet `cast --check`; Gründe fürs Überspringen (`gvar_value` …) gelten wie sonst.
 
 ## Casting und Vollauf (Plan 5)
 

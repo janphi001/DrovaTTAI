@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import sys
@@ -9,7 +10,7 @@ from pathlib import Path
 
 import yaml
 
-from drova_voice import pipeline
+from drova_voice import pipeline, world_dialogues
 from drova_voice.bakeoff import (
     REF_TEXT,
     BakeoffResult,
@@ -83,8 +84,40 @@ def _parse(argv: list[str] | None) -> argparse.Namespace:
     rep.add_argument("--manifest", type=Path)
     rep.add_argument("--min-coverage", type=float, default=98.0)
     exp.add_parser("fetch", help="Export-Ordner aus dem Spielordner nach data/export kopieren")
+    wor = exp.add_parser(
+        "world",
+        help="Welt-Dialoge des Vorlagen-Baums aus den Bundles des Spiels lesen (braucht .[assets])",
+    )
+    wor.add_argument("--workers", type=int, default=8)
     pipeline.add_parsers(sub)
     return p.parse_args(argv)
+
+
+def _export_world(cfg, export_dir: Path, workers: int) -> int:
+    bundle_dir = cfg.game_dir / "Drova_Data" / "StreamingAssets" / "aa" / "StandaloneWindows64"
+    if not bundle_dir.is_dir():
+        print(f"FEHLER: Bundle-Ordner nicht gefunden: {bundle_dir}", file=sys.stderr)
+        return 2
+    npcs_path = export_dir / "npcs.json"
+    npcs: list = []
+    if npcs_path.is_file():
+        loaded = json.loads(npcs_path.read_text(encoding="utf-8-sig"))
+        npcs = loaded if isinstance(loaded, list) else []
+    else:
+        print(f"Hinweis: {npcs_path} fehlt (export fetch); Sprecher nach Asset-Namen geraten")
+    try:
+        modules, names, bundles = world_dialogues.scan(bundle_dir, workers)
+    except RuntimeError as e:
+        print(f"FEHLER: {e}", file=sys.stderr)
+        return 2
+    rows = world_dialogues.build_rows(modules, names, npcs)
+    out = export_dir / world_dialogues.OUTPUT_NAME
+    count = world_dialogues.write_rows(out, rows)
+    used = sum(1 for m in modules if not m.uses_tree)
+    print(
+        f"{bundles} Bundles, {len(modules)} Welt-Dialog-Module ({used} mit Vorlage): {count} Zeilen -> {out}"
+    )
+    return 0
 
 
 def _run(args: argparse.Namespace) -> int:
@@ -149,6 +182,8 @@ def _run(args: argparse.Namespace) -> int:
             shutil.copytree(src, export_dir, dirs_exist_ok=True)
             print(f"{src} -> {export_dir}")
             return 0
+        if args.ecmd == "world":
+            return _export_world(cfg, export_dir, args.workers)
         if not cfg.loc_dir.is_dir():
             print(
                 f"FEHLER: Lokalisierungsordner nicht gefunden: {cfg.loc_dir} (game_dir in config.yaml prüfen)",
