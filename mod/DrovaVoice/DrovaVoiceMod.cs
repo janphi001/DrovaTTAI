@@ -193,6 +193,7 @@ namespace DrovaVoice
                 _probe = new StaleAudioProbe(LoggerInstance, _voice.Diagnostics);
                 _barkDistance = new BarkDistance(_voice.BarkMinDistance, _voice.BarkMaxDistance, LoggerInstance, _voice.Diagnostics);
                 _voice.BarkDistance = _barkDistance;
+                if (_barkProbe) FrameProbe.Active = new FrameProbe(LoggerInstance);
                 ChoiceHook.Service = _voice;   // vor dem Menü: ein Menüfehler darf die Auswahloptionen und die Installation nicht kippen
                 try { SetUpMenu(); } catch (Exception e) { LoggerInstance.Warning($"Optionsmenü nicht verfügbar ({e.GetType().Name}). Die Einstellungen aus MelonPreferences.cfg gelten weiter."); }
                 LoggerInstance.Msg("Audio-Connector der Modding API ersetzt.");
@@ -220,19 +221,35 @@ namespace DrovaVoice
             }
         }
 
-        public override void OnLateUpdate() => _dialogueVoice?.LateUpdate(Time.unscaledTime);
+        public override void OnLateUpdate()
+        {
+            var fp = FrameProbe.Active;
+            long t = fp?.Start() ?? 0;
+            _dialogueVoice?.LateUpdate(Time.unscaledTime);
+            fp?.Stop(FrameProbe.Part.Tempo, t);
+        }
 
         public override void OnUpdate()
         {
             _frame++;
             if (!_connectorInstalled) TryInstallConnector();   // billig: nur ein statischer Null-Test pro Frame bis zur Installation
+            var fp = FrameProbe.Active;
+            fp?.EndFrame(Time.unscaledTimeAsDouble, Time.unscaledDeltaTime, _sources?.Sources.Length ?? 0, _barkDistance?.Busy ?? false);
+            long t = fp?.Start() ?? 0;
             _dialogueVoice?.Update(Time.unscaledTime);
+            fp?.Stop(FrameProbe.Part.Stimme, t);
             if (_sources != null)
             {
+                t = fp?.Start() ?? 0;
                 try { _sources.Tick(Time.unscaledTime); }
                 catch (Exception e) { WarnSourceScan(e); }
+                fp?.Stop(FrameProbe.Part.Scan, t);
+                t = fp?.Start() ?? 0;
                 _probe?.Observe(_sources);
+                fp?.Stop(FrameProbe.Part.Sonde, t);
+                t = fp?.Start() ?? 0;
                 _barkDistance?.Update(_sources.Sources, Time.unscaledTime);
+                fp?.Stop(FrameProbe.Part.Bark, t);
             }
             bool trigger = false;
             if (_frame % 60 == 0)

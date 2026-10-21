@@ -47,12 +47,13 @@ namespace DrovaVoice.Playback
         private Il2CppTMPro.TextMeshProUGUI? _paced;
         private int _gameVisible = int.MaxValue;   // letzter Wert, den das Spiel selbst geschrieben hat
         private int _written = -1;                 // letzter Wert der Mod
-        private float _searchUntil;
-        private int _nextSearchFrame;
-        private readonly HashSet<string> _textsBefore = new HashSet<string>();
+        private bool _bubble;
+        private Il2CppUi.DS_DialogueUGUI? _playingDialogue;
+        private int _speechBeforeId;        // Textfeld des aktuellen Fensters beim Start und sein Text: noch die vorige Zeile
+        private string? _speechBeforeText;
 
-        /// <summary>So lange nach dem Start wird das Textfeld der Zeile gesucht (das Fenster blendet beim ersten Satz erst ein).</summary>
-        private const float SearchSeconds = 1f;
+        /// <summary>So lange nach dem Start wird das Textfeld über das Fenster gelesen (das Fenster blendet beim ersten Satz erst ein).</summary>
+        private const float ResolveSeconds = 1f;
 
         public DialogueVoice(MelonLogger.Instance log, bool verbose) { _log = log; _verbose = verbose; }
 
@@ -74,8 +75,7 @@ namespace DrovaVoice.Playback
                 }
                 harmony.Patch(request, prefix: new HarmonyMethod(typeof(DialogueVoice), nameof(RequestPrefix)));
                 harmony.Patch(finished, prefix: new HarmonyMethod(typeof(DialogueVoice), nameof(EndPrefix)));
-                harmony.Patch(paused, prefix: new HarmonyMethod(typeof(DialogueVoice), nameof(EndPrefix)));
-                _current = this;
+                harmony.Patch(paused, prefix: new HarmonyMethod(typeof(DialogueVoice), nameof(EndPrefix)));                _current = this;
                 _ready = true;
                 if (_verbose) _log.Msg("[Stimme] eigene Dialogstimme bereit");
             }
@@ -95,8 +95,11 @@ namespace DrovaVoice.Playback
 
         private static void RequestPrefix(object __instance)
         {
+            var fp = FrameProbe.Active;
+            long t = fp?.Start() ?? 0;
             try { _current?.OnRequest(__instance as Il2CppUi.DS_DialogueUGUI); }
             catch (Exception e) { _current?.Fault("Start", e); }
+            fp?.Stop(FrameProbe.Part.Stimme, t);
         }
 
         private static void EndPrefix(object __instance)
@@ -109,6 +112,32 @@ namespace DrovaVoice.Playback
                 if (ui.GetInstanceID() == self._playingUi) self.Stop("Gesprächsende");
             }
             catch (Exception e) { _current?.Fault("Ende", e); }
+        }
+
+        /// <summary>Gesprächsfenster: Tempo koppeln. Sprechblase einer Weltzeile: das Spiel skippt sie nicht, die Mod auch nicht.</summary>
+        private void Adopt(Il2CppTMPro.TextMeshProUGUI text)
+        {
+            var kind = Classify(text);
+            if (kind == TextKind.Bubble)
+            {
+                _bubble = true;
+                if (_verbose && _faults.ShouldLog("Bubble")) _log.Msg("[Stimme] Weltzeile in der Sprechblase, Taste beendet sie nicht");
+                return;
+            }
+            if (kind != TextKind.Window) return;
+            _paced = text;
+            _gameVisible = int.MaxValue;
+            _written = -1;
+        }
+
+        /// <summary>
+        /// Textfeld des aktuellen Fensters dieses Dialogfelds, ohne Suche über die Szene: Eine Suche über alle Textfelder kostete
+        /// rund 20 ms je Aufruf. <c>InitializeText</c> abzufangen greift nicht, es läuft innerhalb der Text-Coroutine.
+        /// </summary>
+        private static Il2CppTMPro.TextMeshProUGUI? WindowSpeech(Il2CppUi.DS_DialogueUGUI? ui)
+        {
+            try { return ui?.WindowMgr?._currentWindowControl?.CurrentWindow?.SubtitlesGroup?.ActorSpeech; }
+            catch (Exception) { return null; }   // Fenster gerade zerstört: im nächsten Bild erneut
         }
 
         private void OnRequest(Il2CppUi.DS_DialogueUGUI? ui)
@@ -129,11 +158,12 @@ namespace DrovaVoice.Playback
             _playingUi = id;
             _startedAt = Time.unscaledTime;
             _clipLength = clip.length;
+            _bubble = false;
+            _playingDialogue = ui;
+            var before = WindowSpeech(ui);
+            _speechBeforeId = before != null ? before.GetInstanceID() : 0;
+            _speechBeforeText = before?.text;
             ReleaseText();   // ein anderes Dialogfeld kann noch ein Textfeld halten
-            _searchUntil = _startedAt + SearchSeconds;
-            _nextSearchFrame = Time.frameCount + 1;
-            _textsBefore.Clear();
-            foreach (var t in WindowTexts()) _textsBefore.Add(t.text ?? "");   // Text der vorigen Zeile ist nicht der neue
         }
 
         /// <summary>Nach dem Spiel im selben Bild: sichtbare Zeichen an die Stimme koppeln.</summary>
@@ -145,20 +175,15 @@ namespace DrovaVoice.Playback
                 var text = _paced;
                 if (text == null)
                 {
-                    if (now > _searchUntil || Time.frameCount < _nextSearchFrame) return;
-                    _nextSearchFrame = Time.frameCount + 3;   // Suche gedrosselt, nur kurz nach dem Start
-                    foreach (var t in WindowTexts())
-                    {
-                        string content = t.text ?? "";
-                        if (content.Length == 0 || _textsBefore.Contains(content)) continue;
-                        _paced = text = t;
-                        _gameVisible = int.MaxValue;
-                        _written = -1;
-                        break;
-                    }
+                    if (_bubble || now - _startedAt > ResolveSeconds) return;
+                    var speech = WindowSpeech(_playingDialogue);
+                    if (speech == null) return;
+                    if (speech.GetInstanceID() == _speechBeforeId && speech.text == _speechBeforeText) return;
+                    Adopt(speech);
+                    text = _paced;
                     if (text == null) return;
                 }
-                if (text == null || !text.gameObject.activeInHierarchy || _clipLength <= 0f) { _paced = null; return; }
+                if (!text.gameObject.activeInHierarchy || _clipLength <= 0f) { _paced = null; return; }
                 int total = text.textInfo != null ? text.textInfo.characterCount : 0;
                 if (total <= 0) return;
                 int current = text.maxVisibleCharacters;
@@ -184,21 +209,19 @@ namespace DrovaVoice.Playback
             _gameVisible = int.MaxValue;
         }
 
-        /// <summary>Aktive Textfelder des Gesprächsfensters (…/SubtitlesGroup/Speech, ohne Sprechblasen …/WorldBox/…).</summary>
-        private static IEnumerable<Il2CppTMPro.TextMeshProUGUI> WindowTexts()
+        private enum TextKind { Other, Window, Bubble }
+
+        /// <summary>Gesprächsfenster (…/SubtitlesGroup/Speech) oder Sprechblase einer Weltzeile (…/WorldBox/…).</summary>
+        private static TextKind Classify(Il2CppTMPro.TextMeshProUGUI t)
         {
-            foreach (var t in UnityEngine.Object.FindObjectsOfType<Il2CppTMPro.TextMeshProUGUI>(false))
+            bool group = false;
+            var tr = t.transform;
+            for (int depth = 0; tr != null && depth < 6; depth++, tr = tr.parent)
             {
-                if (t == null || t.name != "Speech") continue;
-                bool group = false, bubble = false;
-                var tr = t.transform;
-                for (int depth = 0; tr != null && depth < 6; depth++, tr = tr.parent)
-                {
-                    if (tr.name == "WorldBox") bubble = true;
-                    if (tr.name == "SubtitlesGroup") group = true;
-                }
-                if (group && !bubble) yield return t;
+                if (tr.name == "WorldBox") return TextKind.Bubble;
+                if (tr.name == "SubtitlesGroup") group = true;
             }
+            return group && t.name == "Speech" ? TextKind.Window : TextKind.Other;
         }
 
         /// <summary>Einmal je Bild: ein Tastendruck während der Stimme beendet sie (Skip).</summary>
@@ -211,7 +234,7 @@ namespace DrovaVoice.Playback
                 var source = _playing;
                 if (source == null) return;
                 if (!source.isPlaying) { _playing = null; _playingUi = 0; ReleaseText(); return; }
-                if (now - _startedAt < StartGraceSeconds) return;
+                if (_bubble || now - _startedAt < StartGraceSeconds) return;
                 bool key = false;
                 try { key = Input.anyKeyDown || Input.GetMouseButtonDown(0); } catch (Exception) { /* ohne Eingabemodul endet die Stimme mit der Zeile */ }
                 if (key) Stop("Taste");
