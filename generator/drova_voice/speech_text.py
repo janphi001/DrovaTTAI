@@ -61,8 +61,16 @@ def _replace_br(text: str) -> str:
     return _BR_RE.sub(repl, text)
 
 
-def _numbers_to_words(text: str) -> str:
-    return _NUM_RE.sub(lambda m: num2words(int(m.group(0)), lang="de"), text)
+# Sprachordner des Spiels -> num2words-Sprache. Fehlt eine Sprache, bleiben die Ziffern stehen;
+# Fish normalisiert Zahlen dann selbst über den Parameter language.
+NUMBER_LANGUAGES = {"de": "de", "en": "en", "es": "es", "fr": "fr", "pl": "pl", "ko": "ko"}
+
+
+def _numbers_to_words(text: str, language: str = "de") -> str:
+    lang = NUMBER_LANGUAGES.get(language)
+    if lang is None:
+        return text
+    return _NUM_RE.sub(lambda m: num2words(int(m.group(0)), lang=lang), text)
 
 
 def compile_lexicon(lexicon: Mapping[str, str]) -> Lexicon:
@@ -111,11 +119,12 @@ def build_speech_text(
     raw: str,
     gvar_values: Mapping[str, str] | None = None,
     lexicon: Mapping[str, str] | Lexicon | None = None,
+    language: str = "de",
 ) -> SpeechText:
     text, unresolved = substitute_gvars(raw, gvar_values or {})
     text = _replace_br(text)
     text = _TAG_RE.sub("", text)
-    text = _numbers_to_words(text)
+    text = _numbers_to_words(text, language)
     if lexicon:
         text = apply_lexicon(text, lexicon)
     clean, stage = extract_stage_directions(text)

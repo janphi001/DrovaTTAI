@@ -97,6 +97,8 @@ Manche Aussagen sieht der Export nicht, vor allem Vorlagen-Bäume wie `DT_WorldD
 
 ## Release-Paket
 
+Englische Fassung der Anleitung: `README.en.md`. Der englische Discord-Text liegt in `release/discord-post.en.md`.
+
 `drova-voice package` baut aus dem Spielordner ein ZIP für Spieler: `Mods/DrovaVoice.dll`, `UserLibs/DrovaVoice.Core.dll`, `UserLibs/NVorbis.dll`, `Mods/DrovaVoice/Audio/<Sprache>/` (nur die OGG-Dateien, auf die `index.json` zeigt) sowie `README.txt` und `LIZENZEN.txt` aus `release/`. Ziel ist `dist/DrovaVoice-<Version>-<Sprache>.zip` mit einer `.sha256` daneben; `dist/` steht nicht im Git. Die Version kommt aus `MelonInfo` in `mod/DrovaVoice/DrovaVoiceMod.cs`, `--version` überschreibt sie, `--out` wählt einen anderen Ordner.
 
 Vorher die Mod bauen und ins Spiel kopieren (`-p:DeployToGame=true`) und im Spiel prüfen: Das Paket enthält genau, was dort liegt. Fehlt eine Datei aus dem Index, bricht der Befehl ab und schreibt kein ZIP. Der Text für die Ankündigung liegt in `release/discord-post.md`.

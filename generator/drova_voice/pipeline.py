@@ -222,7 +222,7 @@ def _extract(cfg: Config, args: argparse.Namespace) -> int:
             f"{len(added)} {label} aus {name} ({len(extra) - len(added)} schon bekannt, {bad} unlesbar)"
         )
     lexicon = load_lexicon(cfg.casting_dir / "lexicon.yaml")
-    lines = build_lines(manifest, load_loc_texts(cfg.loc_dir, cfg.language), lexicon)
+    lines = build_lines(manifest, load_loc_texts(cfg.loc_dir, cfg.language), lexicon, cfg.language)
     write_lines(lines_path(cfg), lines)
     skips = Counter(l.skip for l in lines if l.skip)
     detail = ", ".join(f"{reason}: {n}" for reason, n in sorted(skips.items())) or "keine"

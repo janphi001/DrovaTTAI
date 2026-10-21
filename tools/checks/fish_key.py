@@ -18,6 +18,7 @@ ASSIGN = re.compile(r"""FISH_API_KEY\s*=\s*(['"])(.*?)\1""", re.DOTALL)
 ALLOWED_URL_PREFIXES = (
     "generator/workers/fish/worker.py",
     "README.md",
+    "README.en.md",
     "docs/",
 )
 

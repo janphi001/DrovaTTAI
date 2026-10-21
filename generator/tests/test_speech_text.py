@@ -98,3 +98,15 @@ def test_lexicon_replacement_keeps_backslash_literal():
     assert (
         apply_lexicon("Das Zorvana ist hier", {"Zorvana": "Zor\\vana"}) == "Das Zor\\vana ist hier"
     )
+
+
+def test_numbers_follow_the_configured_language():
+    assert (
+        build_speech_text("Das kostet 25 Bronzeplatten.").text
+        == "Das kostet fünfundzwanzig Bronzeplatten."
+    )
+    assert (
+        build_speech_text("That costs 25 plates.", language="en").text
+        == "That costs twenty-five plates."
+    )
+    assert build_speech_text("价格 25", language="zh_CN").text == "价格 25"
