@@ -49,6 +49,8 @@ namespace DrovaVoice.Playback
         public float BarkMinDistance => _settings.BarkMinDistance;
         public float BarkMaxDistance => _settings.BarkMaxDistance;
         public BarkDistance? BarkDistance { get; set; }
+        /// <summary>Eigene Wiedergabe für Dialog- und Spielerzeilen; null = alles über <c>statement.audio</c>.</summary>
+        public DialogueVoice? DialogueVoice { get; set; }
 
         public void Probe(string key, string message)
         {

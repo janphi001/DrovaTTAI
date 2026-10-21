@@ -6,7 +6,7 @@ Die Mod spielt die vom Generator erzeugten Stimmen im Spiel ab. Grundlage: `docs
 
 1. Beim Start liest die Mod `Mods/DrovaVoice/Audio/<AudioLanguage>/index.json`. Fehlt sie oder passt Version oder Sprache nicht, bleibt die Vertonung aus und das Spiel läuft unverändert. Danach prüft sie etwa einmal pro Sekunde (alle 60 Frames) Länge und Schreibzeit. Hat sich eines davon geändert, liest sie den Index neu, leert den Clip-Cache und vergisst Zeilen, die bisher fehlgeschlagen sind. Dieselbe Prüfung erzwingt eine leere Datei `Mods/DrovaVoice/reload.trigger` (die Mod löscht sie). Schlägt das Lesen fehl, steht der Grund einmal im Log; ein schon geladener Index bleibt aktiv. Zwei weitere Versuche, etwa alle fünf Sekunden und ohne neue Meldung, holen eine Datei nach, die beim ersten Mal gerade ersetzt wurde.
 2. Sobald das Spiel in einer Welt ist (`WorldEventSystemManager.Instance` existiert), ersetzt die Mod den Audio-Connector der Modding API durch den eigenen. Vorher nicht: Im Hauptmenü scheitert `AudioManager` und bliebe die ganze Sitzung kaputt.
-3. Führt das Spiel eine Aussage aus, fragt die API den Connector (nur wenn die Zeile noch keinen Clip hat). Der Connector bildet die Zeilen-ID (Baum, Loca-Pfad, Schlüssel), sucht sie im Index, dekodiert die OGG-Datei (NVorbis), wendet die Lautstärke an und hängt den `AudioClip` an die Zeile. Abgespielt wird er vom Spiel; die Untertitel laufen passend zur Cliplänge.
+3. Führt das Spiel eine Aussage aus, fragt die API den Connector (nur wenn die Zeile noch keinen Clip hat). Der Connector bildet die Zeilen-ID (Baum, Loca-Pfad, Schlüssel), sucht sie im Index, dekodiert die OGG-Datei (NVorbis), wendet die Lautstärke an und erzeugt den `AudioClip`. Barks hängt er an die Zeile (`statement.audio`), das Spiel spielt sie ab. Dialog- und Spielerzeilen spielt die Mod selbst (`DialogueVoice`, siehe unten).
 4. Bei Auswahlknoten, die die Auswahl sprechen (`saySelection`), lädt ein Harmony-Prefix auf `DS_MultipleChoiceNode.OnExecute` die Clips aller Optionen (ID mit `|c<Index>`), damit die gewählte Option gesprochen wird. Er ist erst aktiv, nachdem der Connector ersetzt wurde. Verschiebt das Spiel die Optionsliste, findet die Mod die Option über ihren Schlüssel.
 5. Geladene Clips bleiben im Cache (Standard 64 MB). Verdrängte Clips werden zerstört und beim nächsten Mal neu geladen; die 8 jüngsten werden nie verdrängt.
 
@@ -29,6 +29,7 @@ Datei: `<Spiel>/UserData/MelonPreferences.cfg`, Abschnitt `[DrovaVoice]` (entste
 | `CacheMB` | `64` | 8–512 | Obergrenze für geladene Clips |
 | `Diagnostics` | `false` | — | Jede Zeile einmal loggen (geladen / ohne Eintrag) |
 | `ExportLanguage` | `de` | — | Ordnername des Exports (siehe `docs/export.md`) |
+| `OwnDialogueVoice` | `true` | — | Dialog- und Spielerzeilen über eine eigene AudioSource, damit der Skip wie ohne Stimme wirkt (siehe „Dialogstimme und Skip“); `false` = Wiedergabe durch das Spiel |
 
 Die Dateien sind auf −16 LUFS normiert; wie laut das im Verhältnis zu Musik und Effekten wirkt, muss man im Spiel hören. 100 % lässt die Dateien bit-genau unverändert; ab 101 % begrenzt ein weicher Begrenzer Spitzen über 0,8, damit nichts hart übersteuert (über alle 255 Dateien, Dialog und Spieler, erreicht der höchste Peak 0,91).
 
@@ -67,6 +68,15 @@ Ob die DrovaTTS-Warnung im Log steht und ob eine nachgeladene Zeile hörbar ist,
 - Der Spieler spricht seine gewählte Antwortoption nicht (wie im Original); der Generator erzeugt dafür keine Dateien (`player_choice`). Der Auswahl-Hook der Mod ist deshalb nur eine Reserve, falls später Optionsdateien im Index stehen.
 - Spielerstimm-Sets fehlen noch. Bei Zeilen mit streichbarem Spielernamen gilt `…#neutral`, sonst die Basis-ID; Zeilen mit nicht streichbarem Namen oder Quest-/Geldwerten bleiben stumm.
 - Briefe haben noch keine Dateien und keine Regler.
+
+## Dialogstimme und Skip
+
+- Hängt ein Clip an `statement.audio`, behandelt das Dialogfeld des Spiels (`DS_DialogueUGUI`) die Stimme beim Skip als eigene Stufe: Der erste Druck beendet nur die Stimme, der Text tippt in normaler Geschwindigkeit weiter, erst weitere Drücke schalten weiter. Ohne Clip vervollständigt der erste Druck den Text. Im Spiel gemessen (2026-10-20).
+- Deshalb spielt `DialogueVoice` Dialog- und Spielerzeilen auf einer eigenen `AudioSource` am Objekt des Dialogfelds (Einstellungen von der Quelle des Spiels dort: 3D-Anteil, Reichweite, Mixer). Start: Prefix auf `OnSubtitlesRequest` im selben Bild wie der Connector. Ende: nächste Zeile desselben Dialogfelds, `OnDialogueFinished`/`OnDialoguePaused`, oder ein Tastendruck ab 0,25 s nach dem Start (Skip).
+- Tempo: Mit Clip an der Aussage tippt das Spiel den Text über die Cliplänge, ohne Clip etwa 70 Zeichen/s. Solange die Stimme läuft, begrenzt `DialogueVoice` in `OnLateUpdate` die sichtbaren Zeichen des Gesprächsfensters (`…/SubtitlesGroup/Speech`) auf den Anteil der Clipzeit (`TextPace`), höchstens bis zum Stand des Spiels. Beim Ende oder Skip bekommt das Textfeld den Stand des Spiels zurück.
+- Barks laufen weiter über `statement.audio` (kein Skip, Entfernung über `BarkDistance`).
+- `OwnDialogueVoice = false` in `MelonPreferences.cfg` schaltet zurück auf die Wiedergabe durch das Spiel (dann wieder der Skip in zwei Stufen).
+- Harmony-Patches auf `DS_DialogueUGUI` werden von Hand angelegt. Methoden, die nur innerhalb der Text-Coroutine laufen (`HandleAudio`, `IterateText`, `SkipTextAnimation` …), lassen sich nicht abfangen; `SkipTextAnimation` von außen aufzurufen ändert nichts, weil die Coroutine `maxVisibleCharacters` mit ihrem eigenen Zähler überschreibt.
 
 ## Optionsmenü (Plan 8)
 - Im Optionsmenü des Spiels gibt es das Panel **Drova Voice** (über die Modding API, `OptionMenuAccess`/`OptionUIBuilder`): Schalter Vertonung, Regler Dialog, Spieler und Barks (0–200 %), Barks volle Lautstärke bis (Meter) und stumm ab (Meter). Änderungen gelten ab der nächsten Zeile, ohne Neustart; die Mod liest sie beim Schließen des Menüs aus der Spielkonfiguration (Schlüssel `DrovaVoice_Enabled`, `DrovaVoice_DialogVolume`, `…PlayerVolume`, `…BarkVolume`, `…BarkMinDistance`, `…BarkMaxDistance`).
