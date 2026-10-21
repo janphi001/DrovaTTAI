@@ -40,6 +40,7 @@ namespace DrovaVoice.Playback
                             $"[Figur] {id} | zeilenSprecher={statementNode.actorName} | actor={snapshot?.ActorName} | body={snapshot?.BodyType} | voice={snapshot?.VoiceId} | guid={snapshot?.Guid} | entity={snapshot?.EntityKey} | dist={snapshot?.Distance:0.0}");
                 }
                 var clip = _service.GetClip(id, figure);
+                if (clip == null && !_service.HasEntry(id) && !_service.IsPoolLine(id)) _service.Recorder?.Record(statementNode, id, locaPath);
                 if (clip != null)
                 {
                     // Dialog- und Spielerzeilen spielt die Mod selbst: Mit statement.audio skippt das Spiel nur die Stimme, nicht den Text.

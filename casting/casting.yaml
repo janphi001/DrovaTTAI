@@ -15,3 +15,5 @@ speakers:
   reija: {voice: lebhafte_junge_frau_37bab8}
   # „Karim“ ist Carimas alter interner Name (23 Zeilen); gleiche Stimme wie carima (Nutzer, 2026-10-19)
   karim: {voice: douchland_old_story_2ef205}
+  # Colin: nur 2 Welt-Zeilen (Vorlagen-Baum, Nachtwache), keine Dialogzeilen, daher nicht in cast --propose; m, mittel nach Name geschaetzt (2026-10-20)
+  colin: {voice: almanca_i_yi_ses_7d4cbb}

@@ -96,3 +96,52 @@ def test_extract_rejects_manifest_that_is_not_utf8(pipeline_repo, capsys):
     assert main(["--config", str(pipeline_repo.cfg), "extract"]) == 2
     err = capsys.readouterr().err
     assert "FEHLER:" in err and "nicht lesbar" in err and "Traceback" not in err
+
+
+def _runtime_row(manifest_row: dict, **changes) -> str:
+    row = dict(manifest_row)
+    row.update(changes)
+    return json.dumps(row, ensure_ascii=False)
+
+
+def test_extract_adds_runtime_lines_from_the_mod(pipeline_repo, capsys):
+    export = pipeline_repo.data / "export" / "de"
+    first = json.loads((export / "manifest.json").read_text(encoding="utf-8"))["lines"][0]
+    tree, path = "DT_Test_Template", first["locaPath"]
+    new = _runtime_row(
+        first,
+        id=f"{tree}|{path}|Plh_900",
+        tree=tree,
+        locaKey="Plh_900",
+        text="Ein erfundener Satz.",
+    )
+    (export / "manifest-runtime.jsonl").write_text(new + "\n", encoding="utf-8")
+    assert main(["--config", str(pipeline_repo.cfg), "extract"]) == 0
+    lines = read_lines(pipeline_repo.data / "lines.jsonl")
+    assert len(lines) == 7
+    added = [l for l in lines if l.id == f"{tree}|{path}|Plh_900"]
+    assert added and added[0].speech == "Ein erfundener Satz." and added[0].skip is None
+    assert "1 Laufzeit-Zeilen" in capsys.readouterr().out
+
+
+def test_extract_keeps_the_manifest_line_when_the_runtime_file_repeats_it(pipeline_repo):
+    export = pipeline_repo.data / "export" / "de"
+    first = json.loads((export / "manifest.json").read_text(encoding="utf-8"))["lines"][0]
+    (export / "manifest-runtime.jsonl").write_text(
+        _runtime_row(first, actorName="Jemand") + "\n", encoding="utf-8"
+    )
+    assert main(["--config", str(pipeline_repo.cfg), "extract"]) == 0
+    lines = read_lines(pipeline_repo.data / "lines.jsonl")
+    assert len(lines) == 6
+    assert [l.actor for l in lines if l.id == first["id"]] == [first["actorName"]]
+
+
+def test_extract_skips_unreadable_runtime_lines(pipeline_repo, capsys):
+    export = pipeline_repo.data / "export" / "de"
+    (export / "manifest-runtime.jsonl").write_text(
+        '{kaputt\n\n{"id": "ohne Felder"}\n[]\n', encoding="utf-8"
+    )
+    assert main(["--config", str(pipeline_repo.cfg), "extract"]) == 0
+    assert len(read_lines(pipeline_repo.data / "lines.jsonl")) == 6
+    out = capsys.readouterr().out
+    assert "0 Laufzeit-Zeilen" in out and "3 unlesbar" in out

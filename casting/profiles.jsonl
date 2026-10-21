@@ -41,6 +41,7 @@
 {"speaker": "caspara", "gender": "f", "age": "mittel", "type": "", "confidence": 0.9, "note": "Jägerin und Fallenexpertin, selbstbewusst und stolz, früher auf Georgs Hof, kennt die Gefahren des Moors gut.", "source": "llm"}
 {"speaker": "cengiz", "gender": "m", "age": "mittel", "type": "", "confidence": 0.75, "note": "Grimmiger Holzfäller-Anführer, loyal zu Nemeton; hält seine Leute zusammen und ist misstrauisch gegenüber Neuen.", "source": "llm"}
 {"speaker": "chunnaic", "gender": "f", "age": "mittel", "type": "", "confidence": 0.9, "note": "Schmiedemeisterin in Nemeton, streng und stolz auf ihr Handwerk, verlangt Beweise und Erfahrung von Anfängern.", "source": "llm"}
+{"speaker": "colin", "gender": "m", "age": "mittel", "type": "", "confidence": 1.0, "note": "nur 2 Welt-Zeilen (Nachtwache); Geschlecht nach Name geschaetzt", "source": "manual"}
 {"speaker": "conor", "gender": "m", "age": "mittel", "type": "", "confidence": 0.9, "note": "Verbitterter Lagerbewohner, ständig bestohlen, ausfallend und misstrauisch, will von Nemeton nichts wissen.", "source": "llm"}
 {"speaker": "cord", "gender": "m", "age": "mittel", "type": "", "confidence": 0.75, "note": "Stolzer Hauer in Levins Mine, der Rostmoos konsumiert und auf einen Platz im oberen Viertel hofft.", "source": "llm"}
 {"speaker": "critter_cat_01", "gender": "m", "age": "mittel", "type": "", "confidence": 0.15, "note": "Katze, die nur miaut und faucht; in Varianten kampfstark, freundlich oder scheu.", "source": "llm"}

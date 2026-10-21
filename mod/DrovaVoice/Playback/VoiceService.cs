@@ -51,6 +51,8 @@ namespace DrovaVoice.Playback
         public BarkDistance? BarkDistance { get; set; }
         /// <summary>Eigene Wiedergabe für Dialog- und Spielerzeilen; null = alles über <c>statement.audio</c>.</summary>
         public DialogueVoice? DialogueVoice { get; set; }
+        /// <summary>Sammelt Aussagen ohne Indexeintrag für den Generator; null = aus.</summary>
+        public Export.RuntimeLineRecorder? Recorder { get; set; }
 
         public void Probe(string key, string message)
         {

@@ -44,5 +44,10 @@ namespace DrovaVoice.Core
 
         public static Manifest Deserialize(string json)
             => JsonSerializer.Deserialize<Manifest>(json, Options) ?? throw new JsonException("Manifest ist leer");
+
+        /// <summary>Eine Zeile als JSON ohne Zeilenumbruch (für <c>manifest-runtime.jsonl</c>).</summary>
+        public static string SerializeLine(ManifestLine line) => JsonSerializer.Serialize(line, Options);
+
+        public static ManifestLine? DeserializeLine(string json) => JsonSerializer.Deserialize<ManifestLine>(json, Options);
     }
 }
