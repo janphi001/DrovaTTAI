@@ -44,6 +44,8 @@ namespace DrovaVoice.Playback
 
         public void SetRange(float min, float max) { _min = min; _max = max; }
 
+        public bool Busy => _pending.Count > 0 || _tracked.Count > 0;
+
         /// <summary>Der Connector hat <paramref name="clip"/> an die Aussage gehängt; sie wird freigegeben, sobald er abspielt.</summary>
         public void Watch(DS_Statement statement, AudioClip clip) =>
             _pending.Add(new Pending { Statement = statement, Clip = clip, Since = Time.unscaledTime, Name = SafeName(clip) });

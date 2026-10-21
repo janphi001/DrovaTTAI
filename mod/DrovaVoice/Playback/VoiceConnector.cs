@@ -19,6 +19,8 @@ namespace DrovaVoice.Playback
         public void OnWorldDialogueStatement(DS_StatementNode statementNode)
         {
             string? id = null;
+            var fp = FrameProbe.Active;
+            long t = fp?.Start() ?? 0;
             PatchGuard.Run(() =>
             {
                 var statement = statementNode.statement;
@@ -56,6 +58,7 @@ namespace DrovaVoice.Playback
                     _service.BarkDistance?.Watch(statement, clip);
                 }
             }, e => _service.LogError("OnWorldDialogueStatement", id, e));
+            fp?.Stop(FrameProbe.Part.Connector, t);
         }
     }
 }
