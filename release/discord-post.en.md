@@ -11,7 +11,7 @@ Under 2,000 characters (Discord limit without Nitro). The link always points to 
 I built a mod that gives Drova spoken dialogue. Characters speak their lines while the subtitles run as usual.
 
 **Ready to play: German**
-• Over 14,000 voiced lines in German
+• Over 15,000 voiced lines in German
 • Every named character has their own fixed voice
 • Remarks in the world get quieter the further away you are
 • Unnamed characters (guards, workers …) get a fitting voice from a small pool

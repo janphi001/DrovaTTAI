@@ -11,7 +11,7 @@ Unter 2.000 Zeichen (Discord-Grenze ohne Nitro). Der Link zeigt immer auf das ne
 Ich habe eine Mod gebaut, die Drova auf Deutsch vertont. Die Figuren sprechen ihre Dialoge, die Untertitel laufen ganz normal mit.
 
 **Was drin ist**
-• Über 14.000 vertonte Zeilen
+• Über 15.000 vertonte Zeilen
 • Jede benannte Figur hat ihre eigene, feste Stimme
 • Zurufe in der Welt werden leiser, je weiter du weg bist
 • Namenlose Figuren (Wachen, Arbeiter …) bekommen eine passende Stimme aus einem kleinen Pool
