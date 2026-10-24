@@ -4,6 +4,7 @@ import pytest
 
 from drova_voice.cli import main
 from drova_voice.lines import read_lines
+from drova_voice.pipeline import read_runtime_lines
 
 
 def test_extract_writes_lines_and_reports_skips(pipeline_repo, capsys):
@@ -145,3 +146,7 @@ def test_extract_skips_unreadable_runtime_lines(pipeline_repo, capsys):
     assert len(read_lines(pipeline_repo.data / "lines.jsonl")) == 6
     out = capsys.readouterr().out
     assert "0 Laufzeit-Zeilen" in out and "3 unlesbar" in out
+
+
+def test_a_missing_runtime_file_adds_no_lines(tmp_path):
+    assert read_runtime_lines(tmp_path / "manifest-runtime.jsonl") == ([], 0)

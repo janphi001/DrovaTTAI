@@ -43,6 +43,19 @@ PERCEPTIBLE_PREFIXES = ("Perceptible", "Module_Perceptible", "PerceptableObject"
 Ref = tuple[str, int]  # (Name der serialisierten Datei, z. B. "CAB-…", PathID)
 
 
+def _local_path_id(pointer: Any) -> Any:
+    """PathID, wenn der Zeiger im selben Bundle liegt, sonst None.
+
+    Ein fehlendes ``m_FileID`` ist 0 und damit lokal. PathID 0 ist ein leerer Zeiger.
+    """
+    if not isinstance(pointer, dict) or pointer.get("m_FileID", 0) != 0:
+        return None
+    path_id = pointer.get("m_PathID")
+    if path_id in (None, 0) or isinstance(path_id, bool):
+        return None
+    return path_id
+
+
 @dataclass(frozen=True)
 class WorldArg:
     path: str
@@ -155,24 +168,44 @@ def write_rows(path: Path, rows: Iterable[Mapping[str, Any]]) -> int:
 # --- Lesen der Bundles (braucht UnityPy, optionales Extra "assets") ---------------------------
 
 
-def _find_modules(node: Any) -> Iterator[Mapping[str, Any]]:
+def _find_modules(node: Any, seen: set[int] | None = None) -> Iterator[Mapping[str, Any]]:
+    if seen is None:
+        seen = set()
     if isinstance(node, dict):
+        if id(node) in seen:
+            return
+        seen.add(id(node))
         settings = node.get("_worldDialogueSettings")
         if isinstance(settings, dict):
             yield node
         for value in node.values():
-            yield from _find_modules(value)
+            yield from _find_modules(value, seen)
     elif isinstance(node, list):
+        if id(node) in seen:
+            return
+        seen.add(id(node))
         for value in node:
-            yield from _find_modules(value)
+            yield from _find_modules(value, seen)
 
 
 def _scan_bundle(path: str) -> tuple[list[dict[str, Any]], list[str]]:
     """Module eines Bundles (als JSON-taugliche dicts) und die Namen seiner serialisierten Dateien."""
     import UnityPy
 
-    env = UnityPy.load(path)
-    objects = {(obj.assets_file.name, obj.path_id): obj for obj in env.objects}
+    try:
+        env = UnityPy.load(path)
+        raw_objects = list(env.objects)
+    except Exception:  # noqa: BLE001  (defektes Bundle: dieses eine überspringen)
+        return [], []
+
+    objects: dict[Ref, Any] = {}
+    for obj in raw_objects:
+        try:
+            key = (obj.assets_file.name, obj.path_id)
+        except Exception:  # noqa: BLE001  (Objekt ohne Datei oder PathID überspringen)
+            key = None
+        if key is not None:
+            objects[key] = obj
     cache: dict[Ref, Any] = {}
 
     def tree(key: Ref) -> Any:
@@ -186,49 +219,66 @@ def _scan_bundle(path: str) -> tuple[list[dict[str, Any]], list[str]]:
 
     found: list[dict[str, Any]] = []
     for (cab, pid), obj in objects.items():
-        if obj.type.name != "MonoBehaviour":
-            continue
-        data = tree((cab, pid))
-        if not isinstance(data, dict):
-            continue
-        modules = list(_find_modules(data))
-        if not modules:
-            continue
-        externals = obj.assets_file.externals
-
-        def ref(pointer: Any, cab: str = cab, externals: Any = externals) -> list[Any] | None:
-            if not isinstance(pointer, dict) or not pointer.get("m_PathID"):
-                return None
-            fid = pointer.get("m_FileID", 0)
-            if fid == 0:
-                return [cab, pointer["m_PathID"]]
-            try:
-                return [os.path.basename(externals[fid - 1].path), pointer["m_PathID"]]
-            except (IndexError, AttributeError):
-                return None
-
-        owner, chain = _owner(data, cab, tree, ref)
-        perceptible = any(name.startswith(PERCEPTIBLE_PREFIXES) for name in chain)
-        for module in modules:
-            settings = module["_worldDialogueSettings"]
-            found.append(
-                {
-                    "graph": settings.get("_graphLocaPath", "") or "",
-                    "usesTree": bool(module.get("_useTree")),
-                    "owner": owner,
-                    "perceptible": perceptible,
-                    "args": [
-                        [
-                            a.get("_path", "") or "",
-                            a.get("_key", "") or "",
-                            ref(a.get("Participant")),
-                        ]
-                        for a in settings.get("Args", []) or []
-                        if isinstance(a, dict)
-                    ],
-                }
-            )
+        batch: list[dict[str, Any]] = []
+        try:
+            if obj.type.name != "MonoBehaviour":
+                batch = []
+            else:
+                batch = _modules_in(obj, cab, pid, tree)
+        except Exception:  # noqa: BLE001  (ein defektes Modul überspringen, den Rest behalten)
+            batch = []
+        found.extend(batch)
     return found, sorted({name for name, _ in objects})
+
+
+def _modules_in(obj: Any, cab: str, pid: int, tree: Any) -> list[dict[str, Any]]:
+    data = tree((cab, pid))
+    if not isinstance(data, dict):
+        return []
+    modules = list(_find_modules(data))
+    if not modules:
+        return []
+    externals = obj.assets_file.externals
+
+    def ref(pointer: Any, cab: str = cab, externals: Any = externals) -> list[Any] | None:
+        if not isinstance(pointer, dict):
+            return None
+        path_id = pointer.get("m_PathID")
+        if path_id in (None, 0) or isinstance(path_id, bool):
+            return None
+        fid = pointer.get("m_FileID", 0)
+        if fid == 0:
+            return [cab, path_id]
+        try:
+            external_path = externals[fid - 1].path
+        except (IndexError, AttributeError, TypeError):
+            return None
+        if not isinstance(external_path, str) or not external_path:
+            return None
+        return [os.path.basename(external_path), path_id]
+
+    owner, chain = _owner(data, cab, tree, ref)
+    perceptible = any(name.startswith(PERCEPTIBLE_PREFIXES) for name in chain)
+    rows: list[dict[str, Any]] = []
+    for module in modules:
+        settings = module["_worldDialogueSettings"]
+        graph = settings.get("_graphLocaPath", "") or ""
+        raw_args = settings.get("Args", []) or []
+        args = raw_args if isinstance(raw_args, list) else []
+        rows.append(
+            {
+                "graph": graph if isinstance(graph, str) else "",
+                "usesTree": bool(module.get("_useTree")),
+                "owner": owner,
+                "perceptible": perceptible,
+                "args": [
+                    [a.get("_path", "") or "", a.get("_key", "") or "", ref(a.get("Participant"))]
+                    for a in args
+                    if isinstance(a, dict)
+                ],
+            }
+        )
+    return rows
 
 
 def _owner(
@@ -239,10 +289,8 @@ def _owner(
     Gibt auch die Namen der GameObjects bis dorthin zurück (für die Wahrnehmungs-Regel).
     """
     chain: list[str] = []
-    go = data.get("m_GameObject") or {}
-    key: Ref | None = (
-        (cab, go["m_PathID"]) if go.get("m_FileID", 1) == 0 and go.get("m_PathID") else None
-    )
+    path_id = _local_path_id(data.get("m_GameObject") or {})
+    key: Ref | None = (cab, path_id) if path_id is not None else None
     for _ in range(MAX_DEPTH):
         if key is None:
             return None, chain
@@ -251,28 +299,31 @@ def _owner(
             return None, chain
         chain.append(str(game_object.get("m_Name", "")))
         parent: Ref | None = None
-        for entry in game_object.get("m_Component", []) or []:
-            pointer = (entry or {}).get("component") or {}
-            if pointer.get("m_FileID", 1) != 0:
+        components = game_object.get("m_Component", []) or []
+        if not isinstance(components, list):
+            components = []
+        for entry in components:
+            if not isinstance(entry, dict):
                 continue
-            component = tree((cab, pointer.get("m_PathID", 0)))
+            component_id = _local_path_id(entry.get("component") or {})
+            if component_id is None:
+                continue
+            component = tree((cab, component_id))
             if not isinstance(component, dict):
                 continue
             for field in OWNER_FIELDS:
                 hit = ref(component.get(field))
                 if hit:
                     return hit, chain
-            father = component.get("m_Father")
-            if (
-                isinstance(father, dict)
-                and father.get("m_FileID", 1) == 0
-                and father.get("m_PathID")
-            ):
-                transform = tree((cab, father["m_PathID"]))
-                if isinstance(transform, dict):
-                    up = transform.get("m_GameObject") or {}
-                    if up.get("m_FileID", 1) == 0 and up.get("m_PathID"):
-                        parent = (cab, up["m_PathID"])
+            father_id = _local_path_id(component.get("m_Father"))
+            if father_id is None:
+                continue
+            transform = tree((cab, father_id))
+            if not isinstance(transform, dict):
+                continue
+            up_id = _local_path_id(transform.get("m_GameObject") or {})
+            if up_id is not None:
+                parent = (cab, up_id)
         key = parent
     return None, chain
 
@@ -281,16 +332,33 @@ def _read_names(job: tuple[str, list[list[Any]]]) -> dict[str, str]:
     import UnityPy
 
     path, wanted = job
-    keys = {(cab.lower(), int(pid)) for cab, pid in wanted}
-    env = UnityPy.load(path)
+    keys: set[tuple[str, int]] = set()
+    for cab, pid in wanted:
+        try:
+            keys.add((str(cab).lower(), int(pid)))
+        except (TypeError, ValueError):
+            continue
+    try:
+        env = UnityPy.load(path)
+        raw_objects = list(env.objects)
+    except Exception:  # noqa: BLE001  (defektes Bundle: keine Namen)
+        return {}
     out: dict[str, str] = {}
-    for obj in env.objects:
-        if (obj.assets_file.name.lower(), obj.path_id) in keys:
-            try:
-                name = obj.read_typetree().get("m_Name", "")
-            except Exception:  # noqa: BLE001  (defektes Objekt: Name bleibt leer)
-                name = ""
-            out[f"{obj.assets_file.name.lower()}|{obj.path_id}"] = name
+    for obj in raw_objects:
+        try:
+            key = (obj.assets_file.name.lower(), obj.path_id)
+        except Exception:  # noqa: BLE001
+            key = None
+        if key is None or key not in keys:
+            continue
+        try:
+            tree = obj.read_typetree()
+            name = tree.get("m_Name", "") if isinstance(tree, dict) else ""
+        except Exception:  # noqa: BLE001  (defektes Objekt: Name bleibt leer)
+            name = ""
+        if not isinstance(name, str):
+            name = ""
+        out[f"{key[0]}|{key[1]}"] = name
     return out
 
 
