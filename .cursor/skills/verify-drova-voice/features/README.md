@@ -48,3 +48,4 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Synthesize with the fake engine](./synth.md) covers cast check, fake synthesis, and the absence of Fish.
 - [Encode and install](./encode-install.md) covers OGG encode and install into the temporary game folder.
 - [Report status](./report.md) covers the status view after install.
+- [Export world dialogues](./export-world.md) covers the missing bundle folder, a missing UnityPy install, and a bundle the scan skips.

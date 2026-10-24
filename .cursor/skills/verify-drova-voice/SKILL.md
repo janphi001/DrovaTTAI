@@ -66,7 +66,9 @@ Stable handles are the subcommands and flags in `generator/drova_voice/pipeline.
 - Line id: `DT_Verify_Probe|Dialog/NPC_Probe|Plh_1`
 - Choice id: `DT_Verify_Probe|Dialog/NPC_Probe|Plh_2|c0`
 
-Follow one feature file at a time. The cloud proof path is the unfiltered chain: default `extract` (expected failure, no game export), then `extract --manifest`, `cast --check`, `synth --engine fake`, `encode`, `install`, `report`.
+Follow one feature file at a time. The cloud proof path is the unfiltered chain: default `extract` (expected failure, no game export), then `extract --manifest`, `cast --check`, `synth --engine fake`, `encode`, `install`, `report`. Take the extract snapshot before `export world`: that command writes `manifest-world.jsonl`, and a later extract mentions the file even when it is empty.
+
+`export world` is its own feature. On a fresh run the bundle folder is missing, so the command exits `2` and stderr contains `Bundle-Ordner nicht gefunden`. `launch` installs `.[dev]` only. Proving that a broken bundle is skipped needs `pip install -e ".[assets]"` in `generator` once. Do not commit the venv. Do not copy game bundles into the run.
 
 ## Evidence
 

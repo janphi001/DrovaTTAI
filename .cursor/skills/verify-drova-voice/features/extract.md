@@ -34,3 +34,5 @@ Preconditions:
 - A player choice remains in the file with an empty `speech`. Deleting the row would hide a line that must stay silent.
 - Speaker name `Adela` is required because the copied casting map gives her a voice. An unknown speaker makes the later cast check fail; do not rename the fixture to force a pass.
 - The fixture sentences are invented. Do not replace them with lines from the game.
+- `manifest-runtime.jsonl` and `manifest-world.jsonl` are optional files beside the export. A missing file adds no rows and no status line. The fresh cloud run has neither file, so the explicit-manifest stdout is only the `2 Zeilen` line.
+- After `export world` writes `manifest-world.jsonl`, the next extract mentions it even when the file is empty: `0 Welt-Dialog-Zeilen aus manifest-world.jsonl (0 schon bekannt, 0 unlesbar)`. This fixture still prints `2 Zeilen` and `übersprungen: player_choice: 1`. Take the two-line snapshot before export world.
