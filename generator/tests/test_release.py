@@ -3,6 +3,7 @@ import zipfile
 
 import pytest
 
+from drova_voice.cli import main
 from drova_voice.release import build_package, indexed_audio, mod_version, voice_credits
 
 AUDIO = "Mods/DrovaVoice/Audio/de"
@@ -117,3 +118,58 @@ def test_version_and_credits_come_from_the_repo(tmp_path):
     assert mod_version(repo) == "1.2.3"
     text = voice_credits(repo / "casting" / "fish_voices.yaml")
     assert text.index("Amtlich") < text.index("Gemeinschaft")
+
+
+def test_a_source_without_meloninfo_is_rejected(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / "mod" / "DrovaVoice" / "DrovaVoiceMod.cs").write_text("class X {}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="MelonInfo"):
+        mod_version(repo)
+
+
+def test_a_missing_or_empty_index_is_rejected(tmp_path):
+    _, audio = _game(tmp_path, {"T|P|Plh_1": {"file": "dialog/a.ogg", "duration": 1.0}})
+    (audio / "index.json").unlink()
+    with pytest.raises(ValueError, match="zuerst"):
+        indexed_audio(audio)
+    (audio / "index.json").write_text("{", encoding="utf-8")
+    with pytest.raises(ValueError, match="JSON"):
+        indexed_audio(audio)
+    (audio / "index.json").write_text("[]", encoding="utf-8")
+    with pytest.raises(ValueError, match="keine Einträge"):
+        indexed_audio(audio)
+    (audio / "index.json").write_text('{"entries": {}}', encoding="utf-8")
+    with pytest.raises(ValueError, match="keine Einträge"):
+        indexed_audio(audio)
+
+
+def _config(repo, game):
+    gen = repo / "generator"
+    gen.mkdir()
+    cfg = gen / "config.yaml"
+    cfg.write_text(
+        f"game_dir: '{game.as_posix()}'\nlanguage: de\nrepo_root: '{repo.as_posix()}'\n",
+        encoding="utf-8",
+    )
+    return cfg
+
+
+def test_package_command_writes_the_zip_and_prints_the_hash(tmp_path, capsys):
+    repo = _repo(tmp_path)
+    game, audio = _game(tmp_path, {"T|P|Plh_1": {"file": "dialog/a.ogg", "duration": 1.0}})
+    (audio / "dialog" / "a.ogg").write_bytes(b"OGG")
+    cfg = _config(repo, game)
+    assert main(["--config", str(cfg), "package", "--version", "9.9.9"]) == 0
+    out = capsys.readouterr().out
+    assert "DrovaVoice-9.9.9-de.zip" in out and "SHA-256" in out
+    assert (repo / "dist" / "DrovaVoice-9.9.9-de.zip").is_file()
+
+
+def test_package_command_reports_a_broken_index(tmp_path, capsys):
+    repo = _repo(tmp_path)
+    game, audio = _game(tmp_path, {"T|P|Plh_1": {"file": "dialog/a.ogg", "duration": 1.0}})
+    (audio / "index.json").write_text("{", encoding="utf-8")
+    cfg = _config(repo, game)
+    assert main(["--config", str(cfg), "package"]) == 2
+    assert "JSON" in capsys.readouterr().err
+    assert not (repo / "dist").exists()

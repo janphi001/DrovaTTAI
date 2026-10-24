@@ -102,7 +102,13 @@ def _export_world(cfg, export_dir: Path, workers: int) -> int:
     npcs: list = []
     if npcs_path.is_file():
         loaded = json.loads(npcs_path.read_text(encoding="utf-8-sig"))
-        npcs = loaded if isinstance(loaded, list) else []
+        if isinstance(loaded, list):
+            npcs = loaded
+        else:
+            print(
+                f"Hinweis: {npcs_path} ist keine Liste; Sprecher nach Asset-Namen geraten",
+                file=sys.stderr,
+            )
     else:
         print(f"Hinweis: {npcs_path} fehlt (export fetch); Sprecher nach Asset-Namen geraten")
     try:
