@@ -7,15 +7,16 @@ from pathlib import Path
 import yaml
 
 from drova_voice.export_report import loca_path_of
+from drova_voice.gvar_value import neutralize_values
 from drova_voice.ids import VARIANT_SEP, choice_id, normalize_loca_path, statement_id, with_variant
 from drova_voice.jsonl import read_jsonl, write_jsonl
 from drova_voice.loc import read_loc_file
-from drova_voice.player_name import NAME_VAR, make_name_variants
-from drova_voice.speech_text import GVAR_RE, Lexicon, build_speech_text, compile_lexicon
+from drova_voice.player_name import make_name_variants
+from drova_voice.speech_text import Lexicon, build_speech_text, compile_lexicon
 
 SKIP_GVAR_NAME = "gvar_name"  # nur der Spielername, aber keine neutrale Fassung ohne ihn
 SKIP_GVAR_VALUE = (
-    "gvar_value"  # Quest- oder Geldwerte (oder Name zusammen mit Werten): nicht vorab vertonbar
+    "gvar_value"  # Quest- oder Geldwerte ohne saubere neutrale Fassung (gvar_value.py)
 )
 NEUTRAL = "neutral"
 SKIP_UNSPEAKABLE = "unspeakable"
@@ -115,22 +116,16 @@ def build_lines(
         elif row.get("nodeType") == "choice":
             skip = SKIP_PLAYER_CHOICE
         elif "$GVAR:" in raw:
-            if set(GVAR_RE.findall(raw)) != {NAME_VAR}:
-                skip = SKIP_GVAR_VALUE
+            values = neutralize_values(raw)
+            neutral = make_name_variants(raw).neutral if values is None else values.neutral
+            st = build_speech_text(neutral, None, compiled, language) if neutral else None
+            if st is None:
+                skip = SKIP_GVAR_NAME if values is None else SKIP_GVAR_VALUE
+            elif st.is_speakable:
+                speech, stage = st.text, tuple({"text": s.text, "pos": s.pos} for s in st.stage)
+                out_id = with_variant(line_id, NEUTRAL)
             else:
-                neutral = make_name_variants(raw).neutral
-                st = (
-                    build_speech_text(neutral, None, compiled, language)
-                    if neutral is not None
-                    else None
-                )
-                if st is None:
-                    skip = SKIP_GVAR_NAME
-                elif st.is_speakable:
-                    speech, stage = st.text, tuple({"text": s.text, "pos": s.pos} for s in st.stage)
-                    out_id = with_variant(line_id, NEUTRAL)
-                else:
-                    skip = SKIP_UNSPEAKABLE
+                skip = SKIP_UNSPEAKABLE
         else:
             st = build_speech_text(raw, None, compiled, language)
             if st.is_speakable:

@@ -127,12 +127,19 @@ def test_name_after_a_comma_is_dropped_in_the_neutral_variant():
     assert line.skip is None and line.speech == "Danke." and line.id.endswith("#neutral")
 
 
-def test_value_placeholder_is_skipped_as_gvar_value():
+def test_value_with_a_clean_template_becomes_a_neutral_variant():
+    raw = "Heute sind $GVAR:QuestVars_Beispiel_Config.Preis$ Münzen."
+    (line,) = build_lines(manifest(mline("Plh_1")), {(PATH, "Plh_1"): raw})
+    assert line.id == statement_id(TREE, PATH, "Plh_1") + "#neutral"
+    assert line.speech == "Heute sind ein paar Münzen." and line.raw == raw and line.skip is None
+
+
+def test_value_without_a_clean_template_is_skipped_as_gvar_value():
     (line,) = build_lines(
         manifest(mline("Plh_1")),
-        {(PATH, "Plh_1"): "Heute sind $GVAR:QuestVars_Beispiel_Config.Preis$ Münzen."},
+        {(PATH, "Plh_1"): "Heute kostet es $GVAR:QuestVars_Beispiel_Config.Preis$."},
     )
-    assert line.skip == SKIP_GVAR_VALUE and line.speech == ""
+    assert line.skip == SKIP_GVAR_VALUE and line.speech == "" and not line.id.endswith("#neutral")
 
 
 def test_name_together_with_a_value_is_skipped_as_gvar_value():
@@ -140,6 +147,23 @@ def test_name_together_with_a_value_is_skipped_as_gvar_value():
         manifest(mline("Plh_1")), {(PATH, "Plh_1"): f"Hallo {NAME}, das kostet $GVAR:A.B$ Münzen."}
     )
     assert line.skip == SKIP_GVAR_VALUE and not line.id.endswith("#neutral")
+
+
+def test_name_and_value_both_neutralized_become_one_neutral_variant():
+    (line,) = build_lines(
+        manifest(mline("Plh_1")),
+        {(PATH, "Plh_1"): f"Das kostet $GVAR:QuestVars_Beispiel_Config.Preis$ Gold, {NAME}."},
+    )
+    assert line.speech == "Das kostet etwas Gold." and line.id.endswith("#neutral")
+
+
+def test_choice_with_a_value_stays_silent():
+    row = {**mline("Plh_1"), "nodeType": "choice", "choiceIndex": 0}
+    row["id"] = choice_id(TREE, PATH, "Plh_1", 0)
+    (line,) = build_lines(
+        manifest(row), {(PATH, "Plh_1"): "Ich zahle $GVAR:QuestVars_Beispiel_Config.Preis$ Münzen."}
+    )
+    assert line.skip == SKIP_PLAYER_CHOICE and line.speech == ""
 
 
 def test_neutral_duplicate_ids_still_keep_the_first():
