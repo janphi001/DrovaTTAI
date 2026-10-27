@@ -103,3 +103,22 @@ def test_report_by_speaker(pipeline_repo, capsys):
     assert main(base + ["report", "--by-speaker"]) == 0
     out = capsys.readouterr().out
     assert "Mira (lena)" in out and "Lücken" in out
+
+
+def test_report_gvar_values_counts_voiced_and_silent_lines(pipeline_repo, capsys):
+    loc = pipeline_repo.game / "Drova_Data/StreamingAssets/Localization/de/Dialog/NPC_Mira_de.loc"
+    loc.write_text(
+        loc.read_text(encoding="utf-8").replace(
+            "Wohin soll ich dich führen?",
+            "Das kostet $GVAR:QuestVars_Beispiel_Config.Preis$ Münzen.",
+        ),
+        encoding="utf-8",
+    )
+    base = ["--config", str(pipeline_repo.cfg)]
+    main(base + ["extract"])
+    capsys.readouterr()
+    assert main(base + ["report", "--gvar-values"]) == 0
+    out = capsys.readouterr().out
+    assert "Zeilen mit Quest- oder Geldwerten: 2 (gesprochen 1, stumm 1)" in out
+    assert "currency: gesprochen 1, stumm 0" in out and "bare: gesprochen 0, stumm 1" in out
+    assert "1x QuestVars_Beispiel_Config.Preis [bare]" in out

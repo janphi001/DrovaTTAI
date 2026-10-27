@@ -26,7 +26,7 @@ def _use_name_line(pipeline_repo):
     text = loc.read_text(encoding="utf-8")
     loc.write_text(
         text.replace(
-            "Heute sind $GVAR:QuestVars_Beispiel_Config.Preis$ Münzen.",
+            "Heute kostet es $GVAR:QuestVars_Beispiel_Config.Preis$.",
             "Hallo $GVAR:EVars_Player.Name$!",
         ),
         encoding="utf-8",
@@ -106,3 +106,17 @@ def test_stale_neutral_entry_is_dropped_when_the_name_leaves_the_text(pipeline_r
     index = json.loads(index_path.read_text(encoding="utf-8"))
     assert "DT_Test_NPC_Mira|Dialog/NPC_Mira|Plh_4" in index["entries"]
     assert NEUTRAL_ID not in index["entries"] and index["variants"] == {}
+
+
+def test_extract_gives_a_clean_value_line_a_neutral_id(pipeline_repo):
+    loc = pipeline_repo.game / "Drova_Data/StreamingAssets/Localization/de/Dialog/NPC_Mira_de.loc"
+    loc.write_text(
+        loc.read_text(encoding="utf-8").replace(
+            "Heute kostet es $GVAR:QuestVars_Beispiel_Config.Preis$.",
+            "Heute kostet es $GVAR:QuestVars_Beispiel_Config.Preis$ Gold.",
+        ),
+        encoding="utf-8",
+    )
+    assert main(["--config", str(pipeline_repo.cfg), "extract"]) == 0
+    line = next(l for l in read_lines(pipeline_repo.data / "lines.jsonl") if l.id == NEUTRAL_ID)
+    assert line.speech == "Heute kostet es etwas Gold." and line.skip is None

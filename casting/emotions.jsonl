@@ -756,6 +756,7 @@
 {"id": "DT_PreApo_1_NPC_Leyna|Dialog/NPC_Leyna|Plh_33", "emotion": "tender", "intensity": 0.4, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_1_NPC_Leyna|Dialog/NPC_Leyna|Plh_34", "emotion": "angry", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_1_NPC_Leyna|Dialog/NPC_Leyna|Plh_41", "emotion": "joyful", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
+{"id": "DT_PreApo_1_NPC_Liandra|Dialog/NPC_Liandra|Plh_37#neutral", "emotion": "neutral", "intensity": 0.0, "events": [{"tag": "sigh", "pos": 0}], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_PreApo_1_NPC_Liandra|Dialog/NPC_Liandra|Plh_44", "emotion": "angry", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_1_NPC_Liandra|Dialog/NPC_Liandra|Plh_45", "emotion": "joyful", "intensity": 0.4, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_PreApo_1_NPC_Liandra|Dialog/NPC_Liandra|Plh_50", "emotion": "angry", "intensity": 0.8, "events": [], "emphasis": [], "notes": [], "source": "llm"}
@@ -4704,6 +4705,7 @@
 {"id": "DT_Quest_ReactionAfterPlayerSleptInBettenhaus_NPC_Mursel|Dialog/NPC_Mursel|Plh_63", "emotion": "joyful", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_Quest_ReactionAfterPlayerSleptInBettenhaus_NPC_Mursel|Dialog/NPC_Mursel|Plh_64", "emotion": "angry", "intensity": 0.7, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_ReactionAfterPlayerSleptInBettenhaus_NPC_Mursel|Dialog/NPC_Mursel|Plh_65", "emotion": "joyful", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
+{"id": "DT_Quest_ReactionAfterPlayerSleptInBettenhaus_NPC_Mursel|Dialog/NPC_Mursel|Plh_8#neutral", "emotion": "joyful", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_Quest_ReactionToFood_NPC_Shona|Dialog/NPC_Shona|Plh_62", "emotion": "joyful", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_ReactionToFood_NPC_Shona|Dialog/NPC_Shona|Plh_63", "emotion": "angry", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_ReactionToFood_NPC_Shona|Dialog/NPC_Shona|Plh_64", "emotion": "angry", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
@@ -5236,6 +5238,7 @@
 {"id": "DT_Quest_TellRuslanToLeaveAlmarAlone_NPC_Ruslan|Dialog/NPC_Ruslan|Plh_20", "emotion": "angry", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_TellRuslanToLeaveAlmarAlone_NPC_Ruslan|Dialog/NPC_Ruslan|Plh_21", "emotion": "angry", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_TellRuslanToLeaveAlmarAlone_NPC_Ruslan|Dialog/NPC_Ruslan|Plh_26", "emotion": "angry", "intensity": 0.7, "events": [], "emphasis": [], "notes": [], "source": "llm"}
+{"id": "DT_Quest_TellRuslanToLeaveAlmarAlone_NPC_Ruslan|Dialog/NPC_Ruslan|Plh_93#neutral", "emotion": "joyful", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_Quest_TheBlackheadResolution_NPC_Cengiz|Dialog/NPC_Cengiz|Plh_374", "emotion": "surprised", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_TheBlackheadResolution_NPC_Cengiz|Dialog/NPC_Cengiz|Plh_377", "emotion": "angry", "intensity": 0.5, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_TheBlackheadResolution_NPC_Cengiz|Dialog/NPC_Cengiz|Plh_378", "emotion": "angry", "intensity": 0.7, "events": [], "emphasis": [], "notes": [], "source": "llm"}
@@ -5356,6 +5359,7 @@
 {"id": "DT_Quest_TryToTakeMoneyFromPlayer_NPC_Ruslan|Dialog/NPC_Ruslan|Plh_89", "emotion": "stern", "intensity": 0.4, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_TryToTakeMoneyFromPlayer_NPC_Ruslan|Dialog/NPC_Ruslan|Plh_9", "emotion": "stern", "intensity": 0.6, "events": [{"tag": "um", "pos": 0}], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_TryToTakeMoneyFromPlayer_NPC_Ruslan|Dialog/NPC_Ruslan|Plh_91", "emotion": "stern", "intensity": 0.6, "events": [], "emphasis": [], "notes": [], "source": "llm"}
+{"id": "DT_Quest_VoteFromBoris_NPC_Boris|Dialog/NPC_Boris|Plh_174#neutral", "emotion": "joyful", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_Quest_VoteFromBoris_NPC_Boris|Dialog/NPC_Boris|Plh_177", "emotion": "sad", "intensity": 0.4, "events": [], "emphasis": [], "notes": [], "source": "llm"}
 {"id": "DT_Quest_VoteFromBoris_NPC_Boris|Dialog/NPC_Boris|Plh_191", "emotion": "joyful", "intensity": 0.3, "events": [], "emphasis": [], "notes": [], "source": "stage"}
 {"id": "DT_Quest_VoteFromBoris_NPC_Boris|Dialog/NPC_Boris|Plh_192", "emotion": "surprised", "intensity": 0.4, "events": [], "emphasis": [], "notes": [], "source": "llm"}
