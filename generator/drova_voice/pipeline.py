@@ -35,6 +35,7 @@ from drova_voice.fish_model import (
     write_model_stamp,
 )
 from drova_voice.fish_voices import load_catalog
+from drova_voice.gvar_value import build_inventory, format_inventory
 from drova_voice.ids import VARIANT_SEP, with_variant
 from drova_voice.install import install_audio
 from drova_voice.jsonl import (
@@ -45,6 +46,8 @@ from drova_voice.jsonl import (
     write_jsonl,
 )
 from drova_voice.lines import (
+    SKIP_ID_MISMATCH,
+    SKIP_PLAYER_CHOICE,
     Line,
     build_lines,
     emotion_id,
@@ -725,9 +728,14 @@ def _install(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def _report(cfg: Config, args: argparse.Namespace) -> int:
-    lines = _selected(cfg, args)
+    lines = _selected(cfg, args, expand_pool=not args.gvar_values)
     if lines is None:
         return 2
+    if args.gvar_values:
+        silent_anyway = (SKIP_PLAYER_CHOICE, SKIP_ID_MISMATCH)
+        rows = [(l.raw, not l.skip) for l in lines if l.skip not in silent_anyway]
+        print(format_inventory(build_inventory(rows)))
+        return 0
     try:
         _, casting = _load_casting(cfg)
     except (OSError, ValueError) as e:
@@ -1031,6 +1039,11 @@ def add_parsers(sub) -> None:
     _add_selection(rp)
     rp.add_argument(
         "--by-speaker", action="store_true", help="Status je Sprecher statt je Kategorie"
+    )
+    rp.add_argument(
+        "--gvar-values",
+        action="store_true",
+        help="Zeilen mit Quest- oder Geldwerten je Musterklasse: gesprochen (neutral) oder stumm",
     )
     pv = sub.add_parser(
         "preview", help="Hörseite out/preview/index.html (Zeilen mit Emotion und Audio)"
