@@ -44,8 +44,6 @@ def test_clean_templates_replace_the_value(raw, spoken, kind):
         (f"Das macht {PRICE}.", Kind.BARE),  # kein Nomen danach
         (f"Hier ist {PRICE} Münze.", Kind.BARE),  # Einzahl: "ein paar Münze" wäre falsch
         (f"Du bist der {ROUNDS}. Teilnehmer.", Kind.BARE),  # Ordnungszahl
-        (f"Gib mir deine {PRICE} Münzen.", Kind.CURRENCY),  # Determinierer davor
-        (f"Etwa {PRICE} Münzen.", Kind.CURRENCY),
         (f"Das kostet {PRICE} Münzen-Beutel.", Kind.BARE),
         ("Das kostet $GVAR:QuestVars_Beispiel_Config.Wert$ Münzen.", Kind.UNKNOWN),
         ("Frag $GVAR:QuestVars_Beispiel_Config.HaendlerName$ nach Gold.", Kind.NAME),
@@ -53,6 +51,39 @@ def test_clean_templates_replace_the_value(raw, spoken, kind):
     ],
 )
 def test_unclean_lines_stay_silent(raw, kind):
+    result = neutralize_values(raw)
+    assert result is not None and result.neutral is None and result.kind is kind
+
+
+@pytest.mark.parametrize(
+    ("raw", "spoken"),
+    [
+        (f"Gib mir deine {PRICE} Münzen.", "Gib mir ein paar Münzen."),
+        (f"Etwa {PRICE} Münzen.", "Ein paar Münzen."),
+        (f"Hier sind die {PRICE} Münzen.", "Hier sind ein paar Münzen."),
+        (f"Nimm das {PRICE} Gold und geh.", "Nimm etwas Gold und geh."),
+        (f"Das ist der Lohn: ein {PRICE} Goldstücke.", "Das ist der Lohn: ein paar Goldstücke."),
+        (f"Meine {PRICE} Goldmünzen gehören mir!", "Ein paar Goldmünzen gehören mir!"),
+        (f"Du willst ungefähr {PRICE} Gold?", "Du willst etwas Gold?"),
+        (f"Gib mir die etwa {PRICE} Münzen.", "Gib mir ein paar Münzen."),  # mehrere Vorwörter
+        (f"*zählt* deine {PRICE} Münzen.", "*zählt* Ein paar Münzen."),
+        (f"Gebt ihr eure {PRICE} Münzen.", "Gebt ihr ein paar Münzen."),  # Pronomen "ihr" bleibt
+    ],
+)
+def test_currency_drops_the_determiner_before_the_value(raw, spoken):
+    result = neutralize_values(raw)
+    assert result is not None and result.neutral == spoken and result.kind is Kind.CURRENCY
+
+
+@pytest.mark.parametrize(
+    ("raw", "kind"),
+    [
+        (f"Du hast die {ROUNDS} Runden überstanden.", Kind.COUNT),
+        (f"Etwa {ROUNDS} Gegner warten.", Kind.COUNT),
+        (f"Gebt ihr {PRICE} Gold.", Kind.CURRENCY),  # "ihr" kann Pronomen sein
+    ],
+)
+def test_count_and_ambiguous_words_before_the_value_stay_silent(raw, kind):
     result = neutralize_values(raw)
     assert result is not None and result.neutral is None and result.kind is kind
 

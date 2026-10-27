@@ -101,22 +101,44 @@ def variable_kind(name: str) -> Kind:
     return Kind.UNKNOWN
 
 
-def _replacement(text: str, m: re.Match) -> tuple[Kind, str | None]:
+def _cut_blocked_words(before: str) -> str | None:
+    """Text vor dem Wert ohne die Artikel-, Possessiv- und Mengenwörter direkt davor ("Gib mir deine" ->
+    "Gib mir"). None, wenn davor nichts davon steht. Ein alleinstehendes "ihr" kann auch Pronomen sein
+    ("Gebt ihr …") und bleibt stehen; steht es direkt vor dem Wert, gibt es keine sichere Fassung (None)."""
+    cut = before
+    while (word := _WORD_BEFORE.search(cut)) and _BLOCKED_BEFORE.fullmatch(word.group(1)):
+        if word.group(1).lower() == "ihr":
+            break
+        cut = cut[: word.start()]
+    if cut == before:
+        return None
+    return cut.rstrip()
+
+
+def _replacement(text: str, m: re.Match) -> tuple[Kind, int, str | None]:
+    """(Klasse, Start des zu ersetzenden Stücks, Mengenwort). Bei currency beginnt das Stück schon beim
+    gestrichenen Artikel davor."""
+    start = m.start()
     kind = variable_kind(m.group(1))
     if kind is not Kind.BARE:
-        return kind, None
+        return kind, start, None
     after = _NOUN_AFTER.match(text, m.end())
     template = TEMPLATES.get(after.group(1)) if after else None
     if template is None:
-        return Kind.BARE, None
+        return Kind.BARE, start, None
     quantity, kind = template
-    before = text[: m.start()]
+    before = text[:start]
     word = _WORD_BEFORE.search(before)
     if word and _BLOCKED_BEFORE.fullmatch(word.group(1)):
-        return kind, None
+        cut = _cut_blocked_words(before) if kind is Kind.CURRENCY else None
+        if cut is None:
+            return kind, start, None
+        before, start = cut, len(cut)
+        quantity = " " + quantity if cut and not cut[-1].isspace() else quantity
     if _SENTENCE_START.search(STAGE_RE.sub("", before)):
-        quantity = quantity[0].upper() + quantity[1:]
-    return kind, quantity
+        lead = len(quantity) - len(quantity.lstrip())
+        quantity = quantity[:lead] + quantity[lead].upper() + quantity[lead + 1 :]
+    return kind, start, quantity
 
 
 def neutralize_values(text: str) -> GvarValueResult | None:
@@ -130,12 +152,12 @@ def neutralize_values(text: str) -> GvarValueResult | None:
     last = 0
     failed: Kind | None = None
     for m in matches:
-        kind, quantity = _replacement(text, m)
+        kind, start, quantity = _replacement(text, m)
         kinds.append(kind)
         if quantity is None:
             failed = failed or kind
             continue
-        parts += [text[last : m.start()], quantity]
+        parts += [text[last:start], quantity]
         last = m.end()
     if failed is not None:
         return GvarValueResult(failed, None, has_name)
@@ -175,7 +197,7 @@ def build_inventory(rows: Iterable[tuple[str, bool]]) -> Inventory:
         for m in GVAR_RE.finditer(raw):
             if m.group(1) == NAME_VAR:
                 continue
-            kind, quantity = _replacement(raw, m)
+            kind, _, quantity = _replacement(raw, m)
             if quantity is None:
                 after = _NOUN_AFTER.match(raw, m.end())
                 inv.silent_vars[(m.group(1), kind, after.group(1) if after else "")] += 1

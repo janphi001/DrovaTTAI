@@ -12,7 +12,7 @@ Zeilen mit Quest- oder Geldwerten (`$GVAR:QuestVars_…_Config.Preis$` usw.) war
 ## Generator (`gvar_value.py`)
 1. Variable einordnen (letzter Teil nach dem Punkt): enthält `name` → `name` (stumm); enthält ein Mengenwort (`preis`, `price`, `cost`, `kosten`, `gold`, `anzahl`, `count`, `runden`, `teilnehmer` …) → Menge; sonst `unknown` (stumm).
 2. Bei einer Menge das Nomen direkt dahinter in `TEMPLATES` nachschlagen: Geldnomen → `currency`, gezählte Nomen → `count`. Fehlt es (kein Nomen, Einzahl, Ordnungszahl, Bindestrich-Wort) → `bare` (stumm).
-3. Steht direkt davor ein Artikel, Possessiv-, Demonstrativ- oder Mengenwort oder eine Zahl („die“, „deine“, „etwa“) → stumm.
+3. Steht direkt davor ein Artikel, Possessiv-, Demonstrativ- oder Mengenwort oder eine Zahl („die“, „deine“, „etwa“): bei `currency` werden diese Wörter (auch mehrere hintereinander) samt Leerraum gestrichen, die Menge rückt an ihre Stelle („Gib mir deine … Münzen“ → „Gib mir ein paar Münzen“); die Großschreibung am Satzanfang richtet sich nach dem Text vor dem gestrichenen Wort. Ein alleinstehendes „ihr“ wird nicht gestrichen (kann Pronomen sein, „Gebt ihr … Gold“) → stumm. Bei `count` → stumm.
 4. Ersetzen durch „ein paar“ (Mehrzahl) oder „etwas“ (Stoff: `Gold`, `Silber`); am Satzanfang groß. „ein paar“ wird nicht gebeugt, das Nomen bleibt wie geschrieben (Dativ steht als eigene Form in der Liste).
 5. Bleibt ein Wert der Zeile stumm, bleibt die ganze Zeile stumm. Hat die Zeile auch den Spielernamen, muss danach `make_name_variants` eine neutrale Fassung liefern, sonst stumm.
 
