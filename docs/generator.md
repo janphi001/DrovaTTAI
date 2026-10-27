@@ -58,6 +58,7 @@ Manche Aussagen sieht der Export nicht, vor allem Vorlagen-Bäume wie `DT_WorldD
 | g | `batches [--max-chars N]` | Etappen nach Wichtigkeit in `data/batches.json` |
 | h | `synth --batch N`, `encode --batch N`, `install --batch N` | eine Etappe erzeugen; `synth` bricht bei Guthaben-/Limit-/Anmeldefehlern nach 5 Fehlern in Folge sauber ab |
 | i | `report --by-speaker` | Status und Lücken je Sprecher |
+| j | `report --gvar-values` | Zeilen mit Quest- oder Geldwerten je Musterklasse, gesprochen oder stumm |
 
 `--sample` und `--batch N` gelten für `synth`, `encode`, `install`, `report` und `preview`. Varianten (`voice: alte_frau` in `casting.yaml`) werden mit der Basisstimme erzeugt und beim Kodieren per ffmpeg (`rubberband`) umgeformt. Verbrauch je Lauf (Zeichen und UTF-8-Bytes je tatsächlich gesendeter Anfrage, inklusive Wiederholungen und fehlgeschlagener Anfragen) steht am Ende der `synth`-Ausgabe und in `data/synth/usage.jsonl` (`chars`, `utf8_bytes`, `requests`).
 
@@ -82,7 +83,9 @@ Manche Aussagen sieht der Export nicht, vor allem Vorlagen-Bäume wie `DT_WorldD
 
 ## Grenzen von Plan 3
 
-- Zeilen mit `$GVAR:` im Text: Ist der Spielername der einzige Platzhalter und lässt er sich streichen (`player_name.py`), wird die Zeile in neutraler Fassung vertont (ID `…#neutral`). Sonst übersprungen und im Bericht gezählt: `gvar_name` (Name steht mitten im Satz), `gvar_value` (Quest- oder Geldwerte, auch zusammen mit dem Namen).
+- Zeilen mit `$GVAR:` im Text: Ist der Spielername der einzige Platzhalter und lässt er sich streichen (`player_name.py`), wird die Zeile in neutraler Fassung vertont (ID `…#neutral`). Sonst übersprungen und im Bericht gezählt: `gvar_name` (Name steht mitten im Satz), `gvar_value` (Quest- oder Geldwerte ohne saubere neutrale Fassung, siehe unten).
+- Quest- und Geldwerte (`gvar_value.py`): Steht direkt hinter dem Wert ein Nomen aus der Vorlagenliste, spricht die Stimme eine feste, ungenaue Menge statt der Zahl (ID `…#neutral`, Untertitel zeigen weiter die echte Zahl). Vorlagen: `Münzen`, `Goldmünzen`, `Silbermünzen`, `Kupfermünzen`, `Goldstücke(n)` → „ein paar …“; `Gold`, `Silber` → „etwas …“; `Runden`, `Teilnehmer(n)`, `Kämpfer(n)`, `Gegner(n)` → „ein paar …“. Am Satzanfang groß („Ein paar Münzen …“). Stumm (`gvar_value`) bleiben: Variablen, deren Name (Teil nach dem Punkt) kein Mengenwort enthält (Mengenwörter u. a. `Preis`, `Price`, `Cost`, `Kosten`, `Gold`, `Anzahl`, `Count`, `Runden`, `Teilnehmer`; Liste in `gvar_value.py`) oder `Name` enthält; Werte ohne Vorlagen-Nomen danach (auch Einzahl wie „Münze“ und Ordnungszahlen); Werte nach Artikel, Possessiv- oder Mengenwort („die …“, „deine …“, „etwa …“); Zeilen, in denen ein Wert davon stumm bleibt; Zeilen mit Spielernamen, wenn sich der Name nicht streichen lässt. Auswahloptionen bleiben stumm (`player_choice`).
+- `report --gvar-values` zählt die Zeilen mit Quest- oder Geldwerten je Musterklasse (`currency`, `count`, `bare`, `name`, `unknown`), gesprochen und stumm, und listet die stummen Platzhalter mit dem Wort dahinter. Damit lässt sich die Vorlagenliste auf dem Rechner mit Spieldaten erweitern (nach `extract`).
 - Spielerzeilen nutzen eine feste Stimme (`default_player`), keine Stimmsets. Gesprochen werden nur Aussagen des Spielers (119 im Spiel); **Auswahloptionen** (6.491 Zeilen) bleiben stumm wie im Original (Nutzerentscheidung 2026-10-15, Grund `player_choice`).
 - Keine Briefe.
 
