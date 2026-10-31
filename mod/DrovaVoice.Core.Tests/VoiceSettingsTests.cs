@@ -148,5 +148,36 @@ namespace DrovaVoice.Core.Tests
             Assert.Equal(expected, VoiceSettings.CleanFolderName(input, "ExportLanguage", w));
             Assert.Empty(w);
         }
+
+        [Fact]
+        public void MissingPackagedLanguageIsGermanWithoutAWarning()
+        {
+            var w = new List<string>();
+            Assert.Equal("de", VoiceSettings.ParsePackagedLanguage(null, w));
+            Assert.Empty(w);
+            Assert.Equal("language.txt", VoiceSettings.PackagedLanguageFileName);
+        }
+
+        [Theory]
+        [InlineData("en\n", "en")]
+        [InlineData(" de ", "de")]
+        public void PackagedLanguageTrimsAFolderCode(string input, string expected)
+        {
+            var w = new List<string>();
+            Assert.Equal(expected, VoiceSettings.ParsePackagedLanguage(input, w));
+            Assert.Empty(w);
+        }
+
+        [Theory]
+        [InlineData("../de")]
+        [InlineData("")]
+        [InlineData("abcdefghijklmnopq")]
+        public void IllegalPackagedLanguageWarnsAndReturnsGerman(string input)
+        {
+            var w = new List<string>();
+            Assert.Equal("de", VoiceSettings.ParsePackagedLanguage(input, w));
+            Assert.Single(w);
+            Assert.Contains("AudioLanguage", w[0]);
+        }
     }
 }
