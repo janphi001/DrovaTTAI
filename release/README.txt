@@ -23,6 +23,7 @@ Zeilen mit Quest- oder Geldwerten. Zeilen mit deinem Spielernamen werden ohne
 den Namen gesprochen.
 
 Nur für die deutsche Spielsprache.
+Ein gespeicherter AudioLanguage-Schlüssel hat Vorrang.
 
 
 VORAUSSETZUNGEN

@@ -21,7 +21,7 @@ from drova_voice.bakeoff import (
     select_samples,
     write_sheet,
 )
-from drova_voice.config import DEFAULT_CONFIG_PATH, load_config
+from drova_voice.config import DEFAULT_CONFIG_PATH, Config, load_config
 from drova_voice.emotions import EmotionTag
 from drova_voice.engines.client import EngineClient, EngineError, cache_env, worker_command
 from drova_voice.engines.protocol import SynthRequest
@@ -130,8 +130,14 @@ def _run(args: argparse.Namespace) -> int:
     try:
         cfg = load_config(args.config)
     except FileNotFoundError:
-        print(f"FEHLER: Konfigurationsdatei nicht gefunden: {args.config}", file=sys.stderr)
-        return 2
+        if args.cmd == "package" and getattr(args, "fixture", False):
+            # language bleibt "de". --language gilt nur für das ZIP, resolve_fish_profile sieht die deutsche Konfiguration.
+            # game_dir ist nur die Suche nach den drei DLLs. --fixture baut den Spielordner selbst.
+            repo_root = DEFAULT_CONFIG_PATH.resolve().parent.parent
+            cfg = Config(game_dir=repo_root, language="de", repo_root=repo_root)
+        else:
+            print(f"FEHLER: Konfigurationsdatei nicht gefunden: {args.config}", file=sys.stderr)
+            return 2
     except OSError as e:
         print(
             f"FEHLER: Konfigurationsdatei nicht lesbar: {args.config} ({e.strerror or e})",
