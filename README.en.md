@@ -161,6 +161,8 @@ All steps and options: `docs/generator.md`. The audio file format: `docs/audio-f
 
 `drova-voice package` builds a ZIP for players from the game folder (mod, libraries, the indexed audio, `README.txt` and `LIZENZEN.txt` from `release/`), the same way the German release was made.
 
+`drova-voice package --language en` builds `DrovaVoice-<version>-en.zip` from `Mods/DrovaVoice/Audio/en` and writes `language.txt` with `en`. With no game audio, `drova-voice package --language en --fixture` builds that zip from one invented line, "The crate is empty." That zip is a packaging fixture. `DrovaVoice-<version>-en.synth-gap.txt` next to the zip lists what still needs synth. `data/export/en/manifest.json` is absent. `casting/fish_voices.yaml` has no `region: en`. The greetings in `player_name.py` are German. `data/lines.jsonl`, `data/synth/results.jsonl`, and `data/encoded.jsonl` are shared. Fish reads `FISH_API_KEY` from the environment.
+
 ### 8. Play and adjust
 
 Start the game, load a save, talk to NPCs. The settings are in `<game>/UserData/MelonPreferences.cfg` in the `[DrovaVoice]` section. Values in the file apply after a restart. Volume, bark distance and the on/off switch in the options menu apply from the next line on.
@@ -191,6 +193,8 @@ The guide above works for every language of the game. The folder names are `de`,
 2. **Switch the generator to the language:** `language: en` in `generator/config.yaml`. With that, `extract` reads the English text, numbers are spelled out in English, Fish gets `language=en`, and `install` writes to `Mods/DrovaVoice/Audio/en/`.
 3. **Pick voices in that language:** the 41 voices in `casting/fish_voices.yaml` are German voices. Look for voices in your language in the [Fish library](https://fish.audio) and add them there (`id`, `label`, `gender`, `age`). Then adjust `casting/casting.yaml` or reassign with `drova-voice cast --propose`. The character profiles (`casting/profiles.jsonl`) apply to every language.
 4. **Then as usual:** `extract`, `emote`, `synth`, `encode`, `install`.
+
+Pack the result with `drova-voice package --language en`. With no game audio, add `--fixture`. The leftovers are the same ones named next to the package command above.
 
 Good to know:
 

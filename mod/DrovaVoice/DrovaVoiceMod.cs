@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Text;
 using DrovaVoice.Core;
 using Drova_Modding_API.Systems.Audio;
 using Drova_Modding_API.Systems.WorldEvents;
@@ -60,7 +61,12 @@ namespace DrovaVoice
             var barkProbe = category.CreateEntry("BarkProbe", false, description: "Probe: Figur jeder Aussage loggen (nur für die Entwicklung)");
             var barkMin = category.CreateEntry("BarkMinDistance", VoiceSettings.DefaultBarkMinDistance, description: "Barks: bis zu diesem Abstand in Weltmetern volle Lautstärke");
             var barkMax = category.CreateEntry("BarkMaxDistance", VoiceSettings.DefaultBarkMaxDistance, description: "Barks: ab diesem Abstand stumm, dazwischen linear leiser");
-            var audioLanguage = category.CreateEntry("AudioLanguage", "de", description: "Unterordner unter Mods/DrovaVoice/Audio");
+            var warnings = new List<string>();
+            // Gespeicherter MelonPreferences-Schlüssel gewinnt, solange hier nur der CreateEntry-Standard steht.
+            string? stamp = ReadPackagedLanguage(
+                Path.Combine(ModDir, "Audio", VoiceSettings.PackagedLanguageFileName), warnings);
+            string packaged = VoiceSettings.ParsePackagedLanguage(stamp, warnings);
+            var audioLanguage = category.CreateEntry("AudioLanguage", packaged, description: "Unterordner unter Mods/DrovaVoice/Audio");
             var cacheMb = category.CreateEntry("CacheMB", 64, description: "Obergrenze für geladene Clips in MB (8-512)");
             var diagnostics = category.CreateEntry("Diagnostics", false, description: "Jede Zeile einmal loggen (geladen/ohne Eintrag)");
             _ownDialogueVoice = category.CreateEntry("OwnDialogueVoice", true, description: "Dialog- und Spielerzeilen auf eigener AudioSource abspielen (Skip wie ohne Stimme); aus = über das Spiel wie früher").Value;
@@ -70,13 +76,56 @@ namespace DrovaVoice
 
             WarnIfDrovaTtsLoaded();
 
-            var warnings = new List<string>();
             var settings = VoiceSettings.Create(enabled.Value, dialogVolume.Value, playerVolume.Value, audioLanguage.Value, cacheMb.Value, diagnostics.Value, warnings, barkVolume.Value, barkMin.Value, barkMax.Value);
             foreach (string w in warnings) LoggerInstance.Warning(w);
             _bootSettings = settings;
             _barkProbe = barkProbe.Value;
             if (!settings.Enabled) LoggerInstance.Msg("Vertonung ist ausgeschaltet (Enabled=false); im Optionsmenü wieder einschaltbar.");
             PollIndex(force: false);   // ChoiceHook.Service folgt erst, wenn der Connector ersetzt ist
+        }
+
+        private static string? ReadPackagedLanguage(string path, List<string> warnings)
+        {
+            try
+            {
+                using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    if (stream.Length > 64)
+                    {
+                        warnings.Add($"AudioLanguage: {VoiceSettings.PackagedLanguageFileName} ist länger als 64 Bytes; verwende '{VoiceSettings.DefaultLanguage}'.");
+                        return null;
+                    }
+                    int length = (int)stream.Length;
+                    var bytes = new byte[length];
+                    int read = 0;
+                    while (read < bytes.Length)
+                    {
+                        int n = stream.Read(bytes, read, bytes.Length - read);
+                        if (n == 0)
+                            break;
+                        read += n;
+                    }
+                    return Encoding.UTF8.GetString(bytes, 0, read);
+                }
+            }
+            catch (FileNotFoundException)
+            {
+                return null;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return null;
+            }
+            catch (IOException e)
+            {
+                warnings.Add($"AudioLanguage: {VoiceSettings.PackagedLanguageFileName} nicht lesbar ({e.GetType().Name}).");
+                return null;
+            }
+            catch (UnauthorizedAccessException e)
+            {
+                warnings.Add($"AudioLanguage: {VoiceSettings.PackagedLanguageFileName} nicht lesbar ({e.GetType().Name}).");
+                return null;
+            }
         }
 
         /// <summary>Melon-Name von DrovaTTS ist „Drova TTS“, die Assembly heißt DrovaTTS. Eines von beiden reicht für die Warnung.</summary>

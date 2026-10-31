@@ -9,6 +9,7 @@ namespace DrovaVoice.Core
         public const int MinCacheMegabytes = 8;
         public const int MaxCacheMegabytes = 512;
         public const string DefaultLanguage = "de";
+        public const string PackagedLanguageFileName = "language.txt";
         private const int MaxLanguageLength = 16;
 
         private VoiceSettings() { }
@@ -113,6 +114,14 @@ namespace DrovaVoice.Core
 
         private static string CleanLanguage(string? language, List<string> warnings)
             => CleanFolderName(language, "AudioLanguage", warnings);
+
+        /// <summary>Text aus language.txt als AudioLanguage-Standard. Null bleibt bei <see cref="DefaultLanguage"/> ohne Warnung.</summary>
+        public static string ParsePackagedLanguage(string? text, List<string> warnings)
+        {
+            if (text == null)
+                return DefaultLanguage;
+            return CleanFolderName(text, "AudioLanguage", warnings);
+        }
 
         /// <summary>Ordnername für eine Sprache: 1–16 Zeichen aus Buchstaben, Ziffern, '_' und '-'. Sonst <see cref="DefaultLanguage"/> und eine Warnung.</summary>
         public static string CleanFolderName(string? language, string settingName, List<string> warnings)

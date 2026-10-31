@@ -17,7 +17,7 @@ from drova_voice.casting import (
     write_auto_casting,
 )
 from drova_voice.casting_sheet import write_casting_sheet
-from drova_voice.config import Config
+from drova_voice.config import Config, _language_folder
 from drova_voice.emote import (
     import_llm_emotions,
     merge_emotions,
@@ -69,7 +69,7 @@ from drova_voice.profiles import (
     read_profiles,
     write_profiles,
 )
-from drova_voice.release import build_package
+from drova_voice.release import LIBRARIES, build_package, stage_fixture
 from drova_voice.report import (
     build_report,
     build_speaker_report,
@@ -874,9 +874,22 @@ def _profile(cfg: Config, args: argparse.Namespace) -> int:
 
 
 def _package(cfg: Config, args: argparse.Namespace) -> int:
+    if args.libraries is not None and not args.fixture:
+        return _fail("--libraries braucht --fixture")
     out = args.out if args.out is not None else cfg.repo_root / "dist"
     try:
-        result = build_package(cfg.game_dir, cfg.language, cfg.repo_root, out, args.version)
+        language = (
+            cfg.language
+            if args.language is None
+            else _language_folder(args.language, Path("--language"))
+        )
+        game_dir = cfg.game_dir
+        if args.fixture:
+            libraries = args.libraries
+            if libraries is None and all((cfg.game_dir / rel).is_file() for rel in LIBRARIES):
+                libraries = cfg.game_dir
+            game_dir = stage_fixture(cfg.repo_root, language, libraries)
+        result = build_package(game_dir, language, cfg.repo_root, out, args.version)
     except (OSError, ValueError) as e:
         return _fail(str(e))
     size_mb = result.size / 1024 / 1024
@@ -1025,6 +1038,20 @@ def add_parsers(sub) -> None:
     )
     pk.add_argument("--out", type=Path, help="Zielordner (Standard: dist/ im Repo)")
     pk.add_argument("--version", help="Version im Dateinamen (Standard: aus MelonInfo der Mod)")
+    pk.add_argument(
+        "--language",
+        help="Audio-Ordner, Stempel und ZIP-Suffix für diesen Lauf (Standard: language aus der Konfiguration)",
+    )
+    pk.add_argument(
+        "--fixture",
+        action="store_true",
+        help="Spielordner unter out/fixture-<Sprache>/staging bauen, ohne Fish",
+    )
+    pk.add_argument(
+        "--libraries",
+        type=Path,
+        help="Ordner mit den drei DLLs, nur zusammen mit --fixture",
+    )
     rp = sub.add_parser(
         "report", help="Status je Kategorie: offen, erzeugt, kodiert, installiert, übersprungen"
     )

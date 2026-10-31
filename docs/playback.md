@@ -31,6 +31,8 @@ Datei: `<Spiel>/UserData/MelonPreferences.cfg`, Abschnitt `[DrovaVoice]` (entste
 | `ExportLanguage` | `de` | — | Ordnername des Exports (siehe `docs/export.md`) |
 | `OwnDialogueVoice` | `true` | — | Dialog- und Spielerzeilen über eine eigene AudioSource, damit der Skip wie ohne Stimme wirkt (siehe „Dialogstimme und Skip“); `false` = Wiedergabe durch das Spiel |
 
+Ein frisches ZIP legt `Mods/DrovaVoice/Audio/language.txt` dazu. Steht dort zum Beispiel `en`, ist das der Standard von `AudioLanguage`, solange `MelonPreferences.cfg` den Schlüssel nicht enthält. Ein gespeicherter Schlüssel hat Vorrang. Fehlt die Datei, bleibt der Standard `de`. `drova-voice package --language en` schreibt diese Datei mit `en`. Ohne Spiel-Audio baut `drova-voice package --language en --fixture` nur eine Verpackungsprobe. Für Englisch fehlt noch Synth. `data/export/en/manifest.json` fehlt. `casting/fish_voices.yaml` hat kein `region: en`. Die Anreden in `player_name.py` sind deutsch. `data/lines.jsonl`, `data/synth/results.jsonl` und `data/encoded.jsonl` gelten für alle Sprachen. Fish liest `FISH_API_KEY` aus der Umgebung.
+
 Die Dateien sind auf −16 LUFS normiert; wie laut das im Verhältnis zu Musik und Effekten wirkt, muss man im Spiel hören. 100 % lässt die Dateien bit-genau unverändert; ab 101 % begrenzt ein weicher Begrenzer Spitzen über 0,8, damit nichts hart übersteuert (über alle 255 Dateien, Dialog und Spieler, erreicht der höchste Peak 0,91).
 
 ## Log-Meldungen (`MelonLoader/Latest.log`)

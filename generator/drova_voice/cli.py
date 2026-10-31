@@ -21,7 +21,7 @@ from drova_voice.bakeoff import (
     select_samples,
     write_sheet,
 )
-from drova_voice.config import DEFAULT_CONFIG_PATH, load_config
+from drova_voice.config import DEFAULT_CONFIG_PATH, Config, load_config
 from drova_voice.emotions import EmotionTag
 from drova_voice.engines.client import EngineClient, EngineError, cache_env, worker_command
 from drova_voice.engines.protocol import SynthRequest
@@ -130,8 +130,12 @@ def _run(args: argparse.Namespace) -> int:
     try:
         cfg = load_config(args.config)
     except FileNotFoundError:
-        print(f"FEHLER: Konfigurationsdatei nicht gefunden: {args.config}", file=sys.stderr)
-        return 2
+        if args.cmd == "package" and getattr(args, "fixture", False):
+            repo_root = DEFAULT_CONFIG_PATH.resolve().parent.parent
+            cfg = Config(game_dir=repo_root, language="de", repo_root=repo_root)
+        else:
+            print(f"FEHLER: Konfigurationsdatei nicht gefunden: {args.config}", file=sys.stderr)
+            return 2
     except OSError as e:
         print(
             f"FEHLER: Konfigurationsdatei nicht lesbar: {args.config} ({e.strerror or e})",
@@ -142,14 +146,15 @@ def _run(args: argparse.Namespace) -> int:
         print(f"FEHLER: {e}", file=sys.stderr)
         return 2
     global _fish_worker_env
-    try:
-        profile = resolve_fish_profile(
-            cfg.language, cfg.fish_model, cfg.fish_latency, cfg.fish_temperature, cfg.fish_top_p
-        )
-    except ValueError as e:
-        print(f"FEHLER: {e}", file=sys.stderr)
-        return 2
-    _fish_worker_env = profile.worker_env()
+    if args.cmd != "package":
+        try:
+            profile = resolve_fish_profile(
+                cfg.language, cfg.fish_model, cfg.fish_latency, cfg.fish_temperature, cfg.fish_top_p
+            )
+        except ValueError as e:
+            print(f"FEHLER: {e}", file=sys.stderr)
+            return 2
+        _fish_worker_env = profile.worker_env()
     bake_data = cfg.data_dir / "bakeoff"
     bake_out = cfg.out_dir / "bakeoff"
     samples_path = bake_data / "samples.jsonl"

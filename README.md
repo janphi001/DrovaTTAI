@@ -181,6 +181,8 @@ Die Anleitung oben gilt für jede Sprache des Spiels. Die Ordnernamen sind `de`,
 3. **Stimmen in der Sprache wählen:** Die 41 Stimmen in `casting/fish_voices.yaml` sind deutsche Stimmen. Suche in der [Fish-Bibliothek](https://fish.audio) Stimmen in deiner Sprache und trage sie dort ein (`id`, `label`, `gender`, `age`). Danach `casting/casting.yaml` anpassen oder mit `drova-voice cast --propose` neu zuteilen. Die Steckbriefe der Figuren (`casting/profiles.jsonl`) gelten für jede Sprache.
 4. **Dann wie gewohnt** `extract`, `emote`, `synth`, `encode`, `install`.
 
+Das englische Spieler-ZIP baust du mit `drova-voice package --language en`, sobald `Mods/DrovaVoice/Audio/en` im Spielordner liegt. Ohne dieses Audio geht `drova-voice package --language en --fixture`. Das ZIP enthält dann die erfundene Zeile "The crate is empty." und ist eine Verpackungsprobe. `DrovaVoice-<Version>-en.synth-gap.txt` neben dem ZIP nennt die Synth-Lücken. `data/export/en/manifest.json` fehlt. `casting/fish_voices.yaml` hat kein `region: en`. Die Anreden in `player_name.py` sind deutsch. `data/lines.jsonl`, `data/synth/results.jsonl` und `data/encoded.jsonl` gelten für alle Sprachen. Fish liest `FISH_API_KEY` aus der Umgebung.
+
 Gut zu wissen:
 
 - Die Emotionen in `casting/emotions.jsonl` wurden am deutschen Text bestimmt. Sie hängen an den Zeilen-IDs und gelten deshalb auch für andere Sprachen; deutsche Betonungswörter, die im Text nicht vorkommen, werden übersprungen.
