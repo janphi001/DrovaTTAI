@@ -66,7 +66,7 @@ Stable handles are the subcommands and flags in `generator/drova_voice/pipeline.
 - Line id: `DT_Verify_Probe|Dialog/NPC_Probe|Plh_1`
 - Choice id: `DT_Verify_Probe|Dialog/NPC_Probe|Plh_2|c0`
 
-Follow one feature file at a time. The cloud proof path is the unfiltered chain: default `extract` (expected failure, no game export), then `extract --manifest`, `cast --check`, `synth --engine fake`, `encode`, `install`, `report`. Take the extract snapshot before `export world`: that command writes `manifest-world.jsonl`, and a later extract mentions the file even when it is empty.
+Follow one feature file at a time. The cloud proof path is the unfiltered chain: default `extract` (expected failure, no game export), then `extract --manifest`, `cast --check`, `synth --engine fake`, `encode`, `install`, `report`. Take the two-line extract snapshot before a finished `export world` scan. That scan writes `manifest-world.jsonl` even when the file is empty, and the next extract mentions the file. A missing bundle folder exits `2` and leaves the file absent. A missing UnityPy install does the same. The next extract does not mention world lines in either case.
 
 `export world` is its own feature. On a fresh run the bundle folder is missing, so the command exits `2` and stderr contains `Bundle-Ordner nicht gefunden`. `launch` installs `.[dev]` only. Proving that a broken bundle is skipped needs `pip install -e ".[assets]"` in `generator` once. Do not commit the venv. Do not copy game bundles into the run.
 
@@ -85,7 +85,7 @@ Proof standard:
 - `encode` is proven by an OGG under `<run>/root/out/audio/de/dialog/7735cd9f80d47e45.ogg` (sha1 of the line id, first 16 hex digits). ffprobe reports `codec_name=vorbis`, `channels=1`, `sample_rate=48000`, and a duration greater than 0.
 - `install` is proven by the same OGG under `<run>/game/Mods/DrovaVoice/Audio/de/dialog/` and by `index.json` whose only entry is the Adela line id. The choice id is absent.
 - `report` is the user-facing second view: `dialog: 1 Zeilen -> installiert: 1` and `player: 1 Zeilen -> übersprungen: player_choice: 1`.
-- The default `extract` (no `--manifest`) must fail with exit `2` and `Manifest nicht gefunden`. Record it as an unmet precondition, not as a passed extract.
+- The default `extract` (no `--manifest`) on a fresh run must fail with exit `2`. Stderr contains `Manifest nicht gefunden` and `manifest-loaded.json`. Record that as an unmet precondition, not as a passed extract. When `manifest.json` is absent and `manifest-loaded.json` is present, the same command exits `0` and stdout names that file and `manifest.json fehlt`.
 
 ## Cleanup
 

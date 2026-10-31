@@ -44,7 +44,7 @@ Keep implementation details out of the map. Name only user paths, stable handles
 
 ## Features
 
-- [Extract lines](./extract.md) covers the invented manifest, the missing game export, and silent player choices.
+- [Extract lines](./extract.md) covers the invented manifest, the missing game export, the loaded-manifest fallback, and silent player choices.
 - [Synthesize with the fake engine](./synth.md) covers cast check, fake synthesis, and the absence of Fish.
 - [Encode and install](./encode-install.md) covers OGG encode and install into the temporary game folder.
 - [Report status](./report.md) covers the status view after install.
