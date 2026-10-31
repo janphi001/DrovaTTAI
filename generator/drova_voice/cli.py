@@ -131,8 +131,6 @@ def _run(args: argparse.Namespace) -> int:
         cfg = load_config(args.config)
     except FileNotFoundError:
         if args.cmd == "package" and getattr(args, "fixture", False):
-            # language bleibt "de". --language gilt nur für das ZIP, resolve_fish_profile sieht die deutsche Konfiguration.
-            # game_dir ist nur die Suche nach den drei DLLs. --fixture baut den Spielordner selbst.
             repo_root = DEFAULT_CONFIG_PATH.resolve().parent.parent
             cfg = Config(game_dir=repo_root, language="de", repo_root=repo_root)
         else:
@@ -148,14 +146,15 @@ def _run(args: argparse.Namespace) -> int:
         print(f"FEHLER: {e}", file=sys.stderr)
         return 2
     global _fish_worker_env
-    try:
-        profile = resolve_fish_profile(
-            cfg.language, cfg.fish_model, cfg.fish_latency, cfg.fish_temperature, cfg.fish_top_p
-        )
-    except ValueError as e:
-        print(f"FEHLER: {e}", file=sys.stderr)
-        return 2
-    _fish_worker_env = profile.worker_env()
+    if args.cmd != "package":
+        try:
+            profile = resolve_fish_profile(
+                cfg.language, cfg.fish_model, cfg.fish_latency, cfg.fish_temperature, cfg.fish_top_p
+            )
+        except ValueError as e:
+            print(f"FEHLER: {e}", file=sys.stderr)
+            return 2
+        _fish_worker_env = profile.worker_env()
     bake_data = cfg.data_dir / "bakeoff"
     bake_out = cfg.out_dir / "bakeoff"
     samples_path = bake_data / "samples.jsonl"

@@ -90,9 +90,11 @@ namespace DrovaVoice
             {
                 using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
-                    // Ein Präfix "en" darf einen übergroßen Stempel nicht gültig machen.
                     if (stream.Length > 64)
-                        return new string('x', 17);
+                    {
+                        warnings.Add($"AudioLanguage: {VoiceSettings.PackagedLanguageFileName} ist länger als 64 Bytes; verwende '{VoiceSettings.DefaultLanguage}'.");
+                        return null;
+                    }
                     int length = (int)stream.Length;
                     var bytes = new byte[length];
                     int read = 0;

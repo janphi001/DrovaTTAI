@@ -7,15 +7,14 @@ OGG-Dateien, auf die `index.json` zeigt; verwaiste Dateien und der Export-Ordner
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import re
 import shutil
+import subprocess
 import sys
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any
 
 import yaml
 
@@ -78,7 +77,6 @@ def _safe_rel(rel: object) -> str | None:
 
 
 def _load_indexed(audio_dir: Path, language: str) -> tuple[list[str], dict]:
-    """Dateien aus index.json und die Einträge. Fehlt eine Datei, bricht es ab."""
     audio_dir = Path(audio_dir)
     index_path = audio_dir / "index.json"
     try:
@@ -264,23 +262,29 @@ def _place_libraries(staging: Path, libraries: Path | None) -> None:
         dest.write_bytes(data)
 
 
+_FAKE_SYNTH = """\
+import importlib.util
+import sys
+
+spec = importlib.util.spec_from_file_location("drova_fake_worker", sys.argv[1])
+if spec is None or spec.loader is None:
+    raise SystemExit(1)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+module.synth(None, {"text": sys.argv[2], "out_path": sys.argv[3]})
+"""
+
+
 def _call_fake_synth(text: str, wav: Path) -> None:
-    # Der Fake-Worker hängt workers/_common vorne an sys.path. Das gilt nur für diesen Aufruf.
-    name = "drova_fake_worker"
-    saved = list(sys.path)
-    try:
-        module = sys.modules.get(name)
-        if module is None:
-            spec = importlib.util.spec_from_file_location(name, _FAKE_WORKER)
-            if spec is None or spec.loader is None:
-                raise RuntimeError(f"{_FAKE_WORKER} fehlt")
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[name] = module
-            spec.loader.exec_module(module)
-        worker: Any = module
-        worker.synth(None, {"text": text, "out_path": str(wav)})
-    finally:
-        sys.path[:] = saved
+    proc = subprocess.run(
+        [sys.executable, "-c", _FAKE_SYNTH, str(_FAKE_WORKER), text, str(wav)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or "").strip()
+        raise RuntimeError(detail or f"{_FAKE_WORKER} fehlgeschlagen")
 
 
 def _fixture_line() -> Line:
@@ -358,7 +362,6 @@ def build_package(
     }
     readme = _text(_readme_path(repo_root, language), values)
     licenses = _text(repo_root / "release" / "LIZENZEN.txt", values)
-    # Stempel kommt aus dem Sprachargument. Eine language.txt im Spielordner wird nicht kopiert.
     stamp = (language + "\n").encode("utf-8")
     out_dir.mkdir(parents=True, exist_ok=True)
     target = out_dir / f"DrovaVoice-{version}-{language}.zip"
